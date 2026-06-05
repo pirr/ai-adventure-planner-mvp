@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import httpx
-
 from app.config import settings
 from app.schemas import PlaceCandidate, RouteInfo
 from app.services.geo import google_maps_url, haversine_km
+from app.services.net import http_client
 
 
 SPEED_KMH = {
@@ -37,7 +36,7 @@ async def osrm_route(origin_lat: float, origin_lon: float, place: PlaceCandidate
     coords = f"{origin_lon:.6f},{origin_lat:.6f};{place.lon:.6f},{place.lat:.6f}"
     url = f"{settings.osrm_url}/route/v1/driving/{coords}"
     params = {"overview": "false", "alternatives": "false", "steps": "false"}
-    async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+    async with http_client(settings.http_timeout_seconds) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()

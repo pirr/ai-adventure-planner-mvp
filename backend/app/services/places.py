@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -7,7 +8,15 @@ import httpx
 from app.config import settings
 from app.schemas import PlaceCandidate
 from app.services.i18n import t
+from app.services.net import http_client
 from app.services.sample_data import fallback_places
+
+
+# Server-busy statuses worth a quick same-endpoint retry (momentary hiccup).
+_RETRY_OVERPASS_STATUS = {502, 503, 504}
+# Rate-limit / no-free-slot statuses. A quick retry won't clear these (slots
+# refill over seconds), so fail over to the next endpoint / sample places now.
+_FAILOVER_OVERPASS_STATUS = {406, 429}
 
 
 INTEREST_OSM_FILTERS = {
@@ -132,13 +141,52 @@ def _estimate_walking(place_type: str) -> float:
     }.get(place_type, 1.0)
 
 
+def _overpass_endpoints() -> list[str]:
+    endpoints = [settings.overpass_url]
+    for url in settings.overpass_mirrors:
+        if url and url not in endpoints:
+            endpoints.append(url)
+    return endpoints
+
+
+async def _overpass_request(client: httpx.AsyncClient, query: str) -> dict[str, Any]:
+    """POST the query to each Overpass endpoint, then fall over to the next.
+
+    Rate-limit rejections come back instantly and won't clear on a quick retry,
+    so we only retry genuinely busy endpoints (502/503/504) and otherwise move on.
+    The most informative error (a real HTTP status over a mirror's connection
+    error) is re-raised so the caller can report a meaningful cause.
+    """
+    attempts = max(1, settings.overpass_max_attempts)
+    last_exc: Exception | None = None
+    status_exc: httpx.HTTPStatusError | None = None  # preferred for reporting
+    for url in _overpass_endpoints():
+        for attempt in range(attempts):
+            try:
+                response = await client.post(url, data={"data": query})
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as exc:
+                last_exc = exc
+                if status_exc is None:
+                    status_exc = exc
+                if exc.response.status_code in _RETRY_OVERPASS_STATUS and attempt + 1 < attempts:
+                    await asyncio.sleep(settings.overpass_retry_backoff_seconds * (attempt + 1))
+                    continue
+                break  # rate-limited, non-transient, or out of retries -> next endpoint
+            except (httpx.TransportError, httpx.TimeoutException) as exc:
+                last_exc = exc
+                break  # connection/timeout -> try the next endpoint
+    # Prefer a real HTTP status (e.g. the primary's 406) over a mirror's
+    # connection error, so the surfaced warning names the actual cause.
+    raise status_exc or last_exc or RuntimeError("No Overpass endpoint configured")
+
+
 async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: list[str]) -> list[PlaceCandidate]:
     radius_m = int(radius_km * 1000)
     query = _build_overpass_query(lat, lon, radius_m, interests)
-    async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
-        response = await client.post(settings.overpass_url, data={"data": query})
-        response.raise_for_status()
-        payload = response.json()
+    async with http_client(settings.overpass_timeout_seconds) as client:
+        payload = await _overpass_request(client, query)
 
     candidates: list[PlaceCandidate] = []
     seen: set[str] = set()
@@ -183,6 +231,8 @@ async def get_candidate_places(lat: float, lon: float, available_minutes: int, t
     if use_live_data:
         try:
             candidates = await fetch_osm_places(lat, lon, radius_km, interests)
+        except httpx.HTTPStatusError as exc:
+            warnings.append(t(lang, "warn_osm_unavailable", exc=f"HTTP {exc.response.status_code}"))
         except Exception as exc:  # noqa: BLE001 - MVP should degrade gracefully
             warnings.append(t(lang, "warn_osm_unavailable", exc=exc.__class__.__name__))
 

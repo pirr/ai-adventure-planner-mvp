@@ -4,11 +4,10 @@ from datetime import datetime
 from statistics import mean
 from typing import Any
 
-import httpx
-
 from app.config import settings
 from app.schemas import WeatherSummary
 from app.services.i18n import t, weather_label
+from app.services.net import http_client
 
 
 def _weather_score(temp: float | None, rain_now: float | None, rain_24h: float | None, wind_kmh: float | None, uv: float | None, code: int | None = None) -> int:
@@ -65,7 +64,7 @@ async def _open_meteo(lat: float, lon: float, lang: str) -> WeatherSummary:
         "forecast_days": 2,
         "past_days": 1,
     }
-    async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+    async with http_client(settings.http_timeout_seconds) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
@@ -114,7 +113,7 @@ async def _openweather(lat: float, lon: float, api_key: str, lang: str) -> Weath
         "lang": lang,
         "exclude": "minutely,alerts",
     }
-    async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+    async with http_client(settings.http_timeout_seconds) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
