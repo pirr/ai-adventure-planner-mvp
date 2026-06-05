@@ -63,6 +63,7 @@ const I18N = {
     open_maps: 'Open in Maps',
     useful: '👍 Useful',
     not_useful: '👎 Not useful',
+    photo_source: 'Photo: {source}',
     // weather box
     weather_context: 'Weather context',
     src_live: 'Live',
@@ -170,6 +171,7 @@ const I18N = {
     open_maps: 'Открыть в картах',
     useful: '👍 Полезно',
     not_useful: '👎 Не полезно',
+    photo_source: 'Фото: {source}',
     weather_context: 'Погодный контекст',
     src_live: 'Онлайн',
     src_fallback: 'Резерв',
@@ -463,6 +465,7 @@ function renderCards(items) {
     const node = template.content.cloneNode(true);
     node.querySelector('.title').textContent = item.title;
     node.querySelector('.description').textContent = item.description;
+    renderPhoto(node, item);
     node.querySelector('.score').textContent = item.adventure_score;
     node.querySelector('.breakdown-summary').textContent = t('score_breakdown');
     const mapLink = node.querySelector('.map-link');
@@ -491,6 +494,39 @@ function renderCards(items) {
     node.querySelector('.feedback-down').addEventListener('click', () => submitFeedback(item.id, 'down'));
     cardsEl.appendChild(node);
   });
+}
+
+function renderPhoto(node, item) {
+  const media = node.querySelector('.place-media');
+  const img = node.querySelector('.photo');
+  const credit = node.querySelector('.photo-credit');
+  const photo = item.photo;
+
+  if (!photo || !photo.url) {
+    media.remove();
+    return;
+  }
+
+  img.src = photo.url;
+  img.alt = item.title;
+  img.decoding = 'async';
+  img.addEventListener('error', () => media.remove(), { once: true });
+
+  if (photo.source) {
+    const label = t('photo_source', { source: photo.source });
+    if (photo.source_url && /^https?:\/\//.test(photo.source_url)) {
+      const link = document.createElement('a');
+      link.href = photo.source_url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = label;
+      credit.appendChild(link);
+    } else {
+      credit.textContent = label;
+    }
+  }
+
+  media.classList.remove('hidden');
 }
 
 function renderRejected(items) {

@@ -27,7 +27,7 @@
       <p id="locationStatus" class="status-text" data-i18n="loc_not_set">Location is not set yet.</p>
     </section>
 
-    <section class="card">
+    <section class="card request-card">
       <h2 data-i18n="trip_request">Trip request</h2>
       <label>
         <span data-i18n="free_text">Free text</span>
@@ -141,24 +141,30 @@
 
   <template id="recommendationTemplate">
     <article class="card recommendation">
-      <div class="card-head">
-        <div>
-          <h3 class="title"></h3>
-          <p class="description"></p>
+      <figure class="place-media hidden">
+        <img class="photo" alt="" loading="lazy" />
+        <figcaption class="photo-credit"></figcaption>
+      </figure>
+      <div class="recommendation-body">
+        <div class="card-head">
+          <div>
+            <h3 class="title"></h3>
+            <p class="description"></p>
+          </div>
+          <div class="score"></div>
         </div>
-        <div class="score"></div>
-      </div>
-      <div class="badges"></div>
-      <details>
-        <summary class="breakdown-summary">Score breakdown</summary>
-        <div class="breakdown"></div>
-      </details>
-      <div class="why"></div>
-      <div class="warnings"></div>
-      <div class="actions">
-        <a class="button primary map-link" target="_blank" rel="noopener">Open in Maps</a>
-        <button class="button ghost feedback-up">👍 Useful</button>
-        <button class="button ghost feedback-down">👎 Not useful</button>
+        <div class="badges"></div>
+        <details>
+          <summary class="breakdown-summary">Score breakdown</summary>
+          <div class="breakdown"></div>
+        </details>
+        <div class="why"></div>
+        <div class="warnings"></div>
+        <div class="actions">
+          <a class="button primary map-link" target="_blank" rel="noopener">Open in Maps</a>
+          <button class="button ghost feedback-up">👍 Useful</button>
+          <button class="button ghost feedback-down">👎 Not useful</button>
+        </div>
       </div>
     </article>
   </template>

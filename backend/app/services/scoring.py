@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable
 
-from app.schemas import AdventureRequest, PlaceCandidate, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
+from app.schemas import AdventureRequest, PlaceCandidate, PlacePhoto, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
 from app.services.i18n import t
 
 
@@ -265,7 +265,7 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
     )
 
 
-def to_recommendation(scored: ScoredCandidate) -> Recommendation:
+def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None) -> Recommendation:
     place = scored.place
     route = scored.route
     return Recommendation(
@@ -288,6 +288,7 @@ def to_recommendation(scored: ScoredCandidate) -> Recommendation:
         map_url=route.map_url,
         source=place.source,
         data_confidence=scored.data_confidence,  # type: ignore[arg-type]
+        photo=photo,
         tags=place.tags,
     )
 

@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from app.schemas import AdventureRequest, AdventureResponse
+from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import get_route
 from app.services.scoring import rejected_from_scored, score_candidate, to_recommendation
@@ -30,7 +31,8 @@ async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
     scored = [score_candidate(place, route, weather, request) for place, route in zip(places[:40], routes)]
     scored_sorted = sorted(scored, key=lambda c: c.score, reverse=True)
     top = scored_sorted[: request.limit]
-    recommendations = [to_recommendation(item) for item in top]
+    photos = await asyncio.gather(*[get_place_photo(item.place, request.use_live_data) for item in top])
+    recommendations = [to_recommendation(item, photo) for item, photo in zip(top, photos)]
     chosen_ids = {item.place.source_id for item in top}
     rejected = rejected_from_scored(scored_sorted, chosen_ids, limit=3, lang=request.lang)
     return AdventureResponse(

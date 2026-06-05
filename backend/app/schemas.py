@@ -72,6 +72,13 @@ class RouteInfo(BaseModel):
     confidence: Literal["live", "fallback", "estimated"] = "estimated"
 
 
+class PlacePhoto(BaseModel):
+    url: str
+    source: str
+    source_url: str | None = None
+    attribution: str | None = None
+
+
 class ScoreBreakdown(BaseModel):
     time_fit: int
     weather_fit: int
@@ -102,6 +109,7 @@ class Recommendation(BaseModel):
     map_url: str
     source: str
     data_confidence: Literal["live", "mixed", "fallback", "estimated"] = "mixed"
+    photo: PlacePhoto | None = None
     tags: dict[str, Any] = Field(default_factory=dict)
 
 
