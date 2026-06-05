@@ -74,6 +74,31 @@ button { cursor: pointer; }
   font-weight: 900;
 }
 
+.lang-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+.lang-btn {
+  min-width: 40px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+}
+.lang-btn.active {
+  background: #fff;
+  color: var(--green-dark);
+}
+
 h1 {
   font-size: clamp(34px, 9vw, 54px);
   line-height: 1.02;

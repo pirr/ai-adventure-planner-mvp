@@ -13,7 +13,7 @@ from app.services.weather import get_weather
 
 async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
     request_id = str(uuid.uuid4())
-    weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data)
+    weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data, request.lang)
     places, place_warnings = await get_candidate_places(
         request.lat,
         request.lon,
@@ -21,6 +21,7 @@ async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
         request.transport_mode,
         request.interests,
         request.use_live_data,
+        request.lang,
     )
 
     routes = await asyncio.gather(
@@ -31,7 +32,7 @@ async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
     top = scored_sorted[: request.limit]
     recommendations = [to_recommendation(item) for item in top]
     chosen_ids = {item.place.source_id for item in top}
-    rejected = rejected_from_scored(scored_sorted, chosen_ids, limit=3)
+    rejected = rejected_from_scored(scored_sorted, chosen_ids, limit=3, lang=request.lang)
     return AdventureResponse(
         request_id=request_id,
         generated_at=datetime.utcnow(),

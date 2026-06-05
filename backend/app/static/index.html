@@ -13,119 +13,123 @@
       <div class="logo-row">
         <div class="logo">A</div>
         <span>MVP 0.1</span>
+        <div class="lang-toggle" id="langToggle" aria-label="Language">
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+          <button type="button" class="lang-btn" data-lang="ru">RU</button>
+        </div>
       </div>
-      <h1>Find a mini-adventure nearby</h1>
-      <p>Enter your time, transport and interests. The app ranks nearby places using weather, route effort and fit.</p>
+      <h1 data-i18n="hero_title">Find a mini-adventure nearby</h1>
+      <p data-i18n="hero_subtitle">Enter your time, transport and interests. The app ranks nearby places using weather, route effort and fit.</p>
       <div class="hero-actions">
-        <button id="useLocationBtn" class="button primary">Use my location</button>
-        <button id="demoBtn" class="button ghost">Use Tivat demo</button>
+        <button id="useLocationBtn" class="button primary" data-i18n="use_location">Use my location</button>
+        <button id="demoBtn" class="button ghost" data-i18n="use_demo">Use Tivat demo</button>
       </div>
-      <p id="locationStatus" class="status-text">Location is not set yet.</p>
+      <p id="locationStatus" class="status-text" data-i18n="loc_not_set">Location is not set yet.</p>
     </section>
 
     <section class="card">
-      <h2>Trip request</h2>
+      <h2 data-i18n="trip_request">Trip request</h2>
       <label>
-        Free text
+        <span data-i18n="free_text">Free text</span>
         <textarea id="requestText">Family trip for 5 hours with fortress, history and views.</textarea>
       </label>
 
       <div class="grid two">
         <label>
-          Latitude
+          <span data-i18n="latitude">Latitude</span>
           <input id="lat" type="number" step="0.000001" value="42.4304" />
         </label>
         <label>
-          Longitude
+          <span data-i18n="longitude">Longitude</span>
           <input id="lon" type="number" step="0.000001" value="18.6964" />
         </label>
       </div>
 
       <div class="grid two">
         <label>
-          Available time
+          <span data-i18n="available_time">Available time</span>
           <select id="availableMinutes">
-            <option value="30">30 min</option>
-            <option value="60">1 hour</option>
-            <option value="120">2 hours</option>
-            <option value="240">4 hours</option>
-            <option value="300" selected>5 hours</option>
-            <option value="480">All day</option>
+            <option value="30" data-i18n="opt_30min">30 min</option>
+            <option value="60" data-i18n="opt_1h">1 hour</option>
+            <option value="120" data-i18n="opt_2h">2 hours</option>
+            <option value="240" data-i18n="opt_4h">4 hours</option>
+            <option value="300" selected data-i18n="opt_5h">5 hours</option>
+            <option value="480" data-i18n="opt_allday">All day</option>
           </select>
         </label>
         <label>
-          Transport
+          <span data-i18n="transport">Transport</span>
           <select id="transportMode">
-            <option value="walk">Walk</option>
-            <option value="car" selected>Car</option>
-            <option value="bike">Bike</option>
+            <option value="walk" data-i18n="t_walk">Walk</option>
+            <option value="car" selected data-i18n="t_car">Car</option>
+            <option value="bike" data-i18n="t_bike">Bike</option>
           </select>
         </label>
       </div>
 
       <div class="grid two">
         <label>
-          Group
+          <span data-i18n="group">Group</span>
           <select id="groupType">
-            <option value="solo">Solo</option>
-            <option value="couple">Couple</option>
-            <option value="family" selected>Family</option>
-            <option value="dog">Dog</option>
+            <option value="solo" data-i18n="g_solo">Solo</option>
+            <option value="couple" data-i18n="g_couple">Couple</option>
+            <option value="family" selected data-i18n="g_family">Family</option>
+            <option value="dog" data-i18n="g_dog">Dog</option>
           </select>
         </label>
         <label>
-          Intensity
+          <span data-i18n="intensity">Intensity</span>
           <select id="intensity">
-            <option value="easy" selected>Easy</option>
-            <option value="medium">Medium</option>
-            <option value="active">Active</option>
+            <option value="easy" selected data-i18n="i_easy">Easy</option>
+            <option value="medium" data-i18n="i_medium">Medium</option>
+            <option value="active" data-i18n="i_active">Active</option>
           </select>
         </label>
       </div>
 
       <div class="grid two">
         <label>
-          Children ages
+          <span data-i18n="children_ages">Children ages</span>
           <input id="childrenAges" value="6, 13" />
         </label>
         <label>
-          Max walking km
+          <span data-i18n="max_walking">Max walking km</span>
           <input id="maxWalkingKm" type="number" step="0.1" value="3" />
         </label>
       </div>
 
       <label>
-        Interests
+        <span data-i18n="interests">Interests</span>
         <div class="chips" id="interestChips">
-          <button type="button" class="chip active" data-interest="history">History</button>
-          <button type="button" class="chip active" data-interest="fortresses">Fortresses</button>
-          <button type="button" class="chip active" data-interest="viewpoints">Viewpoints</button>
-          <button type="button" class="chip" data-interest="nature">Nature</button>
-          <button type="button" class="chip" data-interest="water">Water</button>
-          <button type="button" class="chip" data-interest="food">Food</button>
-          <button type="button" class="chip" data-interest="surprise me">Surprise me</button>
+          <button type="button" class="chip active" data-interest="history" data-i18n="c_history">History</button>
+          <button type="button" class="chip active" data-interest="fortresses" data-i18n="c_fortresses">Fortresses</button>
+          <button type="button" class="chip active" data-interest="viewpoints" data-i18n="c_viewpoints">Viewpoints</button>
+          <button type="button" class="chip" data-interest="nature" data-i18n="c_nature">Nature</button>
+          <button type="button" class="chip" data-interest="water" data-i18n="c_water">Water</button>
+          <button type="button" class="chip" data-interest="food" data-i18n="c_food">Food</button>
+          <button type="button" class="chip" data-interest="surprise me" data-i18n="c_surprise">Surprise me</button>
         </div>
       </label>
 
       <label class="switch-row">
         <input id="useLiveData" type="checkbox" checked />
-        <span>Use live OSM / weather / routing when available</span>
+        <span data-i18n="use_live">Use live OSM / weather / routing when available</span>
       </label>
 
-      <button id="searchBtn" class="button primary big">Find adventure</button>
+      <button id="searchBtn" class="button primary big" data-i18n="find_adventure">Find adventure</button>
     </section>
 
     <section id="loading" class="card loading hidden">
       <div class="spinner"></div>
-      <h2>Analyzing options</h2>
-      <p>Checking places, weather, travel time and risk rules.</p>
+      <h2 data-i18n="loading_title">Analyzing options</h2>
+      <p data-i18n="loading_subtitle">Checking places, weather, travel time and risk rules.</p>
     </section>
 
     <section id="errorBox" class="card error hidden"></section>
 
     <section id="results" class="results hidden">
       <div class="section-title">
-        <h2>Recommendations</h2>
+        <h2 data-i18n="results_title">Recommendations</h2>
         <span id="requestIdBadge"></span>
       </div>
       <div id="weatherBox" class="card"></div>
@@ -146,7 +150,7 @@
       </div>
       <div class="badges"></div>
       <details>
-        <summary>Score breakdown</summary>
+        <summary class="breakdown-summary">Score breakdown</summary>
         <div class="breakdown"></div>
       </details>
       <div class="why"></div>

@@ -8,26 +8,7 @@ import httpx
 
 from app.config import settings
 from app.schemas import WeatherSummary
-
-
-WEATHER_CODE_LABELS = {
-    0: "Clear sky",
-    1: "Mainly clear",
-    2: "Partly cloudy",
-    3: "Overcast",
-    45: "Fog",
-    48: "Depositing rime fog",
-    51: "Light drizzle",
-    53: "Drizzle",
-    55: "Heavy drizzle",
-    61: "Slight rain",
-    63: "Rain",
-    65: "Heavy rain",
-    80: "Rain showers",
-    81: "Rain showers",
-    82: "Violent rain showers",
-    95: "Thunderstorm",
-}
+from app.services.i18n import t, weather_label
 
 
 def _weather_score(temp: float | None, rain_now: float | None, rain_24h: float | None, wind_kmh: float | None, uv: float | None, code: int | None = None) -> int:
@@ -72,7 +53,7 @@ def _weather_score(temp: float | None, rain_now: float | None, rain_24h: float |
     return max(0, min(100, int(round(score))))
 
 
-async def _open_meteo(lat: float, lon: float) -> WeatherSummary:
+async def _open_meteo(lat: float, lon: float, lang: str) -> WeatherSummary:
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
@@ -102,7 +83,7 @@ async def _open_meteo(lat: float, lon: float) -> WeatherSummary:
     wind = current.get("wind_speed_10m")
     humidity = current.get("relative_humidity_2m")
     code = current.get("weather_code")
-    summary = WEATHER_CODE_LABELS.get(code, "Weather data available")
+    summary = weather_label(lang, code)
     score = _weather_score(temp, rain_now, rain_24h, wind, uv, code)
     sunrise = (daily.get("sunrise") or [None])[0]
     sunset = (daily.get("sunset") or [None])[0]
@@ -122,7 +103,7 @@ async def _open_meteo(lat: float, lon: float) -> WeatherSummary:
     )
 
 
-async def _openweather(lat: float, lon: float, api_key: str) -> WeatherSummary:
+async def _openweather(lat: float, lon: float, api_key: str, lang: str) -> WeatherSummary:
     # Optional adapter if the user has an OpenWeather key. Open-Meteo fallback is used otherwise.
     url = "https://api.openweathermap.org/data/3.0/onecall"
     params = {
@@ -130,6 +111,7 @@ async def _openweather(lat: float, lon: float, api_key: str) -> WeatherSummary:
         "lon": lon,
         "appid": api_key,
         "units": "metric",
+        "lang": lang,
         "exclude": "minutely,alerts",
     }
     async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
@@ -147,7 +129,7 @@ async def _openweather(lat: float, lon: float, api_key: str) -> WeatherSummary:
     wind_kmh = float(wind) * 3.6 if wind is not None else None
     uv = current.get("uvi")
     weather = (current.get("weather") or [{}])[0]
-    summary = weather.get("description") or "Weather data available"
+    summary = weather.get("description") or t(lang, "weather_data_available")
     score = _weather_score(temp, rain_now, rain_24h, wind_kmh, uv)
     sunrise = datetime.fromtimestamp(daily.get("sunrise")).isoformat() if daily.get("sunrise") else None
     sunset = datetime.fromtimestamp(daily.get("sunset")).isoformat() if daily.get("sunset") else None
@@ -167,7 +149,7 @@ async def _openweather(lat: float, lon: float, api_key: str) -> WeatherSummary:
     )
 
 
-def fallback_weather() -> WeatherSummary:
+def fallback_weather(lang: str = "en") -> WeatherSummary:
     return WeatherSummary(
         source="fallback",
         temperature_c=22,
@@ -178,28 +160,28 @@ def fallback_weather() -> WeatherSummary:
         uv_index=5,
         sunrise=None,
         sunset=None,
-        summary="Fallback weather: mild and dry conditions assumed.",
+        summary=t(lang, "weather_fallback_summary"),
         score=78,
         confidence="fallback",
     )
 
 
-async def get_weather(lat: float, lon: float, use_live_data: bool) -> tuple[WeatherSummary, list[str]]:
+async def get_weather(lat: float, lon: float, use_live_data: bool, lang: str = "en") -> tuple[WeatherSummary, list[str]]:
     warnings: list[str] = []
     if not use_live_data:
-        warnings.append("Live weather disabled, using fallback weather.")
-        return fallback_weather(), warnings
+        warnings.append(t(lang, "warn_live_disabled"))
+        return fallback_weather(lang), warnings
 
     if settings.openweather_api_key:
         try:
-            return await _openweather(lat, lon, settings.openweather_api_key), warnings
+            return await _openweather(lat, lon, settings.openweather_api_key, lang), warnings
         except Exception as exc:  # noqa: BLE001
-            warnings.append(f"OpenWeather unavailable, trying fallback provider: {exc.__class__.__name__}")
+            warnings.append(t(lang, "warn_openweather_unavailable", exc=exc.__class__.__name__))
 
     if settings.use_open_meteo_fallback:
         try:
-            return await _open_meteo(lat, lon), warnings
+            return await _open_meteo(lat, lon, lang), warnings
         except Exception as exc:  # noqa: BLE001
-            warnings.append(f"Open-Meteo unavailable, using fallback weather: {exc.__class__.__name__}")
+            warnings.append(t(lang, "warn_openmeteo_unavailable", exc=exc.__class__.__name__))
 
-    return fallback_weather(), warnings
+    return fallback_weather(lang), warnings

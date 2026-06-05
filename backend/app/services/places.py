@@ -6,6 +6,7 @@ import httpx
 
 from app.config import settings
 from app.schemas import PlaceCandidate
+from app.services.i18n import t
 from app.services.sample_data import fallback_places
 
 
@@ -174,7 +175,7 @@ async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: 
     return candidates
 
 
-async def get_candidate_places(lat: float, lon: float, available_minutes: int, transport_mode: str, interests: list[str], use_live_data: bool) -> tuple[list[PlaceCandidate], list[str]]:
+async def get_candidate_places(lat: float, lon: float, available_minutes: int, transport_mode: str, interests: list[str], use_live_data: bool, lang: str = "en") -> tuple[list[PlaceCandidate], list[str]]:
     radius_km = radius_for_request(available_minutes, transport_mode)
     warnings: list[str] = []
     candidates: list[PlaceCandidate] = []
@@ -183,15 +184,15 @@ async def get_candidate_places(lat: float, lon: float, available_minutes: int, t
         try:
             candidates = await fetch_osm_places(lat, lon, radius_km, interests)
         except Exception as exc:  # noqa: BLE001 - MVP should degrade gracefully
-            warnings.append(f"OpenStreetMap/Overpass unavailable, using fallback places: {exc.__class__.__name__}")
+            warnings.append(t(lang, "warn_osm_unavailable", exc=exc.__class__.__name__))
 
     fallback = fallback_places(lat, lon, radius_km)
     if len(candidates) < 8:
         existing = {item.source_id for item in candidates}
         candidates.extend([item for item in fallback if item.source_id not in existing])
         if not use_live_data:
-            warnings.append("Live place search disabled, using fallback/sample places.")
+            warnings.append(t(lang, "warn_places_disabled"))
         elif candidates:
-            warnings.append("Live place search returned limited results, supplemented with fallback/sample places.")
+            warnings.append(t(lang, "warn_places_limited"))
 
     return candidates, warnings

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Iterable
 
 from app.schemas import AdventureRequest, PlaceCandidate, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
+from app.services.i18n import t
 
 
 INTEREST_ALIASES = {
@@ -128,6 +129,7 @@ def _group_fit(place: PlaceCandidate, request: AdventureRequest) -> int:
 def _safety_fit(place: PlaceCandidate, request: AdventureRequest, weather: WeatherSummary, total_minutes: int) -> tuple[int, list[str]]:
     score = 88
     warnings: list[str] = []
+    lang = request.lang
 
     rain_24h = weather.rain_mm_last_24h or 0
     temp = weather.temperature_c
@@ -136,28 +138,28 @@ def _safety_fit(place: PlaceCandidate, request: AdventureRequest, weather: Weath
 
     if rain_24h > 8 and place.type in {"trail", "park", "viewpoint", "water"}:
         score -= 18
-        warnings.append("Rain in the last 24 hours may make natural paths muddy or slippery.")
+        warnings.append(t(lang, "warn_rain_paths"))
     if rain_24h > 20:
         score -= 12
-        warnings.append("Heavy recent rainfall increases the risk of poor trail conditions.")
+        warnings.append(t(lang, "warn_rain_heavy"))
     if temp is not None and temp > 32:
         score -= 18
-        warnings.append("High temperature may make walking uncomfortable, especially for children.")
+        warnings.append(t(lang, "warn_high_temp"))
     if uv >= 8 and place.type in {"viewpoint", "water", "trail", "park"}:
         score -= 8
-        warnings.append("High UV index: bring sun protection and water.")
+        warnings.append(t(lang, "warn_high_uv"))
     if wind > 35 and place.type in {"viewpoint", "water"}:
         score -= 12
-        warnings.append("Strong wind may reduce comfort at exposed viewpoints or waterfront areas.")
+        warnings.append(t(lang, "warn_strong_wind"))
     if place.difficulty == "hard":
         score -= 22
-        warnings.append("This option may involve difficult terrain or climbing.")
+        warnings.append(t(lang, "warn_hard_terrain"))
     elif place.difficulty == "medium" and request.intensity == "easy":
         score -= 8
-        warnings.append("Some parts may be moderately difficult for an easy walk.")
+        warnings.append(t(lang, "warn_medium_difficulty"))
 
     if request.max_walking_km is not None and place.estimated_walking_km > request.max_walking_km:
-        warnings.append(f"Walking distance is about {place.estimated_walking_km:.1f} km, above your limit of {request.max_walking_km:.1f} km.")
+        warnings.append(t(lang, "warn_walking_over_limit", km=place.estimated_walking_km, limit=request.max_walking_km))
 
     if weather.sunset:
         try:
@@ -165,7 +167,7 @@ def _safety_fit(place: PlaceCandidate, request: AdventureRequest, weather: Weath
             finish = datetime.now(sunset.tzinfo) + timedelta(minutes=total_minutes)
             if finish > sunset:
                 score -= 20
-                warnings.append("The adventure may finish after sunset.")
+                warnings.append(t(lang, "warn_after_sunset"))
         except Exception:
             pass
 
@@ -178,34 +180,37 @@ def _place_quality(place: PlaceCandidate) -> int:
 
 def _why(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, breakdown: ScoreBreakdown, request: AdventureRequest) -> list[str]:
     items: list[str] = []
+    lang = request.lang
     if breakdown.time_fit >= 80:
-        items.append("Fits your available time window.")
+        items.append(t(lang, "why_fits_time"))
     if breakdown.weather_fit >= 75:
-        items.append(f"Weather looks suitable: {weather.summary.lower()}.")
+        items.append(t(lang, "why_weather", summary=weather.summary.lower()))
     if breakdown.distance_fit >= 80:
-        items.append(f"Travel time is manageable: about {route.one_way_minutes} min one way.")
+        items.append(t(lang, "why_travel", minutes=route.one_way_minutes))
     if breakdown.group_fit >= 80:
-        items.append("Suitable for the selected group and difficulty level.")
+        items.append(t(lang, "why_group"))
     if breakdown.interest_fit >= 80:
-        items.append("Matches your selected interests.")
+        items.append(t(lang, "why_interest"))
     if place.estimated_walking_km <= 2.5:
-        items.append(f"Walking is limited to about {place.estimated_walking_km:.1f} km.")
+        items.append(t(lang, "why_walking", km=place.estimated_walking_km))
     if not items:
-        items.append("This is the best available option after filtering nearby places.")
+        items.append(t(lang, "why_best"))
     return items[:5]
 
 
-def _description(place: PlaceCandidate) -> str:
-    by_type = {
-        "viewpoint": "A scenic stop with a short walk and a strong visual payoff.",
-        "fortress": "A history-focused stop with views and exploration potential.",
-        "historic_site": "A cultural walk that works well for a short trip.",
-        "museum": "A low-risk indoor or semi-indoor option with educational value.",
-        "park": "A flexible nature option with easy pacing.",
-        "water": "A relaxed water-focused stop suitable for a light outing.",
-        "trail": "An active outdoor option that may require more effort.",
-    }
-    return by_type.get(place.type, "A nearby place that fits part of your request.")
+_DESCRIPTION_KEYS = {
+    "viewpoint": "desc_viewpoint",
+    "fortress": "desc_fortress",
+    "historic_site": "desc_historic_site",
+    "museum": "desc_museum",
+    "park": "desc_park",
+    "water": "desc_water",
+    "trail": "desc_trail",
+}
+
+
+def _description(place: PlaceCandidate, lang: str) -> str:
+    return t(lang, _DESCRIPTION_KEYS.get(place.type, "desc_default"))
 
 
 def _confidence(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary) -> str:
@@ -253,7 +258,7 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
         breakdown=breakdown,
         why=_why(place, route, weather, breakdown, request),
         warnings=warnings,
-        description=_description(place),
+        description=_description(place, request.lang),
         data_confidence=_confidence(place, route, weather),
     )
 
@@ -285,7 +290,7 @@ def to_recommendation(scored: ScoredCandidate) -> Recommendation:
     )
 
 
-def rejected_from_scored(items: list[ScoredCandidate], chosen_ids: set[str], limit: int = 3) -> list[RejectedAlternative]:
+def rejected_from_scored(items: list[ScoredCandidate], chosen_ids: set[str], limit: int = 3, lang: str = "en") -> list[RejectedAlternative]:
     rejected: list[RejectedAlternative] = []
     for item in sorted(items, key=lambda c: c.score):
         if item.place.source_id in chosen_ids:
@@ -293,14 +298,14 @@ def rejected_from_scored(items: list[ScoredCandidate], chosen_ids: set[str], lim
         reasons = []
         b = item.breakdown
         if b.time_fit < 60:
-            reasons.append("does not fit the available time")
+            reasons.append(t(lang, "rej_no_time"))
         if b.safety_fit < 65:
-            reasons.append("safety/weather risk")
+            reasons.append(t(lang, "rej_safety"))
         if b.group_fit < 65:
-            reasons.append("not ideal for the selected group")
+            reasons.append(t(lang, "rej_group"))
         if b.interest_fit < 55:
-            reasons.append("weak match with interests")
-        reason = ", ".join(reasons) if reasons else "lower overall Adventure Score"
+            reasons.append(t(lang, "rej_interest"))
+        reason = ", ".join(reasons) if reasons else t(lang, "rej_lower_score")
         rejected.append(RejectedAlternative(title=item.place.name, reason=reason, score=item.score))
         if len(rejected) >= limit:
             break

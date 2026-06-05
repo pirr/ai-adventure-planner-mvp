@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, validator
 TransportMode = Literal["walk", "car", "bike"]
 GroupType = Literal["solo", "couple", "family", "kids", "dog"]
 Intensity = Literal["easy", "medium", "active"]
+Lang = Literal["en", "ru"]
 
 
 class AdventureRequest(BaseModel):
@@ -22,6 +23,7 @@ class AdventureRequest(BaseModel):
     request_text: str | None = Field(default=None, max_length=1000)
     use_live_data: bool = True
     limit: int = Field(default=5, ge=1, le=10)
+    lang: Lang = "en"
 
     @validator("interests", pre=True)
     def normalize_interests(cls, value: Any) -> list[str]:
