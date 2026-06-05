@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Literal
+from pydantic import BaseModel, Field, validator
+
+TransportMode = Literal["walk", "car", "bike"]
+GroupType = Literal["solo", "couple", "family", "kids", "dog"]
+Intensity = Literal["easy", "medium", "active"]
+
+
+class AdventureRequest(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
+    available_minutes: int = Field(120, ge=30, le=720)
+    transport_mode: TransportMode = "car"
+    group_type: GroupType = "solo"
+    children_ages: list[int] = Field(default_factory=list)
+    intensity: Intensity = "easy"
+    interests: list[str] = Field(default_factory=lambda: ["nature", "viewpoints"])
+    max_walking_km: float | None = Field(default=None, ge=0, le=30)
+    request_text: str | None = Field(default=None, max_length=1000)
+    use_live_data: bool = True
+    limit: int = Field(default=5, ge=1, le=10)
+
+    @validator("interests", pre=True)
+    def normalize_interests(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        return [str(item).strip().lower() for item in value if str(item).strip()]
+
+
+class WeatherSummary(BaseModel):
+    source: str
+    temperature_c: float | None = None
+    rain_mm_now: float | None = None
+    rain_mm_last_24h: float | None = None
+    wind_kmh: float | None = None
+    humidity_percent: float | None = None
+    uv_index: float | None = None
+    sunrise: str | None = None
+    sunset: str | None = None
+    summary: str
+    score: int = Field(70, ge=0, le=100)
+    confidence: Literal["live", "fallback", "estimated"] = "estimated"
+
+
+class PlaceCandidate(BaseModel):
+    source: str
+    source_id: str
+    name: str
+    type: str
+    lat: float
+    lon: float
+    tags: dict[str, Any] = Field(default_factory=dict)
+    estimated_activity_minutes: int = 45
+    estimated_walking_km: float = 1.0
+    difficulty: Literal["easy", "medium", "hard"] = "easy"
+    quality_score: int = Field(default=60, ge=0, le=100)
+
+
+class RouteInfo(BaseModel):
+    source: str
+    one_way_minutes: int
+    round_trip_minutes: int
+    distance_km: float
+    map_url: str
+    confidence: Literal["live", "fallback", "estimated"] = "estimated"
+
+
+class ScoreBreakdown(BaseModel):
+    time_fit: int
+    weather_fit: int
+    distance_fit: int
+    safety_fit: int
+    group_fit: int
+    interest_fit: int
+    place_quality: int
+
+
+class Recommendation(BaseModel):
+    id: str
+    title: str
+    place_type: str
+    lat: float
+    lon: float
+    adventure_score: int
+    score_breakdown: ScoreBreakdown
+    total_minutes: int
+    travel_minutes: int
+    activity_minutes: int
+    distance_km: float
+    walking_km: float
+    difficulty: str
+    description: str
+    why: list[str]
+    warnings: list[str]
+    map_url: str
+    source: str
+    data_confidence: Literal["live", "mixed", "fallback", "estimated"] = "mixed"
+    tags: dict[str, Any] = Field(default_factory=dict)
+
+
+class RejectedAlternative(BaseModel):
+    title: str
+    reason: str
+    score: int
+
+
+class AdventureResponse(BaseModel):
+    request_id: str
+    generated_at: datetime
+    version: str = "0.1.0"
+    weather: WeatherSummary
+    recommendations: list[Recommendation]
+    rejected_alternatives: list[RejectedAlternative]
+    data_warnings: list[str] = Field(default_factory=list)
+
+
+class FeedbackRequest(BaseModel):
+    request_id: str
+    recommendation_id: str
+    rating: Literal["up", "down"]
+    reason: str | None = None

@@ -1,0 +1,13 @@
+services:
+  app:
+    image: python:3.11-slim
+    working_dir: /app/backend
+    volumes:
+      - .:/app
+      - ./data:/app/backend/data
+    ports:
+      - "8080:8000"
+    command: sh -c "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      - USE_OPEN_METEO_FALLBACK=true
+      - SQLITE_PATH=./data/adventures.db
