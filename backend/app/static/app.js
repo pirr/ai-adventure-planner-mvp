@@ -274,10 +274,12 @@ function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('lang', lang);
   applyStaticI18n();
-  // If results are on screen, re-fetch so backend-generated text (weather,
-  // why, warnings, rejected reasons) also comes back in the chosen language.
-  if (!resultsEl.classList.contains('hidden')) {
-    runSearch();
+  // Re-render cached results so all UI labels switch instantly, without firing
+  // another search (and another rate-limited Overpass call). Backend-generated
+  // sentences (weather summary, why, warnings, rejected reasons) stay in the
+  // language they were fetched in until the next search.
+  if (lastResponse && !resultsEl.classList.contains('hidden')) {
+    renderResults(lastResponse, { scroll: false });
   }
 }
 
@@ -411,7 +413,7 @@ function minutes(value) {
   return m ? `${h}${t('unit_h')} ${m}${t('unit_m')}` : `${h}${t('unit_h')}`;
 }
 
-function renderResults(data) {
+function renderResults(data, { scroll = true } = {}) {
   lastResponse = data;
   lastRequestId = data.request_id;
   $('requestIdBadge').textContent = data.request_id.slice(0, 8);
@@ -420,7 +422,9 @@ function renderResults(data) {
   renderCards(data.recommendations || []);
   renderRejected(data.rejected_alternatives || []);
   resultsEl.classList.remove('hidden');
-  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (scroll) {
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function renderWeather(weather) {
