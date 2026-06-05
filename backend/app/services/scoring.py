@@ -184,7 +184,9 @@ def _why(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, break
     if breakdown.time_fit >= 80:
         items.append(t(lang, "why_fits_time"))
     if breakdown.weather_fit >= 75:
-        items.append(t(lang, "why_weather", summary=weather.summary.lower()))
+        # The template adds its own trailing period, so trim one off the summary
+        # (some summaries are full sentences ending in ".") to avoid "..".
+        items.append(t(lang, "why_weather", summary=weather.summary.lower().rstrip(" .")))
     if breakdown.distance_fit >= 80:
         items.append(t(lang, "why_travel", minutes=route.one_way_minutes))
     if breakdown.group_fit >= 80:
