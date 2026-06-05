@@ -86,6 +86,38 @@ Browser geolocation usually requires HTTPS, except on `localhost`. If phone geol
 
 ---
 
+## Serve over HTTPS (Cloudflare Quick Tunnel)
+
+To test on a phone with working geolocation you need HTTPS. A separate entry
+point, `docker-compose.tunnel.yml`, layers a `cloudflared` service on top of the
+base compose file to open a free **Cloudflare Quick Tunnel** — no Cloudflare
+account, token or domain required. It hands you a public
+`https://<random>.trycloudflare.com` URL that proxies to the app.
+
+Start the app together with the tunnel:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up --build
+```
+
+Then read the generated HTTPS URL from the tunnel logs:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml \
+  logs cloudflared | grep trycloudflare.com
+```
+
+Open that `https://<random>.trycloudflare.com` URL on your phone — geolocation
+will work because the connection is HTTPS.
+
+Notes:
+
+- The URL is random and changes every time the tunnel restarts.
+- A plain `docker compose up` ignores `docker-compose.tunnel.yml` and runs the
+  app locally only at `http://localhost:8080`; the tunnel is opt-in.
+
+---
+
 ## Environment variables
 
 Copy `.env.example` if needed.

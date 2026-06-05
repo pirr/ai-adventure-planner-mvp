@@ -1,0 +1,22 @@
+# Separate entry point that adds a Cloudflare Quick Tunnel on top of the base
+# docker-compose.yml. Layer it on only when you want public HTTPS:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up --build
+#
+# A plain `docker compose up` ignores this file and stays local-only.
+#
+# Quick Tunnel needs no Cloudflare account, token or domain. On start it prints
+# a random https://<random>.trycloudflare.com URL that proxies to the app —
+# HTTPS is what lets browser geolocation work on phones. Read the URL with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml \
+#     logs cloudflared | grep trycloudflare.com
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # Reaches the app over the internal compose network, so the app's published
+    # 8080 port is not involved. The URL changes every time the tunnel restarts.
+    command: tunnel --no-autoupdate --url http://app:8000
+    depends_on:
+      - app
