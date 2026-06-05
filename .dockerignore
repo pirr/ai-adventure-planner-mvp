@@ -1,0 +1,25 @@
+# VCS
+.git
+.gitignore
+
+# Python caches / virtualenvs
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
+
+# Runtime data / local DBs (never bake into the image)
+data/
+backend/data/
+*.db
+
+# Local env and editor/IDE files
+.env
+.idea/
+.DS_Store
+
+# Docker / docs not needed inside the image
+Dockerfile
+.dockerignore
+docker-compose.yml
+docs/
