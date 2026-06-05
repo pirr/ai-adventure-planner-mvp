@@ -15,6 +15,8 @@ It implements the core MVP 0.1 flow:
 
 The app is intentionally built as a simple FastAPI + mobile-first static frontend package so it can run locally immediately. It can later be split into a Next.js frontend and FastAPI backend.
 
+The UI is a set of plain static files in the top-level `frontend/` directory (`index.html`, `app.js`, `styles.css`); the FastAPI backend in `backend/` serves them at the same origin, so the single run command below starts both the API and the UI.
+
 ---
 
 ## What is included
@@ -212,7 +214,7 @@ PYTHONPATH=. pytest
 ## Next steps
 
 1. Add real deployment.
-2. Replace static frontend with Next.js if needed.
+2. Replace the static `frontend/` with Next.js if needed.
 3. Add proper database migrations.
 4. Add Mapbox/Google Directions for reliable routing and traffic.
 5. Add Event Impact Layer.

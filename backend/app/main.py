@@ -23,13 +23,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-STATIC_DIR = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# The frontend lives in the repo-root `frontend/` directory, served by this
+# backend at the same origin so its relative `/api/...` calls keep working.
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/health")
