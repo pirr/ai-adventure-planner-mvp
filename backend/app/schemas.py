@@ -80,6 +80,7 @@ class RouteInfo(BaseModel):
     round_trip_minutes: int
     distance_km: float
     map_url: str
+    apple_map_url: str = ""
     confidence: Literal["live", "fallback", "estimated"] = "estimated"
 
 
@@ -118,6 +119,7 @@ class Recommendation(BaseModel):
     why: list[str]
     warnings: list[str]
     map_url: str
+    apple_map_url: str = ""
     source: str
     data_confidence: Literal["live", "mixed", "fallback", "estimated"] = "mixed"
     photo: PlacePhoto | None = None

@@ -60,7 +60,8 @@ const I18N = {
     results_title: 'Recommendations',
     // recommendation card chrome
     score_breakdown: 'Score breakdown',
-    open_maps: 'Open in Maps',
+    open_maps: 'Google Maps',
+    open_apple_maps: 'Apple Maps',
     useful: '👍 Useful',
     not_useful: '👎 Not useful',
     photo_source: 'Photo: {source}',
@@ -172,7 +173,8 @@ const I18N = {
     loading_subtitle: 'Проверяем места, погоду, время в пути и правила риска.',
     results_title: 'Рекомендации',
     score_breakdown: 'Разбор оценки',
-    open_maps: 'Открыть в картах',
+    open_maps: 'Google Карты',
+    open_apple_maps: 'Apple Карты',
     useful: '👍 Полезно',
     not_useful: '👎 Не полезно',
     photo_source: 'Фото: {source}',
@@ -477,6 +479,9 @@ function renderCards(items) {
     node.querySelector('.breakdown-summary').textContent = t('score_breakdown');
     const mapLink = node.querySelector('.map-link');
     mapLink.textContent = t('open_maps');
+    const appleLink = node.querySelector('.apple-map-link');
+    appleLink.textContent = t('open_apple_maps');
+    appleLink.href = item.apple_map_url;
     node.querySelector('.feedback-up').textContent = t('useful');
     node.querySelector('.feedback-down').textContent = t('not_useful');
     node.querySelector('.badges').innerHTML = `

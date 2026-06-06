@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.config import settings
 from app.schemas import PlaceCandidate, RouteInfo
-from app.services.geo import google_maps_url, haversine_km
+from app.services.geo import apple_maps_url, google_maps_url, haversine_km
 from app.services.net import http_client
 
 
@@ -25,6 +25,7 @@ def fallback_route(origin_lat: float, origin_lon: float, place: PlaceCandidate, 
         round_trip_minutes=one_way * 2,
         distance_km=round(distance, 2),
         map_url=google_maps_url(origin_lat, origin_lon, place.lat, place.lon, transport_mode),
+        apple_map_url=apple_maps_url(origin_lat, origin_lon, place.lat, place.lon, transport_mode),
         confidence="estimated",
     )
 
@@ -51,6 +52,7 @@ async def osrm_route(origin_lat: float, origin_lon: float, place: PlaceCandidate
         round_trip_minutes=one_way * 2,
         distance_km=distance,
         map_url=google_maps_url(origin_lat, origin_lon, place.lat, place.lon, transport_mode),
+        apple_map_url=apple_maps_url(origin_lat, origin_lon, place.lat, place.lon, transport_mode),
         confidence="live",
     )
 

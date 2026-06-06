@@ -288,6 +288,7 @@ def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None) 
         why=scored.why,
         warnings=scored.warnings,
         map_url=route.map_url,
+        apple_map_url=route.apple_map_url,
         source=place.source,
         data_confidence=scored.data_confidence,  # type: ignore[arg-type]
         photo=photo,

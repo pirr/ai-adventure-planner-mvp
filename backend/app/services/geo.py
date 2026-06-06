@@ -22,3 +22,14 @@ def google_maps_url(origin_lat: float, origin_lon: float, dest_lat: float, dest_
         f"&destination={dest_lat:.6f},{dest_lon:.6f}"
         f"&travelmode={travelmode}"
     )
+
+
+def apple_maps_url(origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float, mode: str) -> str:
+    # Apple's dirflg has no cycling option, so bike falls back to walking directions.
+    dirflg = {"car": "d", "walk": "w", "bike": "w"}.get(mode, "d")
+    return (
+        "https://maps.apple.com/?"
+        f"saddr={origin_lat:.6f},{origin_lon:.6f}"
+        f"&daddr={dest_lat:.6f},{dest_lon:.6f}"
+        f"&dirflg={dirflg}"
+    )
