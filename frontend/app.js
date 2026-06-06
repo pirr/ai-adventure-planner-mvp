@@ -536,7 +536,7 @@ function renderCards(items) {
   items.forEach((item) => {
     const node = template.content.cloneNode(true);
     node.querySelector('.title').textContent = item.title;
-    node.querySelector('.description').textContent = item.description;
+    node.querySelector('.description').textContent = item.summary || item.description;
     renderPhoto(node, item);
     node.querySelector('.score').textContent = item.adventure_score;
     node.querySelector('.breakdown-summary').textContent = t('score_breakdown');
@@ -567,6 +567,7 @@ function renderCards(items) {
     node.querySelector('.why').innerHTML = `
       <h3>${t('why_title')}</h3>
       ${item.why.map((text) => `<div class="item good">✓ ${escapeHtml(text)}</div>`).join('')}
+      ${item.data_confidence_note ? `<div class="item">${escapeHtml(item.data_confidence_note)}</div>` : ''}
     `;
     node.querySelector('.warnings').innerHTML = item.warnings.length
       ? `<h3>${t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`

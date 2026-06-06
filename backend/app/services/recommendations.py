@@ -8,12 +8,13 @@ from app.schemas import AdventureRequest, AdventureResponse
 from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import get_route
+from app.services.llm import LLMProvider, explain_recommendations, get_llm_provider
 from app.services.scoring import rejected_from_scored, score_candidate, to_recommendation
 from app.services.storage import storage
 from app.services.weather import get_destination_forecasts, get_weather
 
 
-async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
+async def build_recommendations(request: AdventureRequest, provider: LLMProvider | None = None) -> AdventureResponse:
     request_id = str(uuid.uuid4())
     # Personal Preference Fit signal from this user's past feedback (cold-start safe).
     profile = storage.preference_profile(request.anonymous_id)
@@ -60,6 +61,7 @@ async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
     top = final[: request.limit]
     photos = await asyncio.gather(*[get_place_photo(item.place, request.use_live_data) for item in top])
     recommendations = [to_recommendation(item, photo) for item, photo in zip(top, photos)]
+    recommendations = await explain_recommendations(recommendations, request, provider or get_llm_provider())
     chosen_ids = {item.place.source_id for item in top}
     rejected = rejected_from_scored(final, chosen_ids, limit=3, lang=request.lang)
     return AdventureResponse(

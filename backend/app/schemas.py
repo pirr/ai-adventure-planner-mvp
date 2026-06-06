@@ -124,6 +124,10 @@ class Recommendation(BaseModel):
     walking_km: float
     difficulty: str
     description: str
+    # summary + data_confidence_note are filled by the LLM layer when enabled and
+    # grounded; otherwise they stay None and the rule-based `why` is used as-is.
+    summary: str | None = None
+    data_confidence_note: str | None = None
     why: list[str]
     warnings: list[str]
     map_url: str

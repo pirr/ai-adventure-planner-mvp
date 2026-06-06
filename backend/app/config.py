@@ -33,6 +33,17 @@ class Settings:
     openweather_api_key: str | None = os.getenv("OPENWEATHER_API_KEY")
     use_open_meteo_fallback: bool = os.getenv("USE_OPEN_METEO_FALLBACK", "true").lower() == "true"
     http_timeout_seconds: float = float(os.getenv("HTTP_TIMEOUT_SECONDS", "8"))
+    # LLM explanation layer. Provider-agnostic over the OpenAI /v1 chat API.
+    # Default "template" keeps the rule-based explanations and makes no network
+    # call. Set LLM_PROVIDER to a preset (openai/llamacpp/ollama/deepseek/groq/
+    # openrouter) or "openai" with an explicit LLM_BASE_URL.
+    llm_provider: str = os.getenv("LLM_PROVIDER", "template")
+    llm_enabled: bool = os.getenv("LLM_ENABLED", "true").lower() == "true"
+    llm_base_url: str | None = os.getenv("LLM_BASE_URL")
+    llm_model: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    llm_api_key: str | None = os.getenv("LLM_API_KEY")
+    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "20"))
+    llm_max_explained: int = int(os.getenv("LLM_MAX_EXPLAINED", "5"))
 
 
 settings = Settings()
