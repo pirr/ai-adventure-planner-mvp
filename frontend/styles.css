@@ -596,6 +596,7 @@ summary {
     grid-row: 1;
   }
 
+  #mapPanel,
   .loading,
   .error,
   .results {
