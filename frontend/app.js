@@ -73,6 +73,11 @@ const I18N = {
     loading_title: 'Analyzing options',
     loading_subtitle: 'Checking places, weather, travel time and risk rules.',
     results_title: 'Recommendations',
+    history_title: 'Recently seen',
+    clear_history: 'Clear my history',
+    history_opened: 'opened',
+    history_cleared: 'History cleared.',
+    history_confirm: 'Delete your local history (recent searches, feedback and events)?',
     // recommendation card chrome
     score_breakdown: 'Score breakdown',
     open_maps: 'Google Maps',
@@ -198,6 +203,11 @@ const I18N = {
     loading_title: 'Анализируем варианты',
     loading_subtitle: 'Проверяем места, погоду, время в пути и правила риска.',
     results_title: 'Рекомендации',
+    history_title: 'Недавно просмотренное',
+    clear_history: 'Очистить историю',
+    history_opened: 'открыто',
+    history_cleared: 'История очищена.',
+    history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
     score_breakdown: 'Разбор оценки',
     open_maps: 'Google Карты',
     open_apple_maps: 'Apple Карты',
@@ -325,6 +335,7 @@ function setLang(lang) {
   if (lastResponse && !resultsEl.classList.contains('hidden')) {
     renderResults(lastResponse, { scroll: false });
   }
+  loadHistory();
 }
 
 document.querySelectorAll('.lang-btn').forEach((btn) => {
@@ -385,6 +396,7 @@ document.querySelectorAll('.chip').forEach((button) => {
 });
 
 $('searchBtn').addEventListener('click', runSearch);
+$('clearHistoryBtn').addEventListener('click', clearHistory);
 
 function selectedInterests() {
   return Array.from(document.querySelectorAll('.chip.active')).map((button) => button.dataset.interest);
@@ -458,6 +470,7 @@ async function runSearch() {
     const data = await response.json();
     renderResults(data);
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
+    loadHistory();
   } catch (error) {
     setError(t('search_failed', { error: error.message }));
   } finally {
@@ -709,6 +722,50 @@ async function submitFeedback(recommendationId, rating, reason) {
   }
 }
 
+// "Recently seen" — recommendations this anonymous_id has been shown, newest
+// first, with an "opened" badge derived from analytics events. Plus a control
+// to delete all local history (sessions, recommendations, feedback, events).
+async function loadHistory() {
+  try {
+    const res = await fetch(`/api/history?anonymous_id=${encodeURIComponent(anonymousId())}`);
+    const data = await res.json();
+    renderHistory(data.items || []);
+  } catch (error) {
+    renderHistory([]);
+  }
+}
+
+function renderHistory(items) {
+  const section = $('historySection');
+  const list = $('historyList');
+  if (!items.length) {
+    section.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  const locale = currentLang === 'ru' ? 'ru-RU' : 'en-US';
+  list.innerHTML = items
+    .map((item) => {
+      let when = item.created_at;
+      try {
+        when = new Date(item.created_at).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (error) {}
+      const opened = item.opened ? `<span class="badge">${t('history_opened')}</span>` : '';
+      return `<div class="item"><strong>${escapeHtml(item.title)}</strong> · ${t('score_label', { score: item.score })} · ${escapeHtml(when)} ${opened}</div>`;
+    })
+    .join('');
+  section.classList.remove('hidden');
+}
+
+async function clearHistory() {
+  if (!confirm(t('history_confirm'))) return;
+  try {
+    await fetch(`/api/history?anonymous_id=${encodeURIComponent(anonymousId())}`, { method: 'DELETE' });
+  } catch (error) {}
+  renderHistory([]);
+  alert(t('history_cleared'));
+}
+
 function breakdownLabel(key) {
   const dict = I18N[currentLang] || I18N.en;
   return dict['bd_' + key] || I18N.en['bd_' + key] || humanize(key);
@@ -729,3 +786,4 @@ function escapeHtml(value) {
 
 // Apply translations on initial load.
 applyStaticI18n();
+loadHistory();

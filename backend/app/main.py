@@ -84,3 +84,13 @@ async def events(payload: AnalyticsEvent) -> dict[str, str]:
 @app.get("/api/events")
 async def events_list() -> dict[str, Any]:
     return {"items": storage.events_summary()}
+
+
+@app.get("/api/history")
+async def history(anonymous_id: str | None = None) -> dict[str, Any]:
+    return {"items": storage.history_for(anonymous_id)}
+
+
+@app.delete("/api/history")
+async def history_delete(anonymous_id: str | None = None) -> dict[str, Any]:
+    return {"status": "ok", "deleted_sessions": storage.delete_user_data(anonymous_id)}

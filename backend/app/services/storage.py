@@ -141,5 +141,53 @@ class Storage:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def history_for(self, anonymous_id: str | None, limit: int = 20) -> list[dict[str, Any]]:
+        if not anonymous_id:
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT r.id AS id, r.request_id AS request_id, r.title AS title,
+                       r.score AS score, s.created_at AS created_at
+                FROM recommendations r
+                JOIN search_sessions s ON s.id = r.request_id
+                WHERE s.anonymous_id = ?
+                ORDER BY s.created_at DESC, r.score DESC
+                LIMIT ?
+                """,
+                (anonymous_id, limit),
+            ).fetchall()
+            opened = {
+                row["recommendation_id"]
+                for row in conn.execute(
+                    "SELECT DISTINCT recommendation_id FROM events "
+                    "WHERE anonymous_id = ? AND recommendation_id IS NOT NULL "
+                    "AND event IN ('recommendation_opened', 'maps_opened')",
+                    (anonymous_id,),
+                )
+            }
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["opened"] = item["id"] in opened
+            items.append(item)
+        return items
+
+    def delete_user_data(self, anonymous_id: str | None) -> int:
+        if not anonymous_id:
+            return 0
+        with self._connect() as conn:
+            session_ids = [row["id"] for row in conn.execute(
+                "SELECT id FROM search_sessions WHERE anonymous_id = ?", (anonymous_id,)
+            )]
+            if session_ids:
+                placeholders = ",".join("?" * len(session_ids))
+                conn.execute(f"DELETE FROM recommendations WHERE request_id IN ({placeholders})", session_ids)
+            conn.execute("DELETE FROM search_sessions WHERE anonymous_id = ?", (anonymous_id,))
+            conn.execute("DELETE FROM feedback WHERE anonymous_id = ?", (anonymous_id,))
+            conn.execute("DELETE FROM events WHERE anonymous_id = ?", (anonymous_id,))
+            conn.execute("DELETE FROM users WHERE anonymous_id = ?", (anonymous_id,))
+        return len(session_ids)
+
 
 storage = Storage()
