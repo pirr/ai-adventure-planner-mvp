@@ -929,3 +929,5 @@ function escapeHtml(value) {
 // Apply translations on initial load.
 applyStaticI18n();
 loadHistory();
+// The map panel starts open, so no toggle fires — build the map now.
+if ($('mapPanel') && $('mapPanel').open) applyMapView();
