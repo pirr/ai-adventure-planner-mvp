@@ -66,6 +66,19 @@ Personal Preference Fit / Score v0.2 (D) · refined group inputs (E) · Spec.md 
 **Deferred to 0.3+:** saved places / full Adventure Memory · photos diary · notifications/daily picks · Event
 Impact & live Traffic Fit · Community Intelligence · accounts/login · Postgres/PostGIS migration.
 
+### Frontend: no Next.js in 0.2
+
+0.2 stays on the current vanilla HTML/CSS/JS served by FastAPI (same origin, no build step, no CORS).
+Next.js is **not** adopted in 0.2: the app is effectively one screen with user-specific, non-indexable
+results, so its main strengths — SSR/SEO, multi-page routing, bundling — add no user-facing value, while it
+would add a Node build pipeline, a React rewrite, and (typically) a second deploy with CORS. Everything 0.2
+needs (history view, refined-input toggles, LLM `summary`/`why` rendering, preference breakdown) is a handful
+of render functions in the existing `app.js`.
+
+Reconsider a frontend framework at **0.3** (Adventure Memory Lite: saved places, daily recs, notifications,
+several real screens), when manual DOM becomes the bottleneck. If migrating then, prefer a lightweight SPA
+(Vite + React/Preact/Svelte) and choose Next.js only if SSR/SSG/edge rendering is actually needed.
+
 **Suggested build order (separate commits):**
 1. **B** anonymous identity (foundation) → 2. **E** refined group inputs → 3. **C** history + delete →
 4. **D** Personal Preference Fit (Score v0.2) → 5. **A** pluggable LLM layer → 6. **F** Spec.md rewrite.
