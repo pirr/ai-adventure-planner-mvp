@@ -134,6 +134,36 @@ Wiring & safety:
 - Tests: `FakeProvider` asserts explanations merge in; a raising provider and a guard-violating provider both
   fall back to templates. No network.
 
+**Prompts & model evaluation:**
+- **Prompt design.** System prompt = "explain, don't decide; use ONLY the payload facts; never invent
+  numbers/places/weather/traffic; mark missing data unavailable; repeat the computed warnings verbatim;
+  output strict JSON in `{lang}`; summary ≤ 30 words, 2–4 short `why` bullets." The content message is the
+  machine payload (title, type, score breakdown, **computed warnings verbatim**, weather summary,
+  travel/activity minutes, distance, `data_confidence`, and an explicit `unknown_fields: [traffic, events,
+  crowds]`). Force the shape with `response_format=json_object` (OpenAI/hosted) or a **GBNF / JSON-schema
+  grammar** (llama.cpp) so invalid JSON is impossible. Temperature 0–0.3. Add 1–2 few-shot anchors, including
+  one where a field is missing and the model correctly answers "unavailable". The **prompt is versioned** — a
+  prompt change is a new benchmark candidate.
+- **Eval set.** 20–50 frozen `ExplanationInput` fixtures captured from real `/api/recommendations` runs under
+  `backend/eval/golden/` — covering sunny/rainy, near/far, family/dog, varied place types, **missing-data**
+  cases, and **both EN and RU** — plus an **adversarial slice** that tempts invention (omit weather; mark
+  traffic unknown). Generic LLM leaderboards do not answer this task; the golden set does.
+- **Metrics (honesty is a gate, not a tradeoff).** Per output: **grounding / no-hallucination** (automatic —
+  reuse the runtime guard: every digit and named entity in the output must appear in the input); **format
+  valid** (auto: JSON + schema + length + language); **safety preserved** (auto: all computed warnings still
+  present, none added); **faithful coverage** of the top score factors (auto-ish); **clarity 1–5** (human
+  spot-check + optional LLM-as-judge, anchored by the automatic grounding score); **latency + cost**
+  (operational). Run each case 3× at low temp — high variance ⇒ unreliable.
+- **Model selection — scoreboard.** Run candidates (local Qwen2.5-7B / Llama-3.1-8B, DeepSeek, gpt-4o-mini, …)
+  through the harness → table of `grounding% · format% · safety% · clarity · p50 ms · $/1k`. Rule: **gate
+  first** (e.g. grounding ≥ 99%, format = 100%, safety = 100%), **then cheapest/fastest** clearing clarity ≥ 4
+  — no matter how fluent a failing model sounds. The runtime guard makes a cheap local default safe.
+- **Regression + production.** Keep the harness in `backend/eval/` as a CLI/pytest asserting **aggregate
+  thresholds** (not exact strings); `FakeProvider` gives deterministic grader unit tests, a `--live` mode hits
+  real models. The long-run signal is an **A/B of LLM- vs template-explained cards** against the existing
+  `feedback_submitted` / `maps_opened` analytics keyed by `anonymous_id` (👍 rate, maps-open rate).
+- *(Scaffolding `backend/eval/` + the golden-set fixture format is built with Feature A, not before.)*
+
 ### B. Anonymous identity (foundation)
 - Frontend (`app.js`): generate a UUID in `localStorage` on first load; include `anonymous_id` in the bodies
   of `/api/recommendations`, `/api/feedback`, `/api/events` (extend `requestPayload()` and `track()`).
