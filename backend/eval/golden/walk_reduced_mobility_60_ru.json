@@ -1,0 +1,245 @@
+{
+  "request": {
+    "lat": 42.4304,
+    "lon": 18.6964,
+    "available_minutes": 60,
+    "transport_mode": "walk",
+    "group_type": "solo",
+    "children_ages": [],
+    "with_dog": false,
+    "with_elderly": false,
+    "reduced_mobility": true,
+    "intensity": "easy",
+    "interests": [
+      "viewpoints"
+    ],
+    "max_walking_km": null,
+    "request_text": null,
+    "use_live_data": false,
+    "limit": 4,
+    "lang": "ru",
+    "anonymous_id": null
+  },
+  "recommendations": [
+    {
+      "id": "sample_porto-naval-heritage",
+      "title": "Naval Heritage Collection, Porto Montenegro",
+      "place_type": "museum",
+      "lat": 42.4358,
+      "lon": 18.6946,
+      "adventure_score": 74,
+      "score_breakdown": {
+        "time_fit": 55,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 35,
+        "place_quality": 75,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 71,
+      "travel_minutes": 16,
+      "activity_minutes": 55,
+      "distance_km": 0.62,
+      "walking_km": 0.8,
+      "difficulty": "easy",
+      "description": "Безопасный крытый или полукрытый вариант с познавательной ценностью.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Время в пути приемлемое: около 8 мин в одну сторону.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Пешая часть ограничена примерно 0.8 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.435800,18.694600&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.435800,18.694600&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Naval_Heritage_Collection_01.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Naval_Heritage_Collection_01.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "museum",
+        "historic": "naval",
+        "interests": [
+          "history",
+          "family"
+        ],
+        "wikimedia_commons": "File:Naval Heritage Collection 01.jpg"
+      }
+    },
+    {
+      "id": "sample_gornja-lastva",
+      "title": "Gornja Lastva Viewpoint",
+      "place_type": "viewpoint",
+      "lat": 42.452,
+      "lon": 18.7023,
+      "adventure_score": 58,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 15,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 85,
+        "place_quality": 78,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 111,
+      "travel_minutes": 66,
+      "activity_minutes": 45,
+      "distance_km": 2.45,
+      "walking_km": 1.4,
+      "difficulty": "easy",
+      "description": "Живописная остановка с короткой прогулкой и впечатляющими видами.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам.",
+        "Пешая часть ограничена примерно 1.4 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.452000,18.702300&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.452000,18.702300&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/View_of_Tivat_from_the_road_to_Gornja_Lastva_1.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:View_of_Tivat_from_the_road_to_Gornja_Lastva_1.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "viewpoint",
+        "interests": [
+          "viewpoints",
+          "history",
+          "nature"
+        ],
+        "wikimedia_commons": "File:View of Tivat from the road to Gornja Lastva 1.jpg"
+      }
+    },
+    {
+      "id": "sample_fort-gorazda",
+      "title": "Fort Gorazda",
+      "place_type": "fortress",
+      "lat": 42.3995,
+      "lon": 18.7734,
+      "adventure_score": 58,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 15,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 85,
+        "place_quality": 76,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 247,
+      "travel_minutes": 192,
+      "activity_minutes": 55,
+      "distance_km": 7.19,
+      "walking_km": 1.0,
+      "difficulty": "easy",
+      "description": "Историческая остановка с видами и возможностью исследования.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам.",
+        "Пешая часть ограничена примерно 1.0 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.399500,18.773400&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.399500,18.773400&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Fort_Gorazda_aerial_view.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Fort_Gorazda_aerial_view.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "fort",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:Fort Gorazda aerial view.jpg"
+      }
+    },
+    {
+      "id": "sample_kanli-kula",
+      "title": "Kanli Kula Fortress",
+      "place_type": "fortress",
+      "lat": 42.4533,
+      "lon": 18.5381,
+      "adventure_score": 58,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 15,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 85,
+        "place_quality": 82,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 412,
+      "travel_minutes": 352,
+      "activity_minutes": 60,
+      "distance_km": 13.24,
+      "walking_km": 1.4,
+      "difficulty": "easy",
+      "description": "Историческая остановка с видами и возможностью исследования.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам.",
+        "Пешая часть ограничена примерно 1.4 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.453300,18.538100&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.453300,18.538100&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/2024-02-04_Kanli_Kula_Fortress_1.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:2024-02-04_Kanli_Kula_Fortress_1.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "fort",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:2024-02-04 Kanli Kula Fortress 1.jpg"
+      }
+    }
+  ]
+}

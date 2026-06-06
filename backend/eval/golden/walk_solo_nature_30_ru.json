@@ -1,0 +1,245 @@
+{
+  "request": {
+    "lat": 42.4304,
+    "lon": 18.6964,
+    "available_minutes": 30,
+    "transport_mode": "walk",
+    "group_type": "solo",
+    "children_ages": [],
+    "with_dog": false,
+    "with_elderly": false,
+    "reduced_mobility": false,
+    "intensity": "easy",
+    "interests": [
+      "nature",
+      "water"
+    ],
+    "max_walking_km": null,
+    "request_text": null,
+    "use_live_data": false,
+    "limit": 4,
+    "lang": "ru",
+    "anonymous_id": null
+  },
+  "recommendations": [
+    {
+      "id": "sample_porto-naval-heritage",
+      "title": "Naval Heritage Collection, Porto Montenegro",
+      "place_type": "museum",
+      "lat": 42.4358,
+      "lon": 18.6946,
+      "adventure_score": 64,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 35,
+        "place_quality": 75,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 71,
+      "travel_minutes": 16,
+      "activity_minutes": 55,
+      "distance_km": 0.62,
+      "walking_km": 0.8,
+      "difficulty": "easy",
+      "description": "Безопасный крытый или полукрытый вариант с познавательной ценностью.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Время в пути приемлемое: около 8 мин в одну сторону.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Пешая часть ограничена примерно 0.8 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.435800,18.694600&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.435800,18.694600&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Naval_Heritage_Collection_01.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Naval_Heritage_Collection_01.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "museum",
+        "historic": "naval",
+        "interests": [
+          "history",
+          "family"
+        ],
+        "wikimedia_commons": "File:Naval Heritage Collection 01.jpg"
+      }
+    },
+    {
+      "id": "sample_gornja-lastva",
+      "title": "Gornja Lastva Viewpoint",
+      "place_type": "viewpoint",
+      "lat": 42.452,
+      "lon": 18.7023,
+      "adventure_score": 58,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 15,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 85,
+        "place_quality": 78,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 111,
+      "travel_minutes": 66,
+      "activity_minutes": 45,
+      "distance_km": 2.45,
+      "walking_km": 1.4,
+      "difficulty": "easy",
+      "description": "Живописная остановка с короткой прогулкой и впечатляющими видами.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам.",
+        "Пешая часть ограничена примерно 1.4 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.452000,18.702300&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.452000,18.702300&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/View_of_Tivat_from_the_road_to_Gornja_Lastva_1.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:View_of_Tivat_from_the_road_to_Gornja_Lastva_1.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "viewpoint",
+        "interests": [
+          "viewpoints",
+          "history",
+          "nature"
+        ],
+        "wikimedia_commons": "File:View of Tivat from the road to Gornja Lastva 1.jpg"
+      }
+    },
+    {
+      "id": "sample_budva-old-town",
+      "title": "Budva Old Town and Citadel",
+      "place_type": "fortress",
+      "lat": 42.2789,
+      "lon": 18.837,
+      "adventure_score": 54,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 15,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 35,
+        "place_quality": 85,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 634,
+      "travel_minutes": 544,
+      "activity_minutes": 90,
+      "distance_km": 20.43,
+      "walking_km": 2.2,
+      "difficulty": "easy",
+      "description": "Историческая остановка с видами и возможностью исследования.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Пешая часть ограничена примерно 2.2 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.278900,18.837000&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.278900,18.837000&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Budva_Old_Town_and_Citadel.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Budva_Old_Town_and_Citadel.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "city_gate",
+        "tourism": "attraction",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:Budva Old Town and Citadel.jpg"
+      }
+    },
+    {
+      "id": "sample_kotor-old-town",
+      "title": "Kotor Old Town",
+      "place_type": "historic_site",
+      "lat": 42.4256,
+      "lon": 18.7712,
+      "adventure_score": 54,
+      "score_breakdown": {
+        "time_fit": 0,
+        "weather_fit": 78,
+        "distance_fit": 15,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 35,
+        "place_quality": 90,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 264,
+      "travel_minutes": 164,
+      "activity_minutes": 100,
+      "distance_km": 6.16,
+      "walking_km": 2.5,
+      "difficulty": "easy",
+      "description": "Культурная прогулка, удобная для короткой поездки.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Пешая часть ограничена примерно 2.5 км."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.425600,18.771200&travelmode=walking",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.425600,18.771200&dirflg=w",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Kotor_Old_Town.JPG?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Kotor_Old_Town.JPG",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "old_town",
+        "interests": [
+          "history",
+          "fortresses",
+          "family"
+        ],
+        "wikimedia_commons": "File:Kotor Old Town.JPG"
+      }
+    }
+  ]
+}

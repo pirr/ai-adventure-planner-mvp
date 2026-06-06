@@ -2,23 +2,19 @@
   "request": {
     "lat": 42.4304,
     "lon": 18.6964,
-    "available_minutes": 300,
+    "available_minutes": 120,
     "transport_mode": "car",
-    "group_type": "family",
-    "children_ages": [
-      6,
-      13
-    ],
+    "group_type": "couple",
+    "children_ages": [],
     "with_dog": false,
     "with_elderly": false,
     "reduced_mobility": false,
     "intensity": "easy",
     "interests": [
-      "history",
-      "fortresses",
-      "viewpoints"
+      "water",
+      "nature"
     ],
-    "max_walking_km": 3.0,
+    "max_walking_km": null,
     "request_text": null,
     "use_live_data": false,
     "limit": 4,
@@ -27,75 +23,19 @@
   },
   "recommendations": [
     {
-      "id": "sample_kotor-old-town",
-      "title": "Kotor Old Town",
-      "place_type": "historic_site",
-      "lat": 42.4256,
-      "lon": 18.7712,
-      "adventure_score": 88,
-      "score_breakdown": {
-        "time_fit": 92,
-        "weather_fit": 78,
-        "distance_fit": 100,
-        "safety_fit": 88,
-        "group_fit": 88,
-        "interest_fit": 100,
-        "place_quality": 90,
-        "personal_preference_fit": 70
-      },
-      "total_minutes": 126,
-      "travel_minutes": 26,
-      "activity_minutes": 100,
-      "distance_km": 6.16,
-      "walking_km": 2.5,
-      "difficulty": "easy",
-      "description": "A cultural walk that works well for a short trip.",
-      "summary": null,
-      "data_confidence_note": null,
-      "why": [
-        "Fits your available time window.",
-        "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
-        "Travel time is manageable: about 13 min one way.",
-        "Suitable for the selected group and difficulty level.",
-        "Matches your selected interests."
-      ],
-      "warnings": [],
-      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.425600,18.771200&travelmode=driving",
-      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.425600,18.771200&dirflg=d",
-      "source": "fallback",
-      "data_confidence": "fallback",
-      "photo": {
-        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Kotor_Old_Town.JPG?width=960",
-        "source": "Wikimedia Commons",
-        "source_url": "https://commons.wikimedia.org/wiki/File:Kotor_Old_Town.JPG",
-        "attribution": null
-      },
-      "arrival_weather": null,
-      "forecast": [],
-      "tags": {
-        "historic": "old_town",
-        "interests": [
-          "history",
-          "fortresses",
-          "family"
-        ],
-        "wikimedia_commons": "File:Kotor Old Town.JPG"
-      }
-    },
-    {
       "id": "sample_gornja-lastva",
       "title": "Gornja Lastva Viewpoint",
       "place_type": "viewpoint",
       "lat": 42.452,
       "lon": 18.7023,
-      "adventure_score": 87,
+      "adventure_score": 86,
       "score_breakdown": {
         "time_fit": 92,
         "weather_fit": 78,
         "distance_fit": 100,
         "safety_fit": 88,
         "group_fit": 88,
-        "interest_fit": 100,
+        "interest_fit": 85,
         "place_quality": 78,
         "personal_preference_fit": 70
       },
@@ -139,27 +79,27 @@
       }
     },
     {
-      "id": "sample_budva-old-town",
-      "title": "Budva Old Town and Citadel",
+      "id": "sample_kanli-kula",
+      "title": "Kanli Kula Fortress",
       "place_type": "fortress",
-      "lat": 42.2789,
-      "lon": 18.837,
-      "adventure_score": 87,
+      "lat": 42.4533,
+      "lon": 18.5381,
+      "adventure_score": 83,
       "score_breakdown": {
-        "time_fit": 92,
+        "time_fit": 100,
         "weather_fit": 78,
         "distance_fit": 100,
         "safety_fit": 88,
         "group_fit": 88,
-        "interest_fit": 100,
-        "place_quality": 85,
+        "interest_fit": 35,
+        "place_quality": 82,
         "personal_preference_fit": 70
       },
-      "total_minutes": 156,
-      "travel_minutes": 66,
-      "activity_minutes": 90,
-      "distance_km": 20.43,
-      "walking_km": 2.2,
+      "total_minutes": 106,
+      "travel_minutes": 46,
+      "activity_minutes": 60,
+      "distance_km": 13.24,
+      "walking_km": 1.4,
       "difficulty": "easy",
       "description": "A history-focused stop with views and exploration potential.",
       "summary": null,
@@ -167,32 +107,87 @@
       "why": [
         "Fits your available time window.",
         "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
-        "Travel time is manageable: about 33 min one way.",
+        "Travel time is manageable: about 23 min one way.",
         "Suitable for the selected group and difficulty level.",
-        "Matches your selected interests."
+        "Walking is limited to about 1.4 km."
       ],
       "warnings": [],
-      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.278900,18.837000&travelmode=driving",
-      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.278900,18.837000&dirflg=d",
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.453300,18.538100&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.453300,18.538100&dirflg=d",
       "source": "fallback",
       "data_confidence": "fallback",
       "photo": {
-        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Budva_Old_Town_and_Citadel.jpg?width=960",
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/2024-02-04_Kanli_Kula_Fortress_1.jpg?width=960",
         "source": "Wikimedia Commons",
-        "source_url": "https://commons.wikimedia.org/wiki/File:Budva_Old_Town_and_Citadel.jpg",
+        "source_url": "https://commons.wikimedia.org/wiki/File:2024-02-04_Kanli_Kula_Fortress_1.jpg",
         "attribution": null
       },
       "arrival_weather": null,
       "forecast": [],
       "tags": {
-        "historic": "city_gate",
-        "tourism": "attraction",
+        "historic": "fort",
         "interests": [
           "history",
           "fortresses",
           "viewpoints"
         ],
-        "wikimedia_commons": "File:Budva Old Town and Citadel.jpg"
+        "wikimedia_commons": "File:2024-02-04 Kanli Kula Fortress 1.jpg"
+      }
+    },
+    {
+      "id": "sample_porto-naval-heritage",
+      "title": "Naval Heritage Collection, Porto Montenegro",
+      "place_type": "museum",
+      "lat": 42.4358,
+      "lon": 18.6946,
+      "adventure_score": 81,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 35,
+        "place_quality": 75,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 71,
+      "travel_minutes": 16,
+      "activity_minutes": 55,
+      "distance_km": 0.62,
+      "walking_km": 0.8,
+      "difficulty": "easy",
+      "description": "A low-risk indoor or semi-indoor option with educational value.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Fits your available time window.",
+        "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
+        "Travel time is manageable: about 8 min one way.",
+        "Suitable for the selected group and difficulty level.",
+        "Walking is limited to about 0.8 km."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.435800,18.694600&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.435800,18.694600&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Naval_Heritage_Collection_01.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Naval_Heritage_Collection_01.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "museum",
+        "historic": "naval",
+        "interests": [
+          "history",
+          "family"
+        ],
+        "wikimedia_commons": "File:Naval Heritage Collection 01.jpg"
       }
     },
     {
@@ -201,14 +196,14 @@
       "place_type": "fortress",
       "lat": 42.3995,
       "lon": 18.7734,
-      "adventure_score": 87,
+      "adventure_score": 81,
       "score_breakdown": {
         "time_fit": 92,
         "weather_fit": 78,
         "distance_fit": 100,
         "safety_fit": 88,
         "group_fit": 88,
-        "interest_fit": 100,
+        "interest_fit": 35,
         "place_quality": 76,
         "personal_preference_fit": 70
       },
@@ -226,7 +221,7 @@
         "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
         "Travel time is manageable: about 14 min one way.",
         "Suitable for the selected group and difficulty level.",
-        "Matches your selected interests."
+        "Walking is limited to about 1.0 km."
       ],
       "warnings": [],
       "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.399500,18.773400&travelmode=driving",
