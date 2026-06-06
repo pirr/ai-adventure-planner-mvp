@@ -17,6 +17,10 @@ class AdventureRequest(BaseModel):
     transport_mode: TransportMode = "car"
     group_type: GroupType = "solo"
     children_ages: list[int] = Field(default_factory=list)
+    # Refined group context (0.2). Separate from group_type so they compose.
+    with_dog: bool = False
+    with_elderly: bool = False
+    reduced_mobility: bool = False
     intensity: Intensity = "easy"
     interests: list[str] = Field(default_factory=lambda: ["nature", "viewpoints"])
     max_walking_km: float | None = Field(default=None, ge=0, le=30)

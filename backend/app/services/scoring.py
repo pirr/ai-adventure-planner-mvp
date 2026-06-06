@@ -111,6 +111,7 @@ def _group_fit(place: PlaceCandidate, request: AdventureRequest) -> int:
     score = 88
     has_children = request.group_type in {"family", "kids"} or bool(request.children_ages)
     young_child = any(age <= 7 for age in request.children_ages)
+    has_dog = request.with_dog or request.group_type == "dog"
     max_walk = request.max_walking_km
     if has_children:
         if place.difficulty == "hard":
@@ -121,7 +122,21 @@ def _group_fit(place: PlaceCandidate, request: AdventureRequest) -> int:
             score -= 35
         elif place.estimated_walking_km > 4:
             score -= 20
-    if request.group_type == "dog" and place.type in {"museum", "historic_site"}:
+    if request.reduced_mobility:
+        if place.difficulty == "hard":
+            score -= 50
+        elif place.difficulty == "medium":
+            score -= 22
+        if place.estimated_walking_km > 2:
+            score -= 20
+    elif request.with_elderly:
+        if place.difficulty == "hard":
+            score -= 30
+        elif place.difficulty == "medium":
+            score -= 10
+        if place.estimated_walking_km > 3:
+            score -= 15
+    if has_dog and place.type in {"museum", "historic_site"}:
         score -= 20
     if max_walk is not None and place.estimated_walking_km > max_walk:
         score -= 35
@@ -159,6 +174,13 @@ def _safety_fit(place: PlaceCandidate, request: AdventureRequest, weather: Weath
     elif place.difficulty == "medium" and request.intensity == "easy":
         score -= 8
         warnings.append(t(lang, "warn_medium_difficulty"))
+
+    if request.reduced_mobility and (place.difficulty in {"medium", "hard"} or place.estimated_walking_km > 2):
+        score -= 15
+        warnings.append(t(lang, "warn_reduced_mobility"))
+    elif request.with_elderly and (place.difficulty == "hard" or place.estimated_walking_km > 3.5):
+        score -= 10
+        warnings.append(t(lang, "warn_elderly"))
 
     if request.max_walking_km is not None and place.estimated_walking_km > request.max_walking_km:
         warnings.append(t(lang, "warn_walking_over_limit", km=place.estimated_walking_km, limit=request.max_walking_km))

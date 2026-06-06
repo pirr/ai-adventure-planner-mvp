@@ -75,6 +75,8 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "warn_medium_difficulty": "Some parts may be moderately difficult for an easy walk.",
         "warn_walking_over_limit": "Walking distance is about {km:.1f} km, above your limit of {limit:.1f} km.",
         "warn_after_sunset": "The adventure may finish after sunset.",
+        "warn_reduced_mobility": "May be hard with reduced mobility: uneven terrain or longer walking.",
+        "warn_elderly": "Pace and terrain may be demanding for older participants.",
         # Why recommended
         "why_fits_time": "Fits your available time window.",
         "why_weather": "Weather looks suitable: {summary}.",
@@ -119,6 +121,8 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "warn_medium_difficulty": "Некоторые участки могут быть умеренно сложными для лёгкой прогулки.",
         "warn_walking_over_limit": "Пешая дистанция около {km:.1f} км, что выше вашего лимита в {limit:.1f} км.",
         "warn_after_sunset": "Приключение может закончиться после заката.",
+        "warn_reduced_mobility": "Может быть тяжело при ограниченной мобильности: неровная поверхность или длинная пешая часть.",
+        "warn_elderly": "Темп и рельеф могут быть тяжёлыми для пожилых участников.",
         # Why recommended
         "why_fits_time": "Подходит под доступное время.",
         "why_weather": "Погода подходящая: {summary}.",

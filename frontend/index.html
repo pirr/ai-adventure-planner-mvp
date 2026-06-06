@@ -74,7 +74,6 @@
             <option value="solo" data-i18n="g_solo">Solo</option>
             <option value="couple" data-i18n="g_couple">Couple</option>
             <option value="family" selected data-i18n="g_family">Family</option>
-            <option value="dog" data-i18n="g_dog">Dog</option>
           </select>
         </label>
         <label>
@@ -97,6 +96,20 @@
           <input id="maxWalkingKm" type="number" step="0.1" value="3" />
         </label>
       </div>
+
+      <label><span data-i18n="context">Context</span></label>
+      <label class="switch-row">
+        <input id="withDog" type="checkbox" />
+        <span data-i18n="with_dog">With a dog</span>
+      </label>
+      <label class="switch-row">
+        <input id="withElderly" type="checkbox" />
+        <span data-i18n="with_elderly">With older adults</span>
+      </label>
+      <label class="switch-row">
+        <input id="reducedMobility" type="checkbox" />
+        <span data-i18n="reduced_mobility">Reduced mobility</span>
+      </label>
 
       <label>
         <span data-i18n="interests">Interests</span>
