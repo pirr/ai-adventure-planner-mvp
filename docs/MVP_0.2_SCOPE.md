@@ -104,7 +104,7 @@ New package `backend/app/services/llm/`:
   `response_format=json_object` (or a tool/function schema) → strict `{summary, why[], data_confidence_note}`.
   Configurable `base_url`, `model`, optional `api_key` (bearer). Works unchanged for llama.cpp/OpenAI/hosted.
 - `factory.py` — `get_llm_provider(settings) -> LLMProvider`, selected by `LLM_PROVIDER` (`template` |
-  `openai`), with convenience **presets** (`llamacpp`, `openai`, `deepseek`, `groq`, `openrouter`, `ollama`)
+  `openai`), with convenience **presets** (`llamacpp`, `openai`, `deepseek`, `groq`, `openrouter`, `ollama`, `gemini`)
   that just preset `base_url`. This is the injection point.
 
 **Honesty / grounding (the core requirement):**

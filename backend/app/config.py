@@ -8,7 +8,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "AI Adventure Planner MVP"
-    version: str = "0.1.0"
+    version: str = "0.2"
     # Sent as the User-Agent on every outbound API call. Public providers such as
     # overpass-api.de reject default library agents ("python-httpx/*") with HTTP
     # 406, so identify the app. Add contact info (URL/email) for production use.
@@ -44,6 +44,8 @@ class Settings:
     llm_api_key: str | None = os.getenv("LLM_API_KEY")
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "20"))
     llm_max_explained: int = int(os.getenv("LLM_MAX_EXPLAINED", "5"))
+    llm_fallback_models: tuple[str] = tuple(os.getenv("LLM_FALLBACK_MODELS", "").split(","))
+    gemini_reasoning_effort: str | None = os.getenv("GEMINI_REASONING_EFFORT", "")
 
 
 settings = Settings()

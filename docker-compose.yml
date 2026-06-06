@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "8080:8000"
+      - "8000:8000"
     volumes:
       # Persist the SQLite DB across container rebuilds. The app writes to
       # ./data relative to /app/backend (see SQLITE_PATH below).

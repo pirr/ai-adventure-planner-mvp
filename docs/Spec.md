@@ -560,7 +560,7 @@ Redis, опционально для MVP 0.1.
 
 - локальный сервер llama.cpp (`llama-server`);
 - OpenAI;
-- дешёвые, но качественные hosted-модели (DeepSeek, Groq, Together, OpenRouter, Mistral, Ollama);
+- дешёвые, но качественные hosted-модели (DeepSeek, Groq, Together, OpenRouter, Mistral, Ollama, Google Gemini);
 - template-провайдер (текущие детерминированные объяснения) — выбор по умолчанию и fallback.
 
 Провайдер выбирается конфигом (`LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`). Отдельной зависимости-SDK нет — используется общий HTTP-клиент (`httpx`).

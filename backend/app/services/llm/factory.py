@@ -14,6 +14,8 @@ _PRESETS = {
     "deepseek": "https://api.deepseek.com/v1",
     "groq": "https://api.groq.com/openai/v1",
     "openrouter": "https://openrouter.ai/api/v1",
+    # Google Gemini via its OpenAI-compatible endpoint (Bearer key, json_object).
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
 
@@ -31,4 +33,6 @@ def get_llm_provider(settings: Settings = default_settings) -> LLMProvider:
         model=settings.llm_model,
         api_key=settings.llm_api_key,
         timeout=settings.llm_timeout_seconds,
+        fallback_models=settings.llm_fallback_models,
+        gemini_reasoning_effort=settings.gemini_reasoning_effort,
     )

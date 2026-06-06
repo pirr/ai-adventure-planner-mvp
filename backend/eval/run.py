@@ -13,6 +13,7 @@ Capture fixtures first with:  .venv/bin/python -m eval.make_golden
 """
 from __future__ import annotations
 
+import logging
 import argparse
 import asyncio
 import json
@@ -24,6 +25,7 @@ from app.services.llm import ExplanationInput, get_llm_provider, is_grounded
 from app.services.llm.template import TemplateProvider
 
 GOLDEN = Path(__file__).parent / "golden"
+logger = logging.getLogger(__name__)
 
 
 def load_fixtures() -> list[tuple[str, AdventureRequest, list[Recommendation]]]:
@@ -48,8 +50,9 @@ async def evaluate(provider) -> None:
         started = time.perf_counter()
         try:
             explanations = await provider.explain(ExplanationInput(request=request, recommendations=recs, lang=request.lang))
+            logger.debug(f"LLM explanation: {explanations}")
         except Exception as exc:  # noqa: BLE001
-            print(f"  {name}: provider error: {exc.__class__.__name__}")
+            logger.exception(f"  {name}: provider error: {exc.__class__.__name__}")
             continue
         latencies.append((time.perf_counter() - started) * 1000)
         if explanations is None:

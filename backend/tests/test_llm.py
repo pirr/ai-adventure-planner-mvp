@@ -1,7 +1,16 @@
 import asyncio
 
+from app.config import Settings
 from app.schemas import AdventureRequest, Recommendation, ScoreBreakdown
-from app.services.llm import Explanation, ExplanationInput, LLMProvider, TemplateProvider, explain_recommendations
+from app.services.llm import (
+    Explanation,
+    ExplanationInput,
+    LLMProvider,
+    OpenAICompatibleProvider,
+    TemplateProvider,
+    explain_recommendations,
+    get_llm_provider,
+)
 
 
 def _rec(**over) -> Recommendation:
@@ -89,3 +98,16 @@ def test_template_provider_is_noop():
     out = _run(TemplateProvider())
     assert out[0].summary is None
     assert out[0].why == ["Fits your time."]
+
+
+def test_gemini_preset_resolves_to_openai_compatible():
+    provider = get_llm_provider(Settings(llm_provider="gemini", llm_model="gemini-2.5-flash", llm_api_key="x"))
+    assert isinstance(provider, OpenAICompatibleProvider)
+    assert provider.base_url == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert provider.model == "gemini-2.5-flash"
+    assert provider.api_key == "x"
+
+
+def test_disabled_falls_back_to_template():
+    provider = get_llm_provider(Settings(llm_provider="gemini", llm_enabled=False))
+    assert isinstance(provider, TemplateProvider)

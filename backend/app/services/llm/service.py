@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
+
 from app.config import settings
 from app.schemas import AdventureRequest, Recommendation
 from app.services.llm.base import ExplanationInput, LLMProvider
 from app.services.llm.guard import is_grounded
 from app.services.llm.template import TemplateProvider
+
+
+logger = logging.getLogger(__name__)
 
 
 async def explain_recommendations(
@@ -18,10 +23,13 @@ async def explain_recommendations(
     keeps the rule-based output, and an explanation that fails the grounding
     guard is discarded for that single card (the rest still apply).
     """
+    logger.debug(f"explain_recommendations: {len(recommendations)} recommendations")
+    logger.debug(f"  provider: {provider.name}  model: {getattr(provider, 'model', '-')}")
     if not recommendations or isinstance(provider, TemplateProvider):
         return recommendations
 
     top = recommendations[: settings.llm_max_explained]
+    logger.debug(f"  top: {len(top)}")
     try:
         explanations = await provider.explain(
             ExplanationInput(request=request, recommendations=top, lang=request.lang)
