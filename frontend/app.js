@@ -108,6 +108,13 @@ const I18N = {
     score_label: 'Score {score}/100',
     feedback_saved: 'Feedback saved.',
     feedback_error: 'Could not save feedback: {error}',
+    reason_prompt: 'Why not useful?',
+    reason_too_far: 'Too far',
+    reason_too_difficult: 'Too difficult',
+    reason_bad_weather: 'Bad weather',
+    reason_not_interesting: 'Not interesting',
+    reason_inaccurate: 'Inaccurate',
+    reason_other: 'Other',
     search_failed: 'Search failed: {error}',
     demo_status: 'Demo location set: Tivat, Montenegro.',
     geo_unavailable: 'Geolocation is not available in this browser.',
@@ -218,6 +225,13 @@ const I18N = {
     score_label: 'Оценка {score}/100',
     feedback_saved: 'Отзыв сохранён.',
     feedback_error: 'Не удалось сохранить отзыв: {error}',
+    reason_prompt: 'Почему не полезно?',
+    reason_too_far: 'Слишком далеко',
+    reason_too_difficult: 'Слишком сложно',
+    reason_bad_weather: 'Плохая погода',
+    reason_not_interesting: 'Неинтересно',
+    reason_inaccurate: 'Неточно',
+    reason_other: 'Другое',
     search_failed: 'Поиск не удался: {error}',
     demo_status: 'Демо-локация задана: Тиват, Черногория.',
     geo_unavailable: 'Геолокация недоступна в этом браузере.',
@@ -503,8 +517,9 @@ function renderCards(items) {
       ? `<h3>${t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`
       : `<div class="item good">${t('no_risk')}</div>`;
     mapLink.href = item.map_url;
+    const reasonsBox = node.querySelector('.feedback-reasons');
     node.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up'));
-    node.querySelector('.feedback-down').addEventListener('click', () => submitFeedback(item.id, 'down'));
+    node.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id));
     cardsEl.appendChild(node);
   });
 }
@@ -600,13 +615,41 @@ function renderRejected(items) {
   `;
 }
 
-async function submitFeedback(recommendationId, rating) {
+// A down-vote asks why first: reveal a chip-picker of reasons and submit the
+// chosen one. An up-vote submits immediately with no reason.
+const FEEDBACK_REASONS = ['too_far', 'too_difficult', 'bad_weather', 'not_interesting', 'inaccurate', 'other'];
+
+function toggleReasonPicker(box, recommendationId) {
+  if (!box.classList.contains('hidden')) {
+    box.classList.add('hidden');
+    return;
+  }
+  box.innerHTML =
+    `<span class="reason-label">${t('reason_prompt')}</span>` +
+    FEEDBACK_REASONS.map(
+      (reason) => `<button type="button" class="chip" data-reason="${reason}">${t('reason_' + reason)}</button>`,
+    ).join('');
+  box.querySelectorAll('.chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      box.classList.add('hidden');
+      submitFeedback(recommendationId, 'down', chip.dataset.reason);
+    });
+  });
+  box.classList.remove('hidden');
+}
+
+async function submitFeedback(recommendationId, rating, reason) {
   if (!lastRequestId) return;
   try {
     await fetch('/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request_id: lastRequestId, recommendation_id: recommendationId, rating }),
+      body: JSON.stringify({
+        request_id: lastRequestId,
+        recommendation_id: recommendationId,
+        rating,
+        reason: reason || null,
+      }),
     });
     alert(t('feedback_saved'));
   } catch (error) {

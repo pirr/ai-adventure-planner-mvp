@@ -216,6 +216,21 @@ textarea {
   border-color: #a7d9bd;
 }
 
+.feedback-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.reason-label {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
 .switch-row {
   display: flex;
   gap: 10px;

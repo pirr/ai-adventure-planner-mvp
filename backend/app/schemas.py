@@ -147,8 +147,11 @@ class AdventureResponse(BaseModel):
     data_warnings: list[str] = Field(default_factory=list)
 
 
+FeedbackReason = Literal["too_far", "too_difficult", "bad_weather", "not_interesting", "inaccurate", "other"]
+
+
 class FeedbackRequest(BaseModel):
     request_id: str
     recommendation_id: str
     rating: Literal["up", "down"]
-    reason: str | None = None
+    reason: FeedbackReason | None = None
