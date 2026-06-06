@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#16a34a" />
   <title>AI Adventure Planner MVP</title>
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
@@ -25,6 +26,8 @@
         <button id="demoBtn" class="button ghost" data-i18n="use_demo">Use Tivat demo</button>
       </div>
       <p id="locationStatus" class="status-text" data-i18n="loc_not_set">Location is not set yet.</p>
+      <div id="map"></div>
+      <p class="status-text map-hint" data-i18n="map_hint">Tap the map or drag the pin to set your location.</p>
     </section>
 
     <section class="card request-card">
@@ -193,6 +196,7 @@
     </article>
   </template>
 
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

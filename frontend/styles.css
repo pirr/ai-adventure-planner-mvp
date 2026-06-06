@@ -149,6 +149,26 @@ p {
   margin-bottom: 0;
 }
 
+#map {
+  height: 240px;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: var(--soft);
+  z-index: 0;
+}
+
+/* Leaflet popups/controls inherit the app font and stay readable on the card. */
+.leaflet-container {
+  font: inherit;
+}
+
+.map-hint {
+  opacity: 0.92;
+}
+
 label {
   display: block;
   color: #33423e;

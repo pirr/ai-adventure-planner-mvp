@@ -18,6 +18,80 @@ function anonymousId() {
 }
 
 // ---------------------------------------------------------------------------
+// Map (Leaflet, vendored locally; tiles from OpenStreetMap)
+// ---------------------------------------------------------------------------
+let map = null;
+let originMarker = null;
+let resultsLayer = null;
+
+function initMap() {
+  if (typeof L === 'undefined' || !document.getElementById('map')) return; // degrade gracefully
+  const lat = parseFloat($('lat').value) || 42.4304;
+  const lon = parseFloat($('lon').value) || 18.6964;
+  map = L.map('map').setView([lat, lon], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+  const icon = L.icon({
+    iconUrl: '/static/vendor/leaflet/images/marker-icon.png',
+    iconRetinaUrl: '/static/vendor/leaflet/images/marker-icon-2x.png',
+    shadowUrl: '/static/vendor/leaflet/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  });
+  originMarker = L.marker([lat, lon], { draggable: true, icon }).addTo(map).bindPopup(t('map_you_are_here'));
+  originMarker.on('dragend', () => {
+    const { lat: a, lng: b } = originMarker.getLatLng();
+    setOrigin(a, b, { recenter: false });
+    $('locationStatus').textContent = t('map_location_set');
+  });
+  map.on('click', (event) => {
+    setOrigin(event.latlng.lat, event.latlng.lng, { recenter: false });
+    $('locationStatus').textContent = t('map_location_set');
+  });
+  resultsLayer = L.layerGroup().addTo(map);
+}
+
+// Single source of truth for the origin: writes the lat/lon inputs and moves
+// the pin. `recenter` also pans/zooms the map (used by the location buttons).
+function setOrigin(lat, lon, { recenter = false } = {}) {
+  const latNum = Number(lat);
+  const lonNum = Number(lon);
+  $('lat').value = latNum.toFixed(6);
+  $('lon').value = lonNum.toFixed(6);
+  if (originMarker) originMarker.setLatLng([latNum, lonNum]);
+  if (map && recenter) map.setView([latNum, lonNum], Math.max(map.getZoom(), 13));
+}
+
+// Plot recommended places as green dots (distinct from the blue origin pin).
+// `fit` (true only on a fresh search) frames the origin + all results.
+function renderResultMarkers(items, { fit = false } = {}) {
+  if (!map || !resultsLayer) return;
+  resultsLayer.clearLayers();
+  const points = [];
+  items.forEach((item) => {
+    if (typeof item.lat !== 'number' || typeof item.lon !== 'number') return;
+    L.circleMarker([item.lat, item.lon], {
+      radius: 8,
+      color: '#177a51',
+      fillColor: '#177a51',
+      fillOpacity: 0.85,
+      weight: 2,
+    })
+      .addTo(resultsLayer)
+      .bindPopup(`<strong>${escapeHtml(item.title)}</strong><br>${t('score_label', { score: item.adventure_score })}`);
+    points.push([item.lat, item.lon]);
+  });
+  if (fit && points.length) {
+    const all = originMarker ? [[originMarker.getLatLng().lat, originMarker.getLatLng().lng], ...points] : points;
+    map.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 14 });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Internationalization (EN / RU)
 // ---------------------------------------------------------------------------
 const I18N = {
@@ -29,6 +103,9 @@ const I18N = {
     use_location: 'Use my location',
     use_demo: 'Use Tivat demo',
     loc_not_set: 'Location is not set yet.',
+    map_hint: 'Tap the map or drag the pin to set your location.',
+    map_you_are_here: 'Your location',
+    map_location_set: 'Location set from the map.',
     trip_request: 'Trip request',
     free_text: 'Free text',
     request_text_default: 'Family trip for 5 hours with fortress, history and views.',
@@ -160,6 +237,9 @@ const I18N = {
     use_location: 'Использовать мою геолокацию',
     use_demo: 'Демо: Тиват',
     loc_not_set: 'Локация ещё не задана.',
+    map_hint: 'Нажмите на карту или перетащите маркер, чтобы задать локацию.',
+    map_you_are_here: 'Ваша локация',
+    map_location_set: 'Локация задана по карте.',
     trip_request: 'Параметры поездки',
     free_text: 'Свободный текст',
     request_text_default: 'Семейная поездка на 5 часов: крепость, история и виды.',
@@ -347,8 +427,7 @@ document.querySelectorAll('.lang-btn').forEach((btn) => {
 // ---------------------------------------------------------------------------
 
 function setLocation(lat, lon, label) {
-  $('lat').value = Number(lat).toFixed(6);
-  $('lon').value = Number(lon).toFixed(6);
+  setOrigin(lat, lon, { recenter: true });
   $('locationStatus').textContent = label;
 }
 
@@ -399,6 +478,15 @@ document.querySelectorAll('.chip').forEach((button) => {
 
 $('searchBtn').addEventListener('click', runSearch);
 $('clearHistoryBtn').addEventListener('click', clearHistory);
+
+// Manual lat/lon edits move the pin and recenter the map.
+['lat', 'lon'].forEach((id) =>
+  $(id).addEventListener('change', () => {
+    const lat = parseFloat($('lat').value);
+    const lon = parseFloat($('lon').value);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) setOrigin(lat, lon, { recenter: true });
+  }),
+);
 
 function selectedInterests() {
   return Array.from(document.querySelectorAll('.chip.active')).map((button) => button.dataset.interest);
@@ -495,6 +583,7 @@ function renderResults(data, { scroll = true } = {}) {
   renderWarnings(data.data_warnings || []);
   renderCards(data.recommendations || []);
   renderRejected(data.rejected_alternatives || []);
+  renderResultMarkers(data.recommendations || [], { fit: scroll });
   resultsEl.classList.remove('hidden');
   if (scroll) {
     resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -789,4 +878,5 @@ function escapeHtml(value) {
 
 // Apply translations on initial load.
 applyStaticI18n();
+initMap();
 loadHistory();
