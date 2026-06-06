@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
-from app.schemas import AdventureRequest, AdventureResponse, FeedbackRequest, Recommendation
+from app.schemas import AdventureRequest, AdventureResponse, AnalyticsEvent, FeedbackRequest, Recommendation
 
 
 class Storage:
@@ -51,6 +51,15 @@ class Storage:
                     rating TEXT NOT NULL,
                     reason TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    event TEXT NOT NULL,
+                    request_id TEXT,
+                    recommendation_id TEXT,
+                    meta TEXT
+                );
                 """
             )
 
@@ -77,6 +86,26 @@ class Storage:
     def feedback_summary(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM feedback ORDER BY created_at DESC LIMIT 100").fetchall()
+        return [dict(row) for row in rows]
+
+    def save_event(self, event: AnalyticsEvent) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO events (created_at, event, request_id, recommendation_id, meta) VALUES (?, ?, ?, ?, ?)",
+                (
+                    datetime.utcnow().isoformat(),
+                    event.event,
+                    event.request_id,
+                    event.recommendation_id,
+                    json.dumps(event.meta) if event.meta else None,
+                ),
+            )
+
+    def events_summary(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT event, COUNT(*) AS count FROM events GROUP BY event ORDER BY count DESC"
+            ).fetchall()
         return [dict(row) for row in rows]
 
 

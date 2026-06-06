@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.schemas import AdventureRequest, FeedbackRequest
+from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest
 from app.services.recommendations import build_recommendations
 from app.services.storage import storage
 
@@ -73,3 +73,14 @@ async def feedback(payload: FeedbackRequest) -> dict[str, str]:
 @app.get("/api/feedback")
 async def feedback_list() -> dict[str, Any]:
     return {"items": storage.feedback_summary()}
+
+
+@app.post("/api/events")
+async def events(payload: AnalyticsEvent) -> dict[str, str]:
+    storage.save_event(payload)
+    return {"status": "ok"}
+
+
+@app.get("/api/events")
+async def events_list() -> dict[str, Any]:
+    return {"items": storage.events_summary()}

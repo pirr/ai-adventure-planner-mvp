@@ -407,10 +407,20 @@ function clearError() {
   errorBox.textContent = '';
 }
 
+// Lightweight, fire-and-forget analytics. Never blocks or fails the UI.
+function track(event, extra = {}) {
+  fetch('/api/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, ...extra }),
+  }).catch(() => {});
+}
+
 async function runSearch() {
   clearError();
   resultsEl.classList.add('hidden');
   loadingEl.classList.remove('hidden');
+  track('search_started');
 
   try {
     const response = await fetch('/api/recommendations', {
@@ -424,6 +434,7 @@ async function runSearch() {
     }
     const data = await response.json();
     renderResults(data);
+    track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
   } catch (error) {
     setError(t('search_failed', { error: error.message }));
   } finally {
@@ -496,6 +507,12 @@ function renderCards(items) {
     const appleLink = node.querySelector('.apple-map-link');
     appleLink.textContent = t('open_apple_maps');
     appleLink.href = item.apple_map_url;
+    mapLink.addEventListener('click', () =>
+      track('maps_opened', { request_id: lastRequestId, recommendation_id: item.id, meta: { provider: 'google' } }),
+    );
+    appleLink.addEventListener('click', () =>
+      track('maps_opened', { request_id: lastRequestId, recommendation_id: item.id, meta: { provider: 'apple' } }),
+    );
     node.querySelector('.feedback-up').textContent = t('useful');
     node.querySelector('.feedback-down').textContent = t('not_useful');
     node.querySelector('.badges').innerHTML = `
@@ -517,6 +534,12 @@ function renderCards(items) {
       ? `<h3>${t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`
       : `<div class="item good">${t('no_risk')}</div>`;
     mapLink.href = item.map_url;
+    const details = node.querySelector('details');
+    if (details) {
+      details.addEventListener('toggle', () => {
+        if (details.open) track('recommendation_opened', { request_id: lastRequestId, recommendation_id: item.id });
+      });
+    }
     const reasonsBox = node.querySelector('.feedback-reasons');
     node.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up'));
     node.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id));
@@ -650,6 +673,11 @@ async function submitFeedback(recommendationId, rating, reason) {
         rating,
         reason: reason || null,
       }),
+    });
+    track('feedback_submitted', {
+      request_id: lastRequestId,
+      recommendation_id: recommendationId,
+      meta: { rating, reason: reason || null },
     });
     alert(t('feedback_saved'));
   } catch (error) {

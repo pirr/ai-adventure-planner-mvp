@@ -155,3 +155,19 @@ class FeedbackRequest(BaseModel):
     recommendation_id: str
     rating: Literal["up", "down"]
     reason: FeedbackReason | None = None
+
+
+AnalyticsEventName = Literal[
+    "search_started",
+    "search_completed",
+    "recommendation_opened",
+    "maps_opened",
+    "feedback_submitted",
+]
+
+
+class AnalyticsEvent(BaseModel):
+    event: AnalyticsEventName
+    request_id: str | None = None
+    recommendation_id: str | None = None
+    meta: dict[str, Any] | None = None
