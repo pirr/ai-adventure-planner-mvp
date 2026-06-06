@@ -6,6 +6,17 @@ const errorBox = $('errorBox');
 let lastRequestId = null;
 let lastResponse = null;
 
+// Anonymous, persistent per-browser id (no accounts/PII). Ties a user's
+// sessions, feedback and events together for history and personalization.
+function anonymousId() {
+  let id = localStorage.getItem('anon_id');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : `a-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem('anon_id', id);
+  }
+  return id;
+}
+
 // ---------------------------------------------------------------------------
 // Internationalization (EN / RU)
 // ---------------------------------------------------------------------------
@@ -394,6 +405,7 @@ function requestPayload() {
     use_live_data: $('useLiveData').checked,
     limit: 5,
     lang: currentLang,
+    anonymous_id: anonymousId(),
   };
 }
 
@@ -412,7 +424,7 @@ function track(event, extra = {}) {
   fetch('/api/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event, ...extra }),
+    body: JSON.stringify({ event, anonymous_id: anonymousId(), ...extra }),
   }).catch(() => {});
 }
 
@@ -672,6 +684,7 @@ async function submitFeedback(recommendationId, rating, reason) {
         recommendation_id: recommendationId,
         rating,
         reason: reason || null,
+        anonymous_id: anonymousId(),
       }),
     });
     track('feedback_submitted', {

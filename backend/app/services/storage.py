@@ -25,9 +25,17 @@ class Storage:
         with self._connect() as conn:
             conn.executescript(
                 """
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    anonymous_id TEXT UNIQUE NOT NULL,
+                    created_at TEXT NOT NULL,
+                    locale TEXT
+                );
+
                 CREATE TABLE IF NOT EXISTS search_sessions (
                     id TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL,
+                    anonymous_id TEXT,
                     lat REAL NOT NULL,
                     lon REAL NOT NULL,
                     request_json TEXT NOT NULL,
@@ -49,7 +57,8 @@ class Storage:
                     request_id TEXT NOT NULL,
                     recommendation_id TEXT NOT NULL,
                     rating TEXT NOT NULL,
-                    reason TEXT
+                    reason TEXT,
+                    anonymous_id TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS events (
@@ -58,17 +67,38 @@ class Storage:
                     event TEXT NOT NULL,
                     request_id TEXT,
                     recommendation_id TEXT,
+                    anonymous_id TEXT,
                     meta TEXT
                 );
                 """
             )
+            # Migrate pre-0.2 databases that predate the anonymous_id columns.
+            for table in ("search_sessions", "feedback", "events"):
+                self._ensure_column(conn, table, "anonymous_id", "TEXT")
+
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+    @staticmethod
+    def _touch_user(conn: sqlite3.Connection, anonymous_id: str | None, locale: str | None = None) -> None:
+        if not anonymous_id:
+            return
+        conn.execute(
+            "INSERT INTO users (anonymous_id, created_at, locale) VALUES (?, ?, ?) "
+            "ON CONFLICT(anonymous_id) DO UPDATE SET locale=COALESCE(excluded.locale, users.locale)",
+            (anonymous_id, datetime.utcnow().isoformat(), locale),
+        )
 
     def save_response(self, request_id: str, request: AdventureRequest, response: AdventureResponse) -> None:
         response_json = response.json()
         with self._connect() as conn:
+            self._touch_user(conn, request.anonymous_id, request.lang)
             conn.execute(
-                "INSERT OR REPLACE INTO search_sessions (id, created_at, lat, lon, request_json, response_json) VALUES (?, ?, ?, ?, ?, ?)",
-                (request_id, datetime.utcnow().isoformat(), request.lat, request.lon, request.json(), response_json),
+                "INSERT OR REPLACE INTO search_sessions (id, created_at, anonymous_id, lat, lon, request_json, response_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (request_id, datetime.utcnow().isoformat(), request.anonymous_id, request.lat, request.lon, request.json(), response_json),
             )
             for rec in response.recommendations:
                 conn.execute(
@@ -78,9 +108,10 @@ class Storage:
 
     def save_feedback(self, feedback: FeedbackRequest) -> None:
         with self._connect() as conn:
+            self._touch_user(conn, feedback.anonymous_id)
             conn.execute(
-                "INSERT INTO feedback (created_at, request_id, recommendation_id, rating, reason) VALUES (?, ?, ?, ?, ?)",
-                (datetime.utcnow().isoformat(), feedback.request_id, feedback.recommendation_id, feedback.rating, feedback.reason),
+                "INSERT INTO feedback (created_at, request_id, recommendation_id, rating, reason, anonymous_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (datetime.utcnow().isoformat(), feedback.request_id, feedback.recommendation_id, feedback.rating, feedback.reason, feedback.anonymous_id),
             )
 
     def feedback_summary(self) -> list[dict[str, Any]]:
@@ -90,13 +121,15 @@ class Storage:
 
     def save_event(self, event: AnalyticsEvent) -> None:
         with self._connect() as conn:
+            self._touch_user(conn, event.anonymous_id)
             conn.execute(
-                "INSERT INTO events (created_at, event, request_id, recommendation_id, meta) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO events (created_at, event, request_id, recommendation_id, anonymous_id, meta) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     datetime.utcnow().isoformat(),
                     event.event,
                     event.request_id,
                     event.recommendation_id,
+                    event.anonymous_id,
                     json.dumps(event.meta) if event.meta else None,
                 ),
             )

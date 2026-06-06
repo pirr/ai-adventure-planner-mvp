@@ -24,6 +24,9 @@ class AdventureRequest(BaseModel):
     use_live_data: bool = True
     limit: int = Field(default=5, ge=1, le=10)
     lang: Lang = "en"
+    # Anonymous, client-generated id (localStorage). No accounts/PII; ties a
+    # user's sessions/feedback together for history and personalization.
+    anonymous_id: str | None = Field(default=None, max_length=64)
 
     @validator("interests", pre=True)
     def normalize_interests(cls, value: Any) -> list[str]:
@@ -155,6 +158,7 @@ class FeedbackRequest(BaseModel):
     recommendation_id: str
     rating: Literal["up", "down"]
     reason: FeedbackReason | None = None
+    anonymous_id: str | None = Field(default=None, max_length=64)
 
 
 AnalyticsEventName = Literal[
@@ -170,4 +174,5 @@ class AnalyticsEvent(BaseModel):
     event: AnalyticsEventName
     request_id: str | None = None
     recommendation_id: str | None = None
+    anonymous_id: str | None = Field(default=None, max_length=64)
     meta: dict[str, Any] | None = None
