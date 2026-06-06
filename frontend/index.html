@@ -26,8 +26,6 @@
         <button id="demoBtn" class="button ghost" data-i18n="use_demo">Use Tivat demo</button>
       </div>
       <p id="locationStatus" class="status-text" data-i18n="loc_not_set">Location is not set yet.</p>
-      <div id="map"></div>
-      <p class="status-text map-hint" data-i18n="map_hint">Tap the map or drag the pin to set your location.</p>
     </section>
 
     <section class="card request-card">
@@ -151,6 +149,11 @@
       <div id="weatherBox" class="card"></div>
       <div id="dataWarnings"></div>
       <div id="cards"></div>
+      <details id="mapPanel" class="card map-panel">
+        <summary data-i18n="map_title">Map</summary>
+        <div id="map"></div>
+        <p class="status-text map-hint" data-i18n="map_hint">Tap the map or drag the pin to set your location.</p>
+      </details>
       <div id="rejectedBox" class="card"></div>
     </section>
 

@@ -150,12 +150,12 @@ p {
 }
 
 #map {
-  height: 240px;
+  height: 280px;
   width: 100%;
   margin-top: 12px;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--line);
   background: var(--soft);
   z-index: 0;
 }
@@ -166,7 +166,24 @@ p {
 }
 
 .map-hint {
-  opacity: 0.92;
+  color: var(--muted);
+}
+
+.map-panel > summary {
+  font-size: 16px;
+  font-weight: 850;
+  color: var(--text);
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Place titles double as a "show on map" trigger. */
+.title-link {
+  cursor: pointer;
+}
+.title-link:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
 }
 
 label {

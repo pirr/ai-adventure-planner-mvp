@@ -19,13 +19,18 @@ function anonymousId() {
 
 // ---------------------------------------------------------------------------
 // Map (Leaflet, vendored locally; tiles from OpenStreetMap)
+// Lives in a collapsible panel under the result cards. Created lazily the first
+// time the panel opens, and re-measured via invalidateSize() because Leaflet
+// can't size a container that was hidden inside a closed <details>.
 // ---------------------------------------------------------------------------
 let map = null;
 let originMarker = null;
 let resultsLayer = null;
+let resultMarkersById = {};
+let pendingFocus = null;
 
-function initMap() {
-  if (typeof L === 'undefined' || !document.getElementById('map')) return; // degrade gracefully
+function ensureMap() {
+  if (map || typeof L === 'undefined' || !document.getElementById('map')) return;
   const lat = parseFloat($('lat').value) || 42.4304;
   const lon = parseFloat($('lon').value) || 18.6964;
   map = L.map('map').setView([lat, lon], 13);
@@ -66,15 +71,16 @@ function setOrigin(lat, lon, { recenter = false } = {}) {
   if (map && recenter) map.setView([latNum, lonNum], Math.max(map.getZoom(), 13));
 }
 
-// Plot recommended places as green dots (distinct from the blue origin pin).
-// `fit` (true only on a fresh search) frames the origin + all results.
+// Plot recommended places as green dots (distinct from the blue origin pin),
+// keyed by id so a card click can open the right popup.
 function renderResultMarkers(items, { fit = false } = {}) {
   if (!map || !resultsLayer) return;
   resultsLayer.clearLayers();
+  resultMarkersById = {};
   const points = [];
   items.forEach((item) => {
     if (typeof item.lat !== 'number' || typeof item.lon !== 'number') return;
-    L.circleMarker([item.lat, item.lon], {
+    const marker = L.circleMarker([item.lat, item.lon], {
       radius: 8,
       color: '#177a51',
       fillColor: '#177a51',
@@ -83,12 +89,45 @@ function renderResultMarkers(items, { fit = false } = {}) {
     })
       .addTo(resultsLayer)
       .bindPopup(`<strong>${escapeHtml(item.title)}</strong><br>${t('score_label', { score: item.adventure_score })}`);
+    resultMarkersById[item.id] = marker;
     points.push([item.lat, item.lon]);
   });
   if (fit && points.length) {
     const all = originMarker ? [[originMarker.getLatLng().lat, originMarker.getLatLng().lng], ...points] : points;
     map.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 14 });
   }
+}
+
+// Run once the panel is actually visible: re-measure, plot current results, then
+// either focus a place a card asked for, or frame the origin + all results.
+function applyMapView() {
+  ensureMap();
+  if (!map) return;
+  setTimeout(() => {
+    map.invalidateSize();
+    renderResultMarkers((lastResponse && lastResponse.recommendations) || [], { fit: !pendingFocus });
+    if (pendingFocus) {
+      map.setView([pendingFocus.lat, pendingFocus.lon], 15);
+      const marker = resultMarkersById[pendingFocus.id];
+      if (marker) marker.openPopup();
+      pendingFocus = null;
+    }
+  }, 60);
+}
+
+function refreshMapIfOpen() {
+  const panel = $('mapPanel');
+  if (panel && panel.open) applyMapView();
+}
+
+// Clicking a place card opens the collapsed map and centers it on that place.
+function focusPlace(item) {
+  pendingFocus = item;
+  const panel = $('mapPanel');
+  if (!panel) return;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (panel.open) applyMapView();
+  else panel.open = true; // fires the toggle handler -> applyMapView
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +142,8 @@ const I18N = {
     use_location: 'Use my location',
     use_demo: 'Use Tivat demo',
     loc_not_set: 'Location is not set yet.',
+    map_title: 'Map',
+    show_on_map: 'Show on map',
     map_hint: 'Tap the map or drag the pin to set your location.',
     map_you_are_here: 'Your location',
     map_location_set: 'Location set from the map.',
@@ -237,6 +278,8 @@ const I18N = {
     use_location: 'Использовать мою геолокацию',
     use_demo: 'Демо: Тиват',
     loc_not_set: 'Локация ещё не задана.',
+    map_title: 'Карта',
+    show_on_map: 'Показать на карте',
     map_hint: 'Нажмите на карту или перетащите маркер, чтобы задать локацию.',
     map_you_are_here: 'Ваша локация',
     map_location_set: 'Локация задана по карте.',
@@ -478,6 +521,9 @@ document.querySelectorAll('.chip').forEach((button) => {
 
 $('searchBtn').addEventListener('click', runSearch);
 $('clearHistoryBtn').addEventListener('click', clearHistory);
+$('mapPanel').addEventListener('toggle', () => {
+  if ($('mapPanel').open) applyMapView();
+});
 
 // Manual lat/lon edits move the pin and recenter the map.
 ['lat', 'lon'].forEach((id) =>
@@ -583,7 +629,7 @@ function renderResults(data, { scroll = true } = {}) {
   renderWarnings(data.data_warnings || []);
   renderCards(data.recommendations || []);
   renderRejected(data.rejected_alternatives || []);
-  renderResultMarkers(data.recommendations || [], { fit: scroll });
+  refreshMapIfOpen();
   resultsEl.classList.remove('hidden');
   if (scroll) {
     resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -624,7 +670,11 @@ function renderCards(items) {
   const template = $('recommendationTemplate');
   items.forEach((item) => {
     const node = template.content.cloneNode(true);
-    node.querySelector('.title').textContent = item.title;
+    const titleEl = node.querySelector('.title');
+    titleEl.textContent = item.title;
+    titleEl.classList.add('title-link');
+    titleEl.title = t('show_on_map');
+    titleEl.addEventListener('click', () => focusPlace(item));
     node.querySelector('.description').textContent = item.summary || item.description;
     renderPhoto(node, item);
     node.querySelector('.score').textContent = item.adventure_score;
@@ -878,5 +928,4 @@ function escapeHtml(value) {
 
 // Apply translations on initial load.
 applyStaticI18n();
-initMap();
 loadHistory();
