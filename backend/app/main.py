@@ -94,6 +94,11 @@ async def events_list() -> dict[str, Any]:
     return {"items": storage.events_summary()}
 
 
+@app.get("/api/ab")
+async def ab() -> dict[str, Any]:
+    return {"variants": storage.ab_summary()}
+
+
 @app.get("/api/history")
 async def history(anonymous_id: str | None = None) -> dict[str, Any]:
     return {"items": storage.history_for(anonymous_id)}

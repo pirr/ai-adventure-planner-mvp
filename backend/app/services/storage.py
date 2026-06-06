@@ -39,7 +39,8 @@ class Storage:
                     lat REAL NOT NULL,
                     lon REAL NOT NULL,
                     request_json TEXT NOT NULL,
-                    response_json TEXT NOT NULL
+                    response_json TEXT NOT NULL,
+                    explainer TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS recommendations (
@@ -75,6 +76,8 @@ class Storage:
             # Migrate pre-0.2 databases that predate the anonymous_id columns.
             for table in ("search_sessions", "feedback", "events"):
                 self._ensure_column(conn, table, "anonymous_id", "TEXT")
+            # 0.2.1: which explainer (llm/template) produced each session, for A/B.
+            self._ensure_column(conn, "search_sessions", "explainer", "TEXT")
 
     @staticmethod
     def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
@@ -94,11 +97,13 @@ class Storage:
 
     def save_response(self, request_id: str, request: AdventureRequest, response: AdventureResponse) -> None:
         response_json = response.json()
+        # Outcome-based A/B label: did the user actually see LLM explanations?
+        explainer = "llm" if any(rec.summary for rec in response.recommendations) else "template"
         with self._connect() as conn:
             self._touch_user(conn, request.anonymous_id, request.lang)
             conn.execute(
-                "INSERT OR REPLACE INTO search_sessions (id, created_at, anonymous_id, lat, lon, request_json, response_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (request_id, datetime.utcnow().isoformat(), request.anonymous_id, request.lat, request.lon, request.json(), response_json),
+                "INSERT OR REPLACE INTO search_sessions (id, created_at, anonymous_id, lat, lon, request_json, response_json, explainer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (request_id, datetime.utcnow().isoformat(), request.anonymous_id, request.lat, request.lon, request.json(), response_json, explainer),
             )
             for rec in response.recommendations:
                 conn.execute(
@@ -140,6 +145,36 @@ class Storage:
                 "SELECT event, COUNT(*) AS count FROM events GROUP BY event ORDER BY count DESC"
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def ab_summary(self) -> list[dict[str, Any]]:
+        """Per explainer variant (llm/template): sessions, thumbs-up rate and
+        maps-open rate, joining feedback/events to sessions by request_id."""
+        with self._connect() as conn:
+            sessions = {row["explainer"]: row["n"] for row in conn.execute(
+                "SELECT explainer, COUNT(*) AS n FROM search_sessions GROUP BY explainer"
+            )}
+            feedback = {row["v"]: row for row in conn.execute(
+                "SELECT s.explainer AS v, SUM(CASE WHEN f.rating='up' THEN 1 ELSE 0 END) AS up, COUNT(*) AS total "
+                "FROM feedback f JOIN search_sessions s ON s.id = f.request_id GROUP BY s.explainer"
+            )}
+            maps = {row["v"]: row["n"] for row in conn.execute(
+                "SELECT s.explainer AS v, COUNT(*) AS n FROM events e JOIN search_sessions s ON s.id = e.request_id "
+                "WHERE e.event = 'maps_opened' GROUP BY s.explainer"
+            )}
+        result = []
+        for variant in sorted(sessions, key=lambda v: v or ""):
+            n = sessions[variant]
+            fb = feedback.get(variant)
+            up, total = (fb["up"] or 0, fb["total"]) if fb else (0, 0)
+            result.append({
+                "variant": variant,
+                "sessions": n,
+                "feedback": total,
+                "thumbs_up_rate": round(up / total, 3) if total else None,
+                "maps_opened": maps.get(variant, 0),
+                "maps_open_rate": round(maps.get(variant, 0) / n, 3) if n else None,
+            })
+        return result
 
     def history_for(self, anonymous_id: str | None, limit: int = 20) -> list[dict[str, Any]]:
         if not anonymous_id:

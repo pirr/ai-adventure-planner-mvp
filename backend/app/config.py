@@ -48,6 +48,9 @@ class Settings:
     llm_max_explained: int = int(os.getenv("LLM_MAX_EXPLAINED", "5"))
     llm_fallback_models: tuple[str] = tuple(os.getenv("LLM_FALLBACK_MODELS", "").split(","))
     gemini_reasoning_effort: str | None = os.getenv("GEMINI_REASONING_EFFORT", "")
+    # A/B test the LLM explanations vs templates: when on (and an LLM is
+    # configured), bucket users by anonymous_id — half see templates as control.
+    ab_test_enabled: bool = os.getenv("AB_TEST_ENABLED", "false").lower() == "true"
 
 
 settings = Settings()
