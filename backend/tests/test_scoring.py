@@ -100,3 +100,27 @@ def test_reduced_mobility_penalizes_hard_long_route():
     assert reduced.breakdown.group_fit < normal.breakdown.group_fit
     assert reduced.breakdown.safety_fit < normal.breakdown.safety_fit
     assert any("mobility" in w.lower() for w in reduced.warnings)
+
+
+def test_personal_preference_fit_shifts_with_history():
+    request = AdventureRequest(lat=42.43, lon=18.69, available_minutes=300, transport_mode="car", interests=["history", "fortresses"])
+    weather = WeatherSummary(source="test", summary="clear", score=90, confidence="estimated")
+    place = PlaceCandidate(
+        source="test",
+        source_id="test:fort",
+        name="Fort",
+        type="fortress",
+        lat=42.45,
+        lon=18.70,
+        estimated_activity_minutes=80,
+        estimated_walking_km=1.8,
+        difficulty="easy",
+        quality_score=85,
+    )
+    route = RouteInfo(source="test", one_way_minutes=18, round_trip_minutes=36, distance_km=10, map_url="x", confidence="estimated")
+    cold = score_candidate(place, route, weather, request)
+    assert cold.breakdown.personal_preference_fit == 70  # neutral on cold start
+    disliked = score_candidate(place, route, weather, request, {"place_types": {"fortress": -2}})
+    liked = score_candidate(place, route, weather, request, {"place_types": {"fortress": 2}})
+    assert disliked.breakdown.personal_preference_fit < 70 < liked.breakdown.personal_preference_fit
+    assert disliked.score < cold.score < liked.score

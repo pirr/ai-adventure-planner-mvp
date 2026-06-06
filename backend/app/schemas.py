@@ -106,6 +106,7 @@ class ScoreBreakdown(BaseModel):
     group_fit: int
     interest_fit: int
     place_quality: int
+    personal_preference_fit: int = 70  # neutral until the user has feedback history
 
 
 class Recommendation(BaseModel):

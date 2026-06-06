@@ -202,6 +202,28 @@ def _place_quality(place: PlaceCandidate) -> int:
     return _clamp(place.quality_score)
 
 
+def _personal_preference_fit(place: PlaceCandidate, profile: dict | None) -> int:
+    """0–100 from the user's own feedback history; neutral (70) on cold start.
+
+    Direct signal = net up/down for this place type. When the type is unseen, a
+    half-weight signal spills over from related types that share an interest tag.
+    """
+    if not profile:
+        return 70
+    place_types = profile.get("place_types", {})
+    net: float = place_types.get(place.type, 0)
+    if net == 0:
+        place_interests = PLACE_INTERESTS.get(place.type, set())
+        related = sum(
+            value for ptype, value in place_types.items()
+            if PLACE_INTERESTS.get(ptype, set()) & place_interests
+        )
+        net = related * 0.5
+    if net == 0:
+        return 70
+    return _clamp(70 + 12 * net)
+
+
 def _why(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, breakdown: ScoreBreakdown, request: AdventureRequest) -> list[str]:
     items: list[str] = []
     lang = request.lang
@@ -217,6 +239,8 @@ def _why(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, break
         items.append(t(lang, "why_group"))
     if breakdown.interest_fit >= 80:
         items.append(t(lang, "why_interest"))
+    if breakdown.personal_preference_fit >= 85:
+        items.append(t(lang, "why_preference"))
     if place.estimated_walking_km <= 2.5:
         items.append(t(lang, "why_walking", km=place.estimated_walking_km))
     if not items:
@@ -248,7 +272,7 @@ def _confidence(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary
     return "mixed"
 
 
-def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, request: AdventureRequest) -> ScoredCandidate:
+def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, request: AdventureRequest, profile: dict | None = None) -> ScoredCandidate:
     total_minutes = route.round_trip_minutes + place.estimated_activity_minutes
     time_fit = _time_fit(total_minutes, request.available_minutes)
     weather_fit = weather.score
@@ -256,16 +280,19 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
     group_fit = _group_fit(place, request)
     interest_fit = _interest_fit(place, request.interests)
     place_quality = _place_quality(place)
+    personal_preference_fit = _personal_preference_fit(place, profile)
     safety_fit, warnings = _safety_fit(place, request, weather, total_minutes)
 
+    # Adventure Score v0.2: adds a modest Personal Preference Fit term.
     score = round(
-        0.20 * time_fit
-        + 0.20 * weather_fit
-        + 0.15 * distance_fit
-        + 0.15 * safety_fit
-        + 0.10 * group_fit
-        + 0.10 * interest_fit
-        + 0.10 * place_quality
+        0.18 * time_fit
+        + 0.18 * weather_fit
+        + 0.13 * distance_fit
+        + 0.14 * safety_fit
+        + 0.09 * group_fit
+        + 0.09 * interest_fit
+        + 0.09 * place_quality
+        + 0.10 * personal_preference_fit
     )
     breakdown = ScoreBreakdown(
         time_fit=time_fit,
@@ -275,6 +302,7 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
         group_fit=group_fit,
         interest_fit=interest_fit,
         place_quality=place_quality,
+        personal_preference_fit=personal_preference_fit,
     )
     return ScoredCandidate(
         place=place,

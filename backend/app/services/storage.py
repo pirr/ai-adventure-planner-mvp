@@ -173,6 +173,35 @@ class Storage:
             items.append(item)
         return items
 
+    def preference_profile(self, anonymous_id: str | None) -> dict[str, Any]:
+        """Net up/down feedback per place type for one anonymous user.
+
+        Returns ``{"place_types": {type: net_score}}`` where net_score = (#up - #down).
+        Empty when the user has no feedback yet (cold start → neutral scoring).
+        """
+        if not anonymous_id:
+            return {}
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT f.rating AS rating, r.payload_json AS payload_json
+                FROM feedback f
+                JOIN recommendations r ON r.request_id = f.request_id AND r.id = f.recommendation_id
+                WHERE f.anonymous_id = ?
+                """,
+                (anonymous_id,),
+            ).fetchall()
+        place_types: dict[str, int] = {}
+        for row in rows:
+            try:
+                place_type = json.loads(row["payload_json"]).get("place_type")
+            except (TypeError, ValueError):
+                continue
+            if not place_type:
+                continue
+            place_types[place_type] = place_types.get(place_type, 0) + (1 if row["rating"] == "up" else -1)
+        return {"place_types": place_types} if place_types else {}
+
     def delete_user_data(self, anonymous_id: str | None) -> int:
         if not anonymous_id:
             return 0

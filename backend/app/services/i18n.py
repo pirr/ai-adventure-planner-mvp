@@ -83,6 +83,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "why_travel": "Travel time is manageable: about {minutes} min one way.",
         "why_group": "Suitable for the selected group and difficulty level.",
         "why_interest": "Matches your selected interests.",
+        "why_preference": "Similar to places you've liked before.",
         "why_walking": "Walking is limited to about {km:.1f} km.",
         "why_best": "This is the best available option after filtering nearby places.",
         # Type descriptions
@@ -129,6 +130,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "why_travel": "Время в пути приемлемое: около {minutes} мин в одну сторону.",
         "why_group": "Подходит для выбранной группы и уровня сложности.",
         "why_interest": "Соответствует вашим интересам.",
+        "why_preference": "Похоже на места, которые вам уже нравились.",
         "why_walking": "Пешая часть ограничена примерно {km:.1f} км.",
         "why_best": "Это лучший доступный вариант после фильтрации мест поблизости.",
         # Type descriptions

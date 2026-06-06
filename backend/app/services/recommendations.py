@@ -9,11 +9,14 @@ from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import get_route
 from app.services.scoring import rejected_from_scored, score_candidate, to_recommendation
+from app.services.storage import storage
 from app.services.weather import get_destination_forecasts, get_weather
 
 
 async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
     request_id = str(uuid.uuid4())
+    # Personal Preference Fit signal from this user's past feedback (cold-start safe).
+    profile = storage.preference_profile(request.anonymous_id)
     weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data, request.lang)
     places, place_warnings = await get_candidate_places(
         request.lat,
@@ -29,7 +32,7 @@ async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
         *[get_route(request.lat, request.lon, place, request.transport_mode, request.use_live_data) for place in places[:40]]
     )
     # First pass ranks every candidate using the weather at the user's origin.
-    scored = [score_candidate(place, route, weather, request) for place, route in zip(places[:40], routes)]
+    scored = [score_candidate(place, route, weather, request, profile) for place, route in zip(places[:40], routes)]
     scored.sort(key=lambda c: c.score, reverse=True)
 
     # Second pass re-scores only the strongest candidates with the weather at
@@ -48,7 +51,7 @@ async def build_recommendations(request: AdventureRequest) -> AdventureResponse:
         arrival_weather, timeline = forecast.at_arrival(
             candidate.route.one_way_minutes, candidate.place.estimated_activity_minutes, request.lang
         )
-        refreshed = score_candidate(candidate.place, candidate.route, arrival_weather, request)
+        refreshed = score_candidate(candidate.place, candidate.route, arrival_weather, request, profile)
         refreshed.arrival_weather = arrival_weather
         refreshed.forecast = timeline
         rescored.append(refreshed)
