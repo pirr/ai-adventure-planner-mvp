@@ -33,6 +33,8 @@ class Settings:
     openweather_api_key: str | None = os.getenv("OPENWEATHER_API_KEY")
     use_open_meteo_fallback: bool = os.getenv("USE_OPEN_METEO_FALLBACK", "true").lower() == "true"
     http_timeout_seconds: float = float(os.getenv("HTTP_TIMEOUT_SECONDS", "8"))
+    # App log level (INFO by default). Set DEBUG for verbose LLM/HTTP logs.
+    log_level: str = os.getenv("LOG_LEVEL", "INFO")
     # LLM explanation layer. Provider-agnostic over the OpenAI /v1 chat API.
     # Default "template" keeps the rule-based explanations and makes no network
     # call. Set LLM_PROVIDER to a preset (openai/llamacpp/ollama/deepseek/groq/

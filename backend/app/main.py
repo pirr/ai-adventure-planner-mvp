@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from logging.config import dictConfig
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +17,7 @@ from app.services.storage import storage
 app = FastAPI(title=settings.app_name, version=settings.version)
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=settings.log_level.upper(),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
