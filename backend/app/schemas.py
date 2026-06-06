@@ -49,6 +49,17 @@ class WeatherSummary(BaseModel):
     confidence: Literal["live", "fallback", "estimated"] = "estimated"
 
 
+class HourlyForecast(BaseModel):
+    # One hour of the destination forecast, relative to when the request ran.
+    time: str  # local clock time, "HH:MM"
+    hour_offset: int  # whole hours from now (1, 2, 3, ...)
+    label: str  # localized sky condition
+    temperature_c: float | None = None
+    precipitation_mm: float | None = None
+    wind_kmh: float | None = None
+    is_arrival: bool = False  # the hour the user is estimated to arrive
+
+
 class PlaceCandidate(BaseModel):
     source: str
     source_id: str
@@ -110,6 +121,11 @@ class Recommendation(BaseModel):
     source: str
     data_confidence: Literal["live", "mixed", "fallback", "estimated"] = "mixed"
     photo: PlacePhoto | None = None
+    # Weather at the destination at the estimated arrival time, plus an hourly
+    # timeline from now through travel and into the visit. Empty when live data
+    # is off or the forecast call failed.
+    arrival_weather: WeatherSummary | None = None
+    forecast: list[HourlyForecast] = Field(default_factory=list)
     tags: dict[str, Any] = Field(default_factory=dict)
 
 

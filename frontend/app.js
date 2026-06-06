@@ -64,8 +64,12 @@ const I18N = {
     useful: '👍 Useful',
     not_useful: '👎 Not useful',
     photo_source: 'Photo: {source}',
-    // weather box
-    weather_context: 'Weather context',
+    // per-place destination weather
+    place_weather_title: 'Weather at destination',
+    on_arrival: 'On arrival',
+    forecast_arrival: 'arrival',
+    // weather box (user's current location)
+    weather_context: 'Current location weather',
     src_live: 'Live',
     src_fallback: 'Fallback',
     weather_fit: 'Weather Fit {score}/100',
@@ -172,7 +176,10 @@ const I18N = {
     useful: '👍 Полезно',
     not_useful: '👎 Не полезно',
     photo_source: 'Фото: {source}',
-    weather_context: 'Погодный контекст',
+    place_weather_title: 'Погода в месте назначения',
+    on_arrival: 'По прибытии',
+    forecast_arrival: 'прибытие',
+    weather_context: 'Погода в текущей точке',
     src_live: 'Онлайн',
     src_fallback: 'Резерв',
     weather_fit: 'Соответствие погоды {score}/100',
@@ -479,6 +486,7 @@ function renderCards(items) {
       <span class="badge">${t('difficulty_' + item.difficulty)}</span>
       <span class="badge ${item.data_confidence === 'fallback' ? 'warn' : ''}">${t('confidence_' + item.data_confidence)} ${t('data_word')}</span>
     `;
+    renderPlaceWeather(node, item);
     node.querySelector('.breakdown').innerHTML = Object.entries(item.score_breakdown)
       .map(([key, value]) => `<div class="item"><strong>${breakdownLabel(key)}:</strong> ${value}/100</div>`)
       .join('');
@@ -527,6 +535,50 @@ function renderPhoto(node, item) {
   }
 
   media.classList.remove('hidden');
+}
+
+// Per-place destination weather: a Weather-Fit badge, the conditions expected on
+// arrival, and an hourly strip from now through travel into the visit. Hidden
+// when no forecast was available (live data off, or the forecast call failed).
+function renderPlaceWeather(node, item) {
+  const container = node.querySelector('.place-weather');
+  if (!container) return;
+  const arrival = item.arrival_weather;
+  const hours = item.forecast || [];
+  if (!arrival && !hours.length) {
+    container.remove();
+    return;
+  }
+
+  const fitBadge =
+    arrival && arrival.score != null ? `<span class="badge">${t('weather_fit', { score: arrival.score })}</span>` : '';
+  let arrivalLine = '';
+  if (arrival) {
+    const temp = arrival.temperature_c != null ? ` · ${Math.round(arrival.temperature_c)}°C` : '';
+    arrivalLine = `<p class="pw-arrival">${t('on_arrival')}: ${escapeHtml(arrival.summary)}${temp}</p>`;
+  }
+  const strip = hours.length ? `<div class="forecast-strip">${hours.map(forecastHour).join('')}</div>` : '';
+
+  container.innerHTML = `
+    <div class="pw-head"><h3>${t('place_weather_title')}</h3>${fitBadge}</div>
+    ${arrivalLine}
+    ${strip}
+  `;
+}
+
+function forecastHour(hour) {
+  const temp = hour.temperature_c != null ? `${Math.round(hour.temperature_c)}°` : '';
+  const rain = hour.precipitation_mm > 0 ? ` 🌧${hour.precipitation_mm.toFixed(1)}` : '';
+  const tag = hour.is_arrival ? `<span class="fh-tag">${t('forecast_arrival')}</span>` : '';
+  return `
+    <div class="forecast-hour${hour.is_arrival ? ' arrival' : ''}">
+      <span class="fh-off">+${hour.hour_offset}${t('unit_h')}</span>
+      <span class="fh-time">${escapeHtml(hour.time)}</span>
+      <span class="fh-temp">${temp}</span>
+      <span class="fh-sky">${escapeHtml(hour.label)}${rain}</span>
+      ${tag}
+    </div>
+  `;
 }
 
 function renderRejected(items) {

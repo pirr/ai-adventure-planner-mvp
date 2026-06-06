@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Iterable
 
-from app.schemas import AdventureRequest, PlaceCandidate, PlacePhoto, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
+from app.schemas import AdventureRequest, HourlyForecast, PlaceCandidate, PlacePhoto, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
 from app.services.i18n import t
 
 
@@ -47,6 +47,8 @@ class ScoredCandidate:
     warnings: list[str]
     description: str
     data_confidence: str
+    arrival_weather: WeatherSummary | None = None
+    forecast: list[HourlyForecast] = field(default_factory=list)
 
 
 def normalize_interest(value: str) -> str:
@@ -289,6 +291,8 @@ def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None) 
         source=place.source,
         data_confidence=scored.data_confidence,  # type: ignore[arg-type]
         photo=photo,
+        arrival_weather=scored.arrival_weather,
+        forecast=scored.forecast,
         tags=place.tags,
     )
 

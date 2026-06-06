@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
 from datetime import datetime
-from statistics import mean
 from typing import Any
 
 from app.config import settings
-from app.schemas import WeatherSummary
+from app.schemas import HourlyForecast, WeatherSummary
 from app.services.i18n import t, weather_label
 from app.services.net import http_client
 
@@ -184,3 +185,163 @@ async def get_weather(lat: float, lon: float, use_live_data: bool, lang: str = "
             warnings.append(t(lang, "warn_openmeteo_unavailable", exc=exc.__class__.__name__))
 
     return fallback_weather(lang), warnings
+
+
+# ---------------------------------------------------------------------------
+# Destination / arrival forecast
+#
+# The summary above describes the weather at the user's current location, now.
+# For a place that is an hour's drive away the weather *on arrival* is what
+# matters, so we fetch an hourly forecast at each destination and slice out the
+# hours the user will actually experience (travel time -> end of the visit).
+# ---------------------------------------------------------------------------
+
+# Cap the per-place timeline so the UI strip stays readable even for all-day trips.
+_MAX_FORECAST_HOURS = 6
+
+
+def _hhmm(value: str) -> str:
+    # "2026-06-06T14:00" -> "14:00"
+    return value[11:16] if len(value) >= 16 else value
+
+
+def _as_float(value: Any) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _now_index(times: list[str], current_time: str | None) -> int:
+    """Index of the hourly slot covering "now".
+
+    Open-Meteo hourly times are zero-padded local ISO strings, so a lexical
+    compare on the "YYYY-MM-DDTHH" prefix is also a chronological one.
+    """
+    if not current_time:
+        return 0
+    target = current_time[:13]
+    index = 0
+    for i, value in enumerate(times):
+        if value[:13] <= target:
+            index = i
+        else:
+            break
+    return index
+
+
+@dataclass
+class DestinationForecast:
+    times: list[str]
+    temps: list[float | None]
+    precip: list[float | None]
+    winds: list[float | None]
+    uvs: list[float | None]
+    codes: list[int | None]
+    sunsets: list[str]
+    now_index: int
+
+    def _at(self, seq: list, index: int):
+        if not seq:
+            return None
+        return seq[max(0, min(index, len(seq) - 1))]
+
+    def at_arrival(self, one_way_minutes: int, activity_minutes: int, lang: str) -> tuple[WeatherSummary, list[HourlyForecast]]:
+        arrival_offset = max(1, math.ceil(one_way_minutes / 60))
+        end_offset = min(arrival_offset + math.ceil(max(activity_minutes, 0) / 60), _MAX_FORECAST_HOURS)
+
+        timeline: list[HourlyForecast] = []
+        for offset in range(1, end_offset + 1):
+            index = self.now_index + offset
+            if index >= len(self.times):
+                break
+            timeline.append(
+                HourlyForecast(
+                    time=_hhmm(self.times[index]),
+                    hour_offset=offset,
+                    label=weather_label(lang, self._at(self.codes, index)),
+                    temperature_c=_as_float(self._at(self.temps, index)),
+                    precipitation_mm=_as_float(self._at(self.precip, index)),
+                    wind_kmh=_as_float(self._at(self.winds, index)),
+                    is_arrival=(offset == arrival_offset),
+                )
+            )
+
+        arrival_index = max(0, min(self.now_index + arrival_offset, len(self.times) - 1))
+        temp = _as_float(self._at(self.temps, arrival_index))
+        rain_now = _as_float(self._at(self.precip, arrival_index))
+        wind = _as_float(self._at(self.winds, arrival_index))
+        uv = _as_float(self._at(self.uvs, arrival_index))
+        code = self._at(self.codes, arrival_index)
+        window = [value or 0 for value in self.precip[max(0, arrival_index - 23): arrival_index + 1]]
+        rain_24h = float(sum(window)) if window else None
+        arrival_date = self.times[arrival_index][:10] if self.times else None
+        sunset = next((s for s in self.sunsets if s[:10] == arrival_date), self.sunsets[-1] if self.sunsets else None)
+
+        arrival_weather = WeatherSummary(
+            source="open-meteo",
+            temperature_c=temp,
+            rain_mm_now=rain_now,
+            rain_mm_last_24h=rain_24h,
+            wind_kmh=wind,
+            humidity_percent=None,
+            uv_index=uv,
+            sunrise=None,
+            sunset=sunset,
+            summary=weather_label(lang, code),
+            score=_weather_score(temp, rain_now, rain_24h, wind, uv, code),
+            confidence="live",
+        )
+        return arrival_weather, timeline
+
+
+def _parse_destination_block(block: dict[str, Any]) -> DestinationForecast | None:
+    hourly: dict[str, Any] = block.get("hourly") or {}
+    times = hourly.get("time") or []
+    if not times:
+        return None
+    current_time = (block.get("current") or {}).get("time")
+    return DestinationForecast(
+        times=times,
+        temps=hourly.get("temperature_2m") or [],
+        precip=hourly.get("precipitation") or [],
+        winds=hourly.get("wind_speed_10m") or [],
+        uvs=hourly.get("uv_index") or [],
+        codes=hourly.get("weather_code") or [],
+        sunsets=(block.get("daily") or {}).get("sunset") or [],
+        now_index=_now_index(times, current_time),
+    )
+
+
+async def get_destination_forecasts(points: list[tuple[float, float]], use_live_data: bool, lang: str = "en") -> list[DestinationForecast | None]:
+    """Hourly forecast for each destination, aligned 1:1 with ``points``.
+
+    Open-Meteo accepts comma-separated coordinates, so every top candidate is
+    covered by a single request. Best-effort: any failure (or live data off)
+    yields ``None`` entries, and callers fall back to the origin weather.
+    """
+    if not points:
+        return []
+    if not use_live_data or not settings.use_open_meteo_fallback:
+        return [None] * len(points)
+
+    params = {
+        "latitude": ",".join(f"{lat:.4f}" for lat, _ in points),
+        "longitude": ",".join(f"{lon:.4f}" for _, lon in points),
+        "current": "temperature_2m",
+        "hourly": "temperature_2m,precipitation,weather_code,wind_speed_10m,uv_index",
+        "daily": "sunset",
+        "timezone": "auto",
+        "forecast_days": 2,
+        "past_days": 1,
+    }
+    try:
+        async with http_client(settings.http_timeout_seconds) as client:
+            response = await client.get("https://api.open-meteo.com/v1/forecast", params=params)
+            response.raise_for_status()
+            data = response.json()
+    except Exception:  # noqa: BLE001 - destination forecast is best-effort
+        return [None] * len(points)
+
+    blocks = data if isinstance(data, list) else [data]
+    results: list[DestinationForecast | None] = [_parse_destination_block(block) for block in blocks]
+    if len(results) < len(points):
+        results.extend([None] * (len(points) - len(results)))
+    return results[: len(points)]

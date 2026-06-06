@@ -402,6 +402,88 @@ textarea {
   color: var(--orange);
 }
 
+.place-weather {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--blue-soft);
+  border: 1px solid #cfe6ef;
+  border-radius: 10px;
+}
+
+.pw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pw-head h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #14526d;
+}
+
+.pw-arrival {
+  margin: 6px 0 10px;
+  color: #14526d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.forecast-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.forecast-hour {
+  flex: 0 0 auto;
+  min-width: 74px;
+  display: grid;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.forecast-hour.arrival {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.fh-off {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 11px;
+}
+
+.fh-time {
+  font-weight: 850;
+  font-size: 13px;
+}
+
+.fh-temp {
+  font-weight: 850;
+  font-size: 15px;
+}
+
+.fh-sky {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.fh-tag {
+  color: var(--green-dark);
+  font-weight: 850;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
 .why,
 .warnings,
 .breakdown {
