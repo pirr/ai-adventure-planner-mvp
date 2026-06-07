@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -9,11 +10,18 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest
+from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest, VisitedRequest
 from app.services.recommendations import build_recommendations
 from app.services.storage import storage
 
 app = FastAPI(title=settings.app_name, version=settings.version)
+
+logging.basicConfig(
+    level=settings.log_level.upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -84,3 +92,29 @@ async def events(payload: AnalyticsEvent) -> dict[str, str]:
 @app.get("/api/events")
 async def events_list() -> dict[str, Any]:
     return {"items": storage.events_summary()}
+
+
+@app.get("/api/ab")
+async def ab() -> dict[str, Any]:
+    return {"variants": storage.ab_summary()}
+
+
+@app.post("/api/visited")
+async def visited(payload: VisitedRequest) -> dict[str, str]:
+    storage.mark_visited(payload.anonymous_id, payload.source_id)
+    return {"status": "ok"}
+
+
+@app.delete("/api/visited")
+async def visited_clear(anonymous_id: str | None = None) -> dict[str, Any]:
+    return {"status": "ok", "cleared": storage.clear_visited(anonymous_id)}
+
+
+@app.get("/api/history")
+async def history(anonymous_id: str | None = None) -> dict[str, Any]:
+    return {"items": storage.history_for(anonymous_id)}
+
+
+@app.delete("/api/history")
+async def history_delete(anonymous_id: str | None = None) -> dict[str, Any]:
+    return {"status": "ok", "deleted_sessions": storage.delete_user_data(anonymous_id)}

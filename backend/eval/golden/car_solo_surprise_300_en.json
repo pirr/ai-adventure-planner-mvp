@@ -1,0 +1,250 @@
+{
+  "request": {
+    "lat": 42.4304,
+    "lon": 18.6964,
+    "available_minutes": 300,
+    "transport_mode": "car",
+    "group_type": "solo",
+    "children_ages": [],
+    "with_dog": false,
+    "with_elderly": false,
+    "reduced_mobility": false,
+    "intensity": "easy",
+    "interests": [
+      "surprise me"
+    ],
+    "max_walking_km": null,
+    "request_text": null,
+    "use_live_data": false,
+    "limit": 4,
+    "lang": "en",
+    "anonymous_id": null
+  },
+  "recommendations": [
+    {
+      "id": "sample_budva-old-town",
+      "title": "Budva Old Town and Citadel",
+      "place_type": "fortress",
+      "lat": 42.2789,
+      "lon": 18.837,
+      "adventure_score": 86,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 78,
+        "place_quality": 85,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 156,
+      "travel_minutes": 66,
+      "activity_minutes": 90,
+      "distance_km": 20.43,
+      "walking_km": 2.2,
+      "difficulty": "easy",
+      "description": "A history-focused stop with views and exploration potential.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Fits your available time window.",
+        "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
+        "Travel time is manageable: about 33 min one way.",
+        "Suitable for the selected group and difficulty level.",
+        "Walking is limited to about 2.2 km."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.278900,18.837000&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.278900,18.837000&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Budva_Old_Town_and_Citadel.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Budva_Old_Town_and_Citadel.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "city_gate",
+        "tourism": "attraction",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:Budva Old Town and Citadel.jpg"
+      }
+    },
+    {
+      "id": "sample_kotor-old-town",
+      "title": "Kotor Old Town",
+      "place_type": "historic_site",
+      "lat": 42.4256,
+      "lon": 18.7712,
+      "adventure_score": 86,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 78,
+        "place_quality": 90,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 126,
+      "travel_minutes": 26,
+      "activity_minutes": 100,
+      "distance_km": 6.16,
+      "walking_km": 2.5,
+      "difficulty": "easy",
+      "description": "A cultural walk that works well for a short trip.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Fits your available time window.",
+        "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
+        "Travel time is manageable: about 13 min one way.",
+        "Suitable for the selected group and difficulty level.",
+        "Walking is limited to about 2.5 km."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.425600,18.771200&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.425600,18.771200&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Kotor_Old_Town.JPG?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Kotor_Old_Town.JPG",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "old_town",
+        "interests": [
+          "history",
+          "fortresses",
+          "family"
+        ],
+        "wikimedia_commons": "File:Kotor Old Town.JPG"
+      }
+    },
+    {
+      "id": "sample_porto-naval-heritage",
+      "title": "Naval Heritage Collection, Porto Montenegro",
+      "place_type": "museum",
+      "lat": 42.4358,
+      "lon": 18.6946,
+      "adventure_score": 85,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 78,
+        "place_quality": 75,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 71,
+      "travel_minutes": 16,
+      "activity_minutes": 55,
+      "distance_km": 0.62,
+      "walking_km": 0.8,
+      "difficulty": "easy",
+      "description": "A low-risk indoor or semi-indoor option with educational value.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Fits your available time window.",
+        "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
+        "Travel time is manageable: about 8 min one way.",
+        "Suitable for the selected group and difficulty level.",
+        "Walking is limited to about 0.8 km."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.435800,18.694600&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.435800,18.694600&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Naval_Heritage_Collection_01.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Naval_Heritage_Collection_01.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "museum",
+        "historic": "naval",
+        "interests": [
+          "history",
+          "family"
+        ],
+        "wikimedia_commons": "File:Naval Heritage Collection 01.jpg"
+      }
+    },
+    {
+      "id": "sample_gornja-lastva",
+      "title": "Gornja Lastva Viewpoint",
+      "place_type": "viewpoint",
+      "lat": 42.452,
+      "lon": 18.7023,
+      "adventure_score": 85,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 78,
+        "place_quality": 78,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 61,
+      "travel_minutes": 16,
+      "activity_minutes": 45,
+      "distance_km": 2.45,
+      "walking_km": 1.4,
+      "difficulty": "easy",
+      "description": "A scenic stop with a short walk and a strong visual payoff.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Fits your available time window.",
+        "Weather looks suitable: fallback weather: mild and dry conditions assumed.",
+        "Travel time is manageable: about 8 min one way.",
+        "Suitable for the selected group and difficulty level.",
+        "Walking is limited to about 1.4 km."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.452000,18.702300&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.452000,18.702300&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/View_of_Tivat_from_the_road_to_Gornja_Lastva_1.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:View_of_Tivat_from_the_road_to_Gornja_Lastva_1.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "tourism": "viewpoint",
+        "interests": [
+          "viewpoints",
+          "history",
+          "nature"
+        ],
+        "wikimedia_commons": "File:View of Tivat from the road to Gornja Lastva 1.jpg"
+      }
+    }
+  ]
+}

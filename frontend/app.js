@@ -6,6 +6,130 @@ const errorBox = $('errorBox');
 let lastRequestId = null;
 let lastResponse = null;
 
+// Anonymous, persistent per-browser id (no accounts/PII). Ties a user's
+// sessions, feedback and events together for history and personalization.
+function anonymousId() {
+  let id = localStorage.getItem('anon_id');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : `a-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem('anon_id', id);
+  }
+  return id;
+}
+
+// ---------------------------------------------------------------------------
+// Map (Leaflet, vendored locally; tiles from OpenStreetMap)
+// Lives in a collapsible panel under the result cards. Created lazily the first
+// time the panel opens, and re-measured via invalidateSize() because Leaflet
+// can't size a container that was hidden inside a closed <details>.
+// ---------------------------------------------------------------------------
+let map = null;
+let originMarker = null;
+let resultsLayer = null;
+let resultMarkersById = {};
+let pendingFocus = null;
+
+function ensureMap() {
+  if (map || typeof L === 'undefined' || !document.getElementById('map')) return;
+  const lat = parseFloat($('lat').value) || 42.4304;
+  const lon = parseFloat($('lon').value) || 18.6964;
+  map = L.map('map').setView([lat, lon], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+  const icon = L.icon({
+    iconUrl: '/static/vendor/leaflet/images/marker-icon.png',
+    iconRetinaUrl: '/static/vendor/leaflet/images/marker-icon-2x.png',
+    shadowUrl: '/static/vendor/leaflet/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  });
+  originMarker = L.marker([lat, lon], { draggable: true, icon }).addTo(map).bindPopup(t('map_you_are_here'));
+  originMarker.on('dragend', () => {
+    const { lat: a, lng: b } = originMarker.getLatLng();
+    setOrigin(a, b, { recenter: false });
+    $('locationStatus').textContent = t('map_location_set');
+  });
+  map.on('click', (event) => {
+    setOrigin(event.latlng.lat, event.latlng.lng, { recenter: false });
+    $('locationStatus').textContent = t('map_location_set');
+  });
+  resultsLayer = L.layerGroup().addTo(map);
+}
+
+// Single source of truth for the origin: writes the lat/lon inputs and moves
+// the pin. `recenter` also pans/zooms the map (used by the location buttons).
+function setOrigin(lat, lon, { recenter = false } = {}) {
+  const latNum = Number(lat);
+  const lonNum = Number(lon);
+  $('lat').value = latNum.toFixed(6);
+  $('lon').value = lonNum.toFixed(6);
+  if (originMarker) originMarker.setLatLng([latNum, lonNum]);
+  if (map && recenter) map.setView([latNum, lonNum], Math.max(map.getZoom(), 13));
+}
+
+// Plot recommended places as green dots (distinct from the blue origin pin),
+// keyed by id so a card click can open the right popup.
+function renderResultMarkers(items, { fit = false } = {}) {
+  if (!map || !resultsLayer) return;
+  resultsLayer.clearLayers();
+  resultMarkersById = {};
+  const points = [];
+  items.forEach((item) => {
+    if (typeof item.lat !== 'number' || typeof item.lon !== 'number') return;
+    const marker = L.circleMarker([item.lat, item.lon], {
+      radius: 8,
+      color: '#177a51',
+      fillColor: '#177a51',
+      fillOpacity: 0.85,
+      weight: 2,
+    })
+      .addTo(resultsLayer)
+      .bindPopup(`<strong>${escapeHtml(item.title)}</strong><br>${t('score_label', { score: item.adventure_score })}`);
+    resultMarkersById[item.id] = marker;
+    points.push([item.lat, item.lon]);
+  });
+  if (fit && points.length) {
+    const all = originMarker ? [[originMarker.getLatLng().lat, originMarker.getLatLng().lng], ...points] : points;
+    map.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 14 });
+  }
+}
+
+// Run once the panel is actually visible: re-measure, plot current results, then
+// either focus a place a card asked for, or frame the origin + all results.
+function applyMapView() {
+  ensureMap();
+  if (!map) return;
+  setTimeout(() => {
+    map.invalidateSize();
+    renderResultMarkers((lastResponse && lastResponse.recommendations) || [], { fit: !pendingFocus });
+    if (pendingFocus) {
+      map.setView([pendingFocus.lat, pendingFocus.lon], 15);
+      const marker = resultMarkersById[pendingFocus.id];
+      if (marker) marker.openPopup();
+      pendingFocus = null;
+    }
+  }, 60);
+}
+
+function refreshMapIfOpen() {
+  const panel = $('mapPanel');
+  if (panel && panel.open) applyMapView();
+}
+
+// Clicking a place card opens the collapsed map and centers it on that place.
+function focusPlace(item) {
+  pendingFocus = item;
+  const panel = $('mapPanel');
+  if (!panel) return;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (panel.open) applyMapView();
+  else panel.open = true; // fires the toggle handler -> applyMapView
+}
+
 // ---------------------------------------------------------------------------
 // Internationalization (EN / RU)
 // ---------------------------------------------------------------------------
@@ -18,6 +142,11 @@ const I18N = {
     use_location: 'Use my location',
     use_demo: 'Use Tivat demo',
     loc_not_set: 'Location is not set yet.',
+    map_title: 'Map',
+    show_on_map: 'Show on map',
+    map_hint: 'Tap the map or drag the pin to set your location.',
+    map_you_are_here: 'Your location',
+    map_location_set: 'Location set from the map.',
     trip_request: 'Trip request',
     free_text: 'Free text',
     request_text_default: 'Family trip for 5 hours with fortress, history and views.',
@@ -45,6 +174,10 @@ const I18N = {
     i_active: 'Active',
     children_ages: 'Children ages',
     max_walking: 'Max walking km',
+    context: 'Context',
+    with_dog: 'With a dog',
+    with_elderly: 'With older adults',
+    reduced_mobility: 'Reduced mobility',
     interests: 'Interests',
     c_history: 'History',
     c_fortresses: 'Fortresses',
@@ -58,6 +191,11 @@ const I18N = {
     loading_title: 'Analyzing options',
     loading_subtitle: 'Checking places, weather, travel time and risk rules.',
     results_title: 'Recommendations',
+    history_title: 'Recently seen',
+    clear_history: 'Clear my history',
+    history_opened: 'opened',
+    history_cleared: 'History cleared.',
+    history_confirm: 'Delete your local history (recent searches, feedback and events)?',
     // recommendation card chrome
     score_breakdown: 'Score breakdown',
     open_maps: 'Google Maps',
@@ -97,6 +235,7 @@ const I18N = {
     bd_group_fit: 'Group Fit',
     bd_interest_fit: 'Interest Fit',
     bd_place_quality: 'Place Quality',
+    bd_personal_preference_fit: 'Personal Fit',
     why_title: 'Why recommended',
     risks_title: 'Risks',
     no_risk: 'No major risk detected by MVP rules.',
@@ -139,6 +278,11 @@ const I18N = {
     use_location: 'Использовать мою геолокацию',
     use_demo: 'Демо: Тиват',
     loc_not_set: 'Локация ещё не задана.',
+    map_title: 'Карта',
+    show_on_map: 'Показать на карте',
+    map_hint: 'Нажмите на карту или перетащите маркер, чтобы задать локацию.',
+    map_you_are_here: 'Ваша локация',
+    map_location_set: 'Локация задана по карте.',
     trip_request: 'Параметры поездки',
     free_text: 'Свободный текст',
     request_text_default: 'Семейная поездка на 5 часов: крепость, история и виды.',
@@ -166,6 +310,10 @@ const I18N = {
     i_active: 'Активная',
     children_ages: 'Возраст детей',
     max_walking: 'Макс. пешком, км',
+    context: 'Контекст',
+    with_dog: 'С собакой',
+    with_elderly: 'С пожилыми',
+    reduced_mobility: 'Ограниченная мобильность',
     interests: 'Интересы',
     c_history: 'История',
     c_fortresses: 'Крепости',
@@ -179,6 +327,11 @@ const I18N = {
     loading_title: 'Анализируем варианты',
     loading_subtitle: 'Проверяем места, погоду, время в пути и правила риска.',
     results_title: 'Рекомендации',
+    history_title: 'Недавно просмотренное',
+    clear_history: 'Очистить историю',
+    history_opened: 'открыто',
+    history_cleared: 'История очищена.',
+    history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
     score_breakdown: 'Разбор оценки',
     open_maps: 'Google Карты',
     open_apple_maps: 'Apple Карты',
@@ -214,6 +367,7 @@ const I18N = {
     bd_group_fit: 'Группа',
     bd_interest_fit: 'Интересы',
     bd_place_quality: 'Качество места',
+    bd_personal_preference_fit: 'Личные предпочтения',
     why_title: 'Почему рекомендуем',
     risks_title: 'Риски',
     no_risk: 'Существенных рисков по правилам MVP не выявлено.',
@@ -306,6 +460,7 @@ function setLang(lang) {
   if (lastResponse && !resultsEl.classList.contains('hidden')) {
     renderResults(lastResponse, { scroll: false });
   }
+  loadHistory();
 }
 
 document.querySelectorAll('.lang-btn').forEach((btn) => {
@@ -315,8 +470,7 @@ document.querySelectorAll('.lang-btn').forEach((btn) => {
 // ---------------------------------------------------------------------------
 
 function setLocation(lat, lon, label) {
-  $('lat').value = Number(lat).toFixed(6);
-  $('lon').value = Number(lon).toFixed(6);
+  setOrigin(lat, lon, { recenter: true });
   $('locationStatus').textContent = label;
 }
 
@@ -366,6 +520,19 @@ document.querySelectorAll('.chip').forEach((button) => {
 });
 
 $('searchBtn').addEventListener('click', runSearch);
+$('clearHistoryBtn').addEventListener('click', clearHistory);
+$('mapPanel').addEventListener('toggle', () => {
+  if ($('mapPanel').open) applyMapView();
+});
+
+// Manual lat/lon edits move the pin and recenter the map.
+['lat', 'lon'].forEach((id) =>
+  $(id).addEventListener('change', () => {
+    const lat = parseFloat($('lat').value);
+    const lon = parseFloat($('lon').value);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) setOrigin(lat, lon, { recenter: true });
+  }),
+);
 
 function selectedInterests() {
   return Array.from(document.querySelectorAll('.chip.active')).map((button) => button.dataset.interest);
@@ -387,6 +554,9 @@ function requestPayload() {
     transport_mode: $('transportMode').value,
     group_type: $('groupType').value,
     children_ages: parseChildrenAges($('childrenAges').value),
+    with_dog: $('withDog').checked,
+    with_elderly: $('withElderly').checked,
+    reduced_mobility: $('reducedMobility').checked,
     intensity: $('intensity').value,
     interests: selectedInterests(),
     max_walking_km: maxWalkingValue === '' ? null : parseFloat(maxWalkingValue),
@@ -394,6 +564,7 @@ function requestPayload() {
     use_live_data: $('useLiveData').checked,
     limit: 5,
     lang: currentLang,
+    anonymous_id: anonymousId(),
   };
 }
 
@@ -412,7 +583,7 @@ function track(event, extra = {}) {
   fetch('/api/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event, ...extra }),
+    body: JSON.stringify({ event, anonymous_id: anonymousId(), ...extra }),
   }).catch(() => {});
 }
 
@@ -435,6 +606,7 @@ async function runSearch() {
     const data = await response.json();
     renderResults(data);
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
+    loadHistory();
   } catch (error) {
     setError(t('search_failed', { error: error.message }));
   } finally {
@@ -457,6 +629,7 @@ function renderResults(data, { scroll = true } = {}) {
   renderWarnings(data.data_warnings || []);
   renderCards(data.recommendations || []);
   renderRejected(data.rejected_alternatives || []);
+  refreshMapIfOpen();
   resultsEl.classList.remove('hidden');
   if (scroll) {
     resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -497,8 +670,12 @@ function renderCards(items) {
   const template = $('recommendationTemplate');
   items.forEach((item) => {
     const node = template.content.cloneNode(true);
-    node.querySelector('.title').textContent = item.title;
-    node.querySelector('.description').textContent = item.description;
+    const titleEl = node.querySelector('.title');
+    titleEl.textContent = item.title;
+    titleEl.classList.add('title-link');
+    titleEl.title = t('show_on_map');
+    titleEl.addEventListener('click', () => focusPlace(item));
+    node.querySelector('.description').textContent = item.summary || item.description;
     renderPhoto(node, item);
     node.querySelector('.score').textContent = item.adventure_score;
     node.querySelector('.breakdown-summary').textContent = t('score_breakdown');
@@ -529,6 +706,7 @@ function renderCards(items) {
     node.querySelector('.why').innerHTML = `
       <h3>${t('why_title')}</h3>
       ${item.why.map((text) => `<div class="item good">✓ ${escapeHtml(text)}</div>`).join('')}
+      ${item.data_confidence_note ? `<div class="item">${escapeHtml(item.data_confidence_note)}</div>` : ''}
     `;
     node.querySelector('.warnings').innerHTML = item.warnings.length
       ? `<h3>${t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`
@@ -672,6 +850,7 @@ async function submitFeedback(recommendationId, rating, reason) {
         recommendation_id: recommendationId,
         rating,
         reason: reason || null,
+        anonymous_id: anonymousId(),
       }),
     });
     track('feedback_submitted', {
@@ -683,6 +862,50 @@ async function submitFeedback(recommendationId, rating, reason) {
   } catch (error) {
     alert(t('feedback_error', { error: error.message }));
   }
+}
+
+// "Recently seen" — recommendations this anonymous_id has been shown, newest
+// first, with an "opened" badge derived from analytics events. Plus a control
+// to delete all local history (sessions, recommendations, feedback, events).
+async function loadHistory() {
+  try {
+    const res = await fetch(`/api/history?anonymous_id=${encodeURIComponent(anonymousId())}`);
+    const data = await res.json();
+    renderHistory(data.items || []);
+  } catch (error) {
+    renderHistory([]);
+  }
+}
+
+function renderHistory(items) {
+  const section = $('historySection');
+  const list = $('historyList');
+  if (!items.length) {
+    section.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  const locale = currentLang === 'ru' ? 'ru-RU' : 'en-US';
+  list.innerHTML = items
+    .map((item) => {
+      let when = item.created_at;
+      try {
+        when = new Date(item.created_at).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (error) {}
+      const opened = item.opened ? `<span class="badge">${t('history_opened')}</span>` : '';
+      return `<div class="item"><strong>${escapeHtml(item.title)}</strong> · ${t('score_label', { score: item.score })} · ${escapeHtml(when)} ${opened}</div>`;
+    })
+    .join('');
+  section.classList.remove('hidden');
+}
+
+async function clearHistory() {
+  if (!confirm(t('history_confirm'))) return;
+  try {
+    await fetch(`/api/history?anonymous_id=${encodeURIComponent(anonymousId())}`, { method: 'DELETE' });
+  } catch (error) {}
+  renderHistory([]);
+  alert(t('history_cleared'));
 }
 
 function breakdownLabel(key) {
@@ -705,3 +928,6 @@ function escapeHtml(value) {
 
 // Apply translations on initial load.
 applyStaticI18n();
+loadHistory();
+// The map panel starts open, so no toggle fires — build the map now.
+if ($('mapPanel') && $('mapPanel').open) applyMapView();

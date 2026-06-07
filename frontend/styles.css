@@ -149,6 +149,43 @@ p {
   margin-bottom: 0;
 }
 
+#map {
+  height: clamp(340px, 60vh, 600px);
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  z-index: 0;
+}
+
+/* Leaflet popups/controls inherit the app font and stay readable on the card. */
+.leaflet-container {
+  font: inherit;
+}
+
+.map-hint {
+  color: var(--muted);
+}
+
+.map-panel > summary {
+  font-size: 16px;
+  font-weight: 850;
+  color: var(--text);
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Place titles double as a "show on map" trigger. */
+.title-link {
+  cursor: pointer;
+}
+.title-link:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
 label {
   display: block;
   color: #33423e;
@@ -559,6 +596,7 @@ summary {
     grid-row: 1;
   }
 
+  #mapPanel,
   .loading,
   .error,
   .results {

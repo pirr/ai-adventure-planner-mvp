@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#16a34a" />
   <title>AI Adventure Planner MVP</title>
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
@@ -74,7 +75,6 @@
             <option value="solo" data-i18n="g_solo">Solo</option>
             <option value="couple" data-i18n="g_couple">Couple</option>
             <option value="family" selected data-i18n="g_family">Family</option>
-            <option value="dog" data-i18n="g_dog">Dog</option>
           </select>
         </label>
         <label>
@@ -98,6 +98,20 @@
         </label>
       </div>
 
+      <label><span data-i18n="context">Context</span></label>
+      <label class="switch-row">
+        <input id="withDog" type="checkbox" />
+        <span data-i18n="with_dog">With a dog</span>
+      </label>
+      <label class="switch-row">
+        <input id="withElderly" type="checkbox" />
+        <span data-i18n="with_elderly">With older adults</span>
+      </label>
+      <label class="switch-row">
+        <input id="reducedMobility" type="checkbox" />
+        <span data-i18n="reduced_mobility">Reduced mobility</span>
+      </label>
+
       <label>
         <span data-i18n="interests">Interests</span>
         <div class="chips" id="interestChips">
@@ -119,6 +133,12 @@
       <button id="searchBtn" class="button primary big" data-i18n="find_adventure">Find adventure</button>
     </section>
 
+    <details id="mapPanel" class="card map-panel" open>
+      <summary data-i18n="map_title">Map</summary>
+      <div id="map"></div>
+      <p class="status-text map-hint" data-i18n="map_hint">Tap the map or drag the pin to set your location.</p>
+    </details>
+
     <section id="loading" class="card loading hidden">
       <div class="spinner"></div>
       <h2 data-i18n="loading_title">Analyzing options</h2>
@@ -136,6 +156,14 @@
       <div id="dataWarnings"></div>
       <div id="cards"></div>
       <div id="rejectedBox" class="card"></div>
+    </section>
+
+    <section id="historySection" class="card hidden">
+      <div class="section-title">
+        <h2 data-i18n="history_title">Recently seen</h2>
+        <button id="clearHistoryBtn" type="button" class="button ghost" data-i18n="clear_history">Clear my history</button>
+      </div>
+      <div id="historyList"></div>
     </section>
   </main>
 
@@ -172,6 +200,7 @@
     </article>
   </template>
 
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

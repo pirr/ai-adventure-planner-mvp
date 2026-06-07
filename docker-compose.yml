@@ -2,11 +2,16 @@ services:
   app:
     build: .
     ports:
-      - "8080:8000"
+      - "8000:8000"
     volumes:
       # Persist the SQLite DB across container rebuilds. The app writes to
       # ./data relative to /app/backend (see SQLITE_PATH below).
       - ./data:/app/backend/data
+    # Load overrides from .env when present (see .env.example): OPENWEATHER_API_KEY,
+    # LLM_* etc. Optional, so the app still runs without a .env file.
+    env_file:
+      - path: .env
+        required: false
     environment:
       - USE_OPEN_METEO_FALLBACK=true
       - SQLITE_PATH=./data/adventures.db

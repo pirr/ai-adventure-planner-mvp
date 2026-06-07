@@ -17,6 +17,10 @@ class AdventureRequest(BaseModel):
     transport_mode: TransportMode = "car"
     group_type: GroupType = "solo"
     children_ages: list[int] = Field(default_factory=list)
+    # Refined group context (0.2). Separate from group_type so they compose.
+    with_dog: bool = False
+    with_elderly: bool = False
+    reduced_mobility: bool = False
     intensity: Intensity = "easy"
     interests: list[str] = Field(default_factory=lambda: ["nature", "viewpoints"])
     max_walking_km: float | None = Field(default=None, ge=0, le=30)
@@ -24,6 +28,12 @@ class AdventureRequest(BaseModel):
     use_live_data: bool = True
     limit: int = Field(default=5, ge=1, le=10)
     lang: Lang = "en"
+    # "Show others": rotate past places this user was already shown, surfacing
+    # fresh candidates first (falls back to repeats only if none are left).
+    exclude_seen: bool = False
+    # Anonymous, client-generated id (localStorage). No accounts/PII; ties a
+    # user's sessions/feedback together for history and personalization.
+    anonymous_id: str | None = Field(default=None, max_length=64)
 
     @validator("interests", pre=True)
     def normalize_interests(cls, value: Any) -> list[str]:
@@ -99,10 +109,14 @@ class ScoreBreakdown(BaseModel):
     group_fit: int
     interest_fit: int
     place_quality: int
+    personal_preference_fit: int = 70  # neutral until the user has feedback history
 
 
 class Recommendation(BaseModel):
     id: str
+    # Canonical place id (e.g. "osm:node:123"); `id` is the DOM-safe mangled form.
+    # Used to record "seen" and to let the client mark a place visited.
+    source_id: str | None = None
     title: str
     place_type: str
     lat: float
@@ -116,6 +130,10 @@ class Recommendation(BaseModel):
     walking_km: float
     difficulty: str
     description: str
+    # summary + data_confidence_note are filled by the LLM layer when enabled and
+    # grounded; otherwise they stay None and the rule-based `why` is used as-is.
+    summary: str | None = None
+    data_confidence_note: str | None = None
     why: list[str]
     warnings: list[str]
     map_url: str
@@ -155,6 +173,7 @@ class FeedbackRequest(BaseModel):
     recommendation_id: str
     rating: Literal["up", "down"]
     reason: FeedbackReason | None = None
+    anonymous_id: str | None = Field(default=None, max_length=64)
 
 
 AnalyticsEventName = Literal[
@@ -170,4 +189,10 @@ class AnalyticsEvent(BaseModel):
     event: AnalyticsEventName
     request_id: str | None = None
     recommendation_id: str | None = None
+    anonymous_id: str | None = Field(default=None, max_length=64)
     meta: dict[str, Any] | None = None
+
+
+class VisitedRequest(BaseModel):
+    anonymous_id: str = Field(..., max_length=64)
+    source_id: str = Field(..., max_length=200)

@@ -75,12 +75,15 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "warn_medium_difficulty": "Some parts may be moderately difficult for an easy walk.",
         "warn_walking_over_limit": "Walking distance is about {km:.1f} km, above your limit of {limit:.1f} km.",
         "warn_after_sunset": "The adventure may finish after sunset.",
+        "warn_reduced_mobility": "May be hard with reduced mobility: uneven terrain or longer walking.",
+        "warn_elderly": "Pace and terrain may be demanding for older participants.",
         # Why recommended
         "why_fits_time": "Fits your available time window.",
         "why_weather": "Weather looks suitable: {summary}.",
         "why_travel": "Travel time is manageable: about {minutes} min one way.",
         "why_group": "Suitable for the selected group and difficulty level.",
         "why_interest": "Matches your selected interests.",
+        "why_preference": "Similar to places you've liked before.",
         "why_walking": "Walking is limited to about {km:.1f} km.",
         "why_best": "This is the best available option after filtering nearby places.",
         # Type descriptions
@@ -119,12 +122,15 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "warn_medium_difficulty": "Некоторые участки могут быть умеренно сложными для лёгкой прогулки.",
         "warn_walking_over_limit": "Пешая дистанция около {km:.1f} км, что выше вашего лимита в {limit:.1f} км.",
         "warn_after_sunset": "Приключение может закончиться после заката.",
+        "warn_reduced_mobility": "Может быть тяжело при ограниченной мобильности: неровная поверхность или длинная пешая часть.",
+        "warn_elderly": "Темп и рельеф могут быть тяжёлыми для пожилых участников.",
         # Why recommended
         "why_fits_time": "Подходит под доступное время.",
         "why_weather": "Погода подходящая: {summary}.",
         "why_travel": "Время в пути приемлемое: около {minutes} мин в одну сторону.",
         "why_group": "Подходит для выбранной группы и уровня сложности.",
         "why_interest": "Соответствует вашим интересам.",
+        "why_preference": "Похоже на места, которые вам уже нравились.",
         "why_walking": "Пешая часть ограничена примерно {km:.1f} км.",
         "why_best": "Это лучший доступный вариант после фильтрации мест поблизости.",
         # Type descriptions

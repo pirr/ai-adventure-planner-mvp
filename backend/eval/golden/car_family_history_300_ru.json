@@ -1,0 +1,254 @@
+{
+  "request": {
+    "lat": 42.4304,
+    "lon": 18.6964,
+    "available_minutes": 300,
+    "transport_mode": "car",
+    "group_type": "family",
+    "children_ages": [
+      6,
+      13
+    ],
+    "with_dog": false,
+    "with_elderly": false,
+    "reduced_mobility": false,
+    "intensity": "easy",
+    "interests": [
+      "history",
+      "fortresses"
+    ],
+    "max_walking_km": null,
+    "request_text": null,
+    "use_live_data": false,
+    "limit": 4,
+    "lang": "ru",
+    "anonymous_id": null
+  },
+  "recommendations": [
+    {
+      "id": "sample_kotor-old-town",
+      "title": "Kotor Old Town",
+      "place_type": "historic_site",
+      "lat": 42.4256,
+      "lon": 18.7712,
+      "adventure_score": 88,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 100,
+        "place_quality": 90,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 126,
+      "travel_minutes": 26,
+      "activity_minutes": 100,
+      "distance_km": 6.16,
+      "walking_km": 2.5,
+      "difficulty": "easy",
+      "description": "Культурная прогулка, удобная для короткой поездки.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Подходит под доступное время.",
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Время в пути приемлемое: около 13 мин в одну сторону.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.425600,18.771200&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.425600,18.771200&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Kotor_Old_Town.JPG?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Kotor_Old_Town.JPG",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "old_town",
+        "interests": [
+          "history",
+          "fortresses",
+          "family"
+        ],
+        "wikimedia_commons": "File:Kotor Old Town.JPG"
+      }
+    },
+    {
+      "id": "sample_budva-old-town",
+      "title": "Budva Old Town and Citadel",
+      "place_type": "fortress",
+      "lat": 42.2789,
+      "lon": 18.837,
+      "adventure_score": 87,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 100,
+        "place_quality": 85,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 156,
+      "travel_minutes": 66,
+      "activity_minutes": 90,
+      "distance_km": 20.43,
+      "walking_km": 2.2,
+      "difficulty": "easy",
+      "description": "Историческая остановка с видами и возможностью исследования.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Подходит под доступное время.",
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Время в пути приемлемое: около 33 мин в одну сторону.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.278900,18.837000&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.278900,18.837000&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Budva_Old_Town_and_Citadel.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Budva_Old_Town_and_Citadel.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "city_gate",
+        "tourism": "attraction",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:Budva Old Town and Citadel.jpg"
+      }
+    },
+    {
+      "id": "sample_fort-gorazda",
+      "title": "Fort Gorazda",
+      "place_type": "fortress",
+      "lat": 42.3995,
+      "lon": 18.7734,
+      "adventure_score": 87,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 100,
+        "place_quality": 76,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 83,
+      "travel_minutes": 28,
+      "activity_minutes": 55,
+      "distance_km": 7.19,
+      "walking_km": 1.0,
+      "difficulty": "easy",
+      "description": "Историческая остановка с видами и возможностью исследования.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Подходит под доступное время.",
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Время в пути приемлемое: около 14 мин в одну сторону.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.399500,18.773400&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.399500,18.773400&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Fort_Gorazda_aerial_view.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Fort_Gorazda_aerial_view.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "fort",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:Fort Gorazda aerial view.jpg"
+      }
+    },
+    {
+      "id": "sample_kanli-kula",
+      "title": "Kanli Kula Fortress",
+      "place_type": "fortress",
+      "lat": 42.4533,
+      "lon": 18.5381,
+      "adventure_score": 87,
+      "score_breakdown": {
+        "time_fit": 92,
+        "weather_fit": 78,
+        "distance_fit": 100,
+        "safety_fit": 88,
+        "group_fit": 88,
+        "interest_fit": 100,
+        "place_quality": 82,
+        "personal_preference_fit": 70
+      },
+      "total_minutes": 106,
+      "travel_minutes": 46,
+      "activity_minutes": 60,
+      "distance_km": 13.24,
+      "walking_km": 1.4,
+      "difficulty": "easy",
+      "description": "Историческая остановка с видами и возможностью исследования.",
+      "summary": null,
+      "data_confidence_note": null,
+      "why": [
+        "Подходит под доступное время.",
+        "Погода подходящая: резервная погода: предполагаются мягкие и сухие условия.",
+        "Время в пути приемлемое: около 23 мин в одну сторону.",
+        "Подходит для выбранной группы и уровня сложности.",
+        "Соответствует вашим интересам."
+      ],
+      "warnings": [],
+      "map_url": "https://www.google.com/maps/dir/?api=1&origin=42.430400,18.696400&destination=42.453300,18.538100&travelmode=driving",
+      "apple_map_url": "https://maps.apple.com/?saddr=42.430400,18.696400&daddr=42.453300,18.538100&dirflg=d",
+      "source": "fallback",
+      "data_confidence": "fallback",
+      "photo": {
+        "url": "https://commons.wikimedia.org/wiki/Special:FilePath/2024-02-04_Kanli_Kula_Fortress_1.jpg?width=960",
+        "source": "Wikimedia Commons",
+        "source_url": "https://commons.wikimedia.org/wiki/File:2024-02-04_Kanli_Kula_Fortress_1.jpg",
+        "attribution": null
+      },
+      "arrival_weather": null,
+      "forecast": [],
+      "tags": {
+        "historic": "fort",
+        "interests": [
+          "history",
+          "fortresses",
+          "viewpoints"
+        ],
+        "wikimedia_commons": "File:2024-02-04 Kanli Kula Fortress 1.jpg"
+      }
+    }
+  ]
+}
