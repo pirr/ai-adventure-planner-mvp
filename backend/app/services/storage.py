@@ -71,6 +71,18 @@ class Storage:
                     anonymous_id TEXT,
                     meta TEXT
                 );
+
+                -- 0.2.2: per-user place state. `seen` is set automatically for every
+                -- recommended place (so "Show others" can rotate to fresh ones); `visited`
+                -- is set explicitly by the user (so the place is never suggested again).
+                CREATE TABLE IF NOT EXISTS place_marks (
+                    anonymous_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    seen INTEGER NOT NULL DEFAULT 0,
+                    visited INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (anonymous_id, source_id)
+                );
                 """
             )
             # Migrate pre-0.2 databases that predate the anonymous_id columns.
@@ -110,6 +122,9 @@ class Storage:
                     "INSERT OR REPLACE INTO recommendations (id, request_id, title, score, payload_json) VALUES (?, ?, ?, ?, ?)",
                     (rec.id, request_id, rec.title, rec.adventure_score, rec.json()),
                 )
+            # Remember which places this user has now been shown, so a later
+            # "Show others" search can rotate past them.
+            self._record_seen(conn, request.anonymous_id, [rec.source_id for rec in response.recommendations])
 
     def save_feedback(self, feedback: FeedbackRequest) -> None:
         with self._connect() as conn:
@@ -237,6 +252,56 @@ class Storage:
             place_types[place_type] = place_types.get(place_type, 0) + (1 if row["rating"] == "up" else -1)
         return {"place_types": place_types} if place_types else {}
 
+    @staticmethod
+    def _record_seen(conn: sqlite3.Connection, anonymous_id: str | None, source_ids: list[str | None]) -> None:
+        """Mark each given place as seen for this user (no-op without an id)."""
+        if not anonymous_id:
+            return
+        now = datetime.utcnow().isoformat()
+        for source_id in source_ids:
+            if not source_id:
+                continue
+            conn.execute(
+                "INSERT INTO place_marks (anonymous_id, source_id, seen, updated_at) VALUES (?, ?, 1, ?) "
+                "ON CONFLICT(anonymous_id, source_id) DO UPDATE SET seen=1, updated_at=excluded.updated_at",
+                (anonymous_id, source_id, now),
+            )
+
+    def mark_visited(self, anonymous_id: str | None, source_id: str | None) -> None:
+        if not anonymous_id or not source_id:
+            return
+        with self._connect() as conn:
+            self._touch_user(conn, anonymous_id)
+            conn.execute(
+                "INSERT INTO place_marks (anonymous_id, source_id, visited, updated_at) VALUES (?, ?, 1, ?) "
+                "ON CONFLICT(anonymous_id, source_id) DO UPDATE SET visited=1, updated_at=excluded.updated_at",
+                (anonymous_id, source_id, datetime.utcnow().isoformat()),
+            )
+
+    def clear_visited(self, anonymous_id: str | None) -> int:
+        """Un-mark every place this user marked visited. Returns rows affected."""
+        if not anonymous_id:
+            return 0
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE place_marks SET visited=0, updated_at=? WHERE anonymous_id=? AND visited=1",
+                (datetime.utcnow().isoformat(), anonymous_id),
+            )
+            return cursor.rowcount
+
+    def place_marks(self, anonymous_id: str | None) -> dict[str, set[str]]:
+        """This user's seen and visited place source_ids (empty without an id)."""
+        if not anonymous_id:
+            return {"seen": set(), "visited": set()}
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT source_id, seen, visited FROM place_marks WHERE anonymous_id = ?",
+                (anonymous_id,),
+            ).fetchall()
+        seen = {row["source_id"] for row in rows if row["seen"]}
+        visited = {row["source_id"] for row in rows if row["visited"]}
+        return {"seen": seen, "visited": visited}
+
     def delete_user_data(self, anonymous_id: str | None) -> int:
         if not anonymous_id:
             return 0
@@ -250,6 +315,7 @@ class Storage:
             conn.execute("DELETE FROM search_sessions WHERE anonymous_id = ?", (anonymous_id,))
             conn.execute("DELETE FROM feedback WHERE anonymous_id = ?", (anonymous_id,))
             conn.execute("DELETE FROM events WHERE anonymous_id = ?", (anonymous_id,))
+            conn.execute("DELETE FROM place_marks WHERE anonymous_id = ?", (anonymous_id,))
             conn.execute("DELETE FROM users WHERE anonymous_id = ?", (anonymous_id,))
         return len(session_ids)
 

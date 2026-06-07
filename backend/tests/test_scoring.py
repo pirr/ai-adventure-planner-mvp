@@ -1,5 +1,5 @@
 from app.schemas import AdventureRequest, PlaceCandidate, RouteInfo, WeatherSummary
-from app.services.scoring import score_candidate
+from app.services.scoring import score_candidate, to_recommendation
 
 
 def test_family_walk_limit_penalizes_hard_long_route():
@@ -100,6 +100,16 @@ def test_reduced_mobility_penalizes_hard_long_route():
     assert reduced.breakdown.group_fit < normal.breakdown.group_fit
     assert reduced.breakdown.safety_fit < normal.breakdown.safety_fit
     assert any("mobility" in w.lower() for w in reduced.warnings)
+
+
+def test_to_recommendation_carries_source_id():
+    place = PlaceCandidate(source="osm", source_id="osm:node:42", name="Lookout", type="viewpoint", lat=42.4, lon=18.7)
+    route = RouteInfo(source="test", one_way_minutes=10, round_trip_minutes=20, distance_km=5, map_url="x", confidence="estimated")
+    weather = WeatherSummary(source="test", summary="clear", score=90, confidence="estimated")
+    scored = score_candidate(place, route, weather, AdventureRequest(lat=42.4, lon=18.7))
+    rec = to_recommendation(scored)
+    assert rec.source_id == "osm:node:42"  # canonical id for seen/visited tracking
+    assert rec.id == "osm_node_42"  # DOM-safe mangled id unchanged
 
 
 def test_personal_preference_fit_shifts_with_history():

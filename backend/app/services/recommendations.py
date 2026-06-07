@@ -11,7 +11,7 @@ from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import get_route
 from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations, get_llm_provider
-from app.services.scoring import rejected_from_scored, score_candidate, to_recommendation
+from app.services.scoring import ScoredCandidate, rejected_from_scored, score_candidate, to_recommendation
 from app.services.storage import storage
 from app.services.weather import get_destination_forecasts, get_weather
 
@@ -45,12 +45,27 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         request.lang,
     )
 
+    # Per-user place state: hard-drop visited places before we spend routing
+    # calls on them; keep `seen` to optionally rotate past them below.
+    marks = storage.place_marks(request.anonymous_id)
+    visited, seen = marks["visited"], marks["seen"]
+    if visited:
+        places = [place for place in places if place.source_id not in visited]
+    rotate = request.exclude_seen and bool(seen)
+
+    def order_key(candidate: ScoredCandidate) -> int:
+        # "Show others": sink already-seen places below every unseen one (the
+        # penalty exceeds the 0-100 score range), so fresh candidates surface
+        # first and seen ones only backfill empty slots. Off otherwise, and it
+        # never changes the displayed adventure_score.
+        return candidate.score - (1000 if rotate and candidate.place.source_id in seen else 0)
+
     routes = await asyncio.gather(
         *[get_route(request.lat, request.lon, place, request.transport_mode, request.use_live_data) for place in places[:40]]
     )
     # First pass ranks every candidate using the weather at the user's origin.
     scored = [score_candidate(place, route, weather, request, profile) for place, route in zip(places[:40], routes)]
-    scored.sort(key=lambda c: c.score, reverse=True)
+    scored.sort(key=order_key, reverse=True)
 
     # Second pass re-scores only the strongest candidates with the weather at
     # their arrival time, so a place that turns rainy by the time you get there
@@ -73,7 +88,7 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         refreshed.forecast = timeline
         rescored.append(refreshed)
 
-    final = sorted(rescored + rest, key=lambda c: c.score, reverse=True)
+    final = sorted(rescored + rest, key=order_key, reverse=True)
     top = final[: request.limit]
     photos = await asyncio.gather(*[get_place_photo(item.place, request.use_live_data) for item in top])
     recommendations = [to_recommendation(item, photo) for item, photo in zip(top, photos)]

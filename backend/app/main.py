@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest
+from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest, VisitedRequest
 from app.services.recommendations import build_recommendations
 from app.services.storage import storage
 
@@ -97,6 +97,17 @@ async def events_list() -> dict[str, Any]:
 @app.get("/api/ab")
 async def ab() -> dict[str, Any]:
     return {"variants": storage.ab_summary()}
+
+
+@app.post("/api/visited")
+async def visited(payload: VisitedRequest) -> dict[str, str]:
+    storage.mark_visited(payload.anonymous_id, payload.source_id)
+    return {"status": "ok"}
+
+
+@app.delete("/api/visited")
+async def visited_clear(anonymous_id: str | None = None) -> dict[str, Any]:
+    return {"status": "ok", "cleared": storage.clear_visited(anonymous_id)}
 
 
 @app.get("/api/history")

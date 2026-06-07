@@ -322,6 +322,7 @@ def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None) 
     route = scored.route
     return Recommendation(
         id=place.source_id.replace(":", "_"),
+        source_id=place.source_id,
         title=place.name,
         place_type=place.type,
         lat=place.lat,

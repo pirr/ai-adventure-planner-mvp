@@ -28,6 +28,9 @@ class AdventureRequest(BaseModel):
     use_live_data: bool = True
     limit: int = Field(default=5, ge=1, le=10)
     lang: Lang = "en"
+    # "Show others": rotate past places this user was already shown, surfacing
+    # fresh candidates first (falls back to repeats only if none are left).
+    exclude_seen: bool = False
     # Anonymous, client-generated id (localStorage). No accounts/PII; ties a
     # user's sessions/feedback together for history and personalization.
     anonymous_id: str | None = Field(default=None, max_length=64)
@@ -111,6 +114,9 @@ class ScoreBreakdown(BaseModel):
 
 class Recommendation(BaseModel):
     id: str
+    # Canonical place id (e.g. "osm:node:123"); `id` is the DOM-safe mangled form.
+    # Used to record "seen" and to let the client mark a place visited.
+    source_id: str | None = None
     title: str
     place_type: str
     lat: float
@@ -185,3 +191,8 @@ class AnalyticsEvent(BaseModel):
     recommendation_id: str | None = None
     anonymous_id: str | None = Field(default=None, max_length=64)
     meta: dict[str, Any] | None = None
+
+
+class VisitedRequest(BaseModel):
+    anonymous_id: str = Field(..., max_length=64)
+    source_id: str = Field(..., max_length=200)
