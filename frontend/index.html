@@ -143,7 +143,10 @@
     <details id="historySection" class="history hidden">
       <summary data-i18n="history_title">Recently seen</summary>
       <div id="historyList"></div>
-      <button id="clearHistoryBtn" type="button" class="link-btn" data-i18n="clear_history">Clear my history</button>
+      <div class="history-actions">
+        <button id="clearHistoryBtn" type="button" class="link-btn" data-i18n="clear_history">Clear my history</button>
+        <button id="clearVisitedBtn" type="button" class="link-btn" data-i18n="clear_visited">Clear visited</button>
+      </div>
     </details>
   </main>
 
@@ -153,6 +156,7 @@
     <div class="sheet-head">
       <h2 class="sheet-title" data-i18n="results_title">Your adventures</h2>
       <span class="sheet-count" id="sheetCount"></span>
+      <button id="showOthersBtn" type="button" class="pill-btn hidden" data-i18n="show_others">Show others</button>
     </div>
     <div class="sheet-body">
       <div id="errorBox" class="error hidden"></div>
@@ -197,8 +201,9 @@
           <div class="actions">
             <a class="btn btn-solid map-link" target="_blank" rel="noopener">Google Maps</a>
             <a class="btn btn-line apple-map-link" target="_blank" rel="noopener">Apple Maps</a>
-            <button class="btn btn-ghost feedback-up">👍</button>
-            <button class="btn btn-ghost feedback-down">👎</button>
+            <button type="button" class="btn btn-ghost feedback-up">👍</button>
+            <button type="button" class="btn btn-ghost feedback-down">👎</button>
+            <button type="button" class="btn btn-ghost mark-visited"></button>
           </div>
           <div class="feedback-reasons hidden"></div>
         </div>

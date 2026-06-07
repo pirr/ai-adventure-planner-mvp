@@ -177,6 +177,7 @@ body.exploring .planner { display: none; }
 .btn-ghost { background: transparent; color: var(--muted); padding: 10px 14px; }
 .btn-ghost:hover { color: var(--ink); background: var(--cream-2); }
 .link-btn { border: none; background: none; color: var(--clay); font-weight: 700; font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0; }
+.history-actions { display: flex; flex-wrap: wrap; gap: 18px; }
 
 /* planner history */
 .history { margin-top: 18px; background: #fff; border: 1.5px solid var(--line); border-radius: var(--r-lg); padding: 4px 18px; box-shadow: var(--float-sm); }

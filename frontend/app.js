@@ -139,6 +139,7 @@ function setMode(mode) {
   document.body.classList.toggle('exploring', mode === 'exploring');
   $('editBtn').classList.toggle('hidden', mode !== 'exploring');
   $('locateBtn').classList.toggle('hidden', mode !== 'exploring');
+  $('showOthersBtn').classList.toggle('hidden', mode !== 'exploring');
 }
 
 function enterExploring() {
@@ -231,6 +232,12 @@ const I18N = {
     loading_subtitle: 'Checking places, weather, travel time and risk rules.',
     history_title: 'Recently seen',
     clear_history: 'Clear my history',
+    clear_visited: 'Clear visited',
+    visited_confirm: 'Clear all places you marked as visited?',
+    visited_cleared: 'Visited places cleared.',
+    mark_visited: "I've been here",
+    show_others: 'Show others',
+    no_more_others: 'No new places left — showing the best matches again.',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
     history_confirm: 'Delete your local history (recent searches, feedback and events)?',
@@ -365,6 +372,12 @@ const I18N = {
     loading_subtitle: 'Проверяем места, погоду, время в пути и правила риска.',
     history_title: 'Недавно просмотренное',
     clear_history: 'Очистить историю',
+    clear_visited: 'Очистить посещённые',
+    visited_confirm: 'Очистить все отмеченные посещённые места?',
+    visited_cleared: 'Посещённые места очищены.',
+    mark_visited: 'Я здесь был',
+    show_others: 'Другие места',
+    no_more_others: 'Новых мест не осталось — снова показываем лучшие варианты.',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
     history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
@@ -579,8 +592,10 @@ function selectedInterests() {
   return Array.from(document.querySelectorAll('#interestChips .tile.is-active')).map((t2) => t2.dataset.interest);
 }
 
-$('searchBtn').addEventListener('click', runSearch);
+$('searchBtn').addEventListener('click', () => runSearch());
+$('showOthersBtn').addEventListener('click', () => runSearch({ excludeSeen: true }));
 $('clearHistoryBtn').addEventListener('click', clearHistory);
+$('clearVisitedBtn').addEventListener('click', clearVisited);
 
 function parseChildrenAges(value) {
   return value
@@ -589,7 +604,7 @@ function parseChildrenAges(value) {
     .filter((v) => Number.isFinite(v) && v >= 0 && v <= 18);
 }
 
-function requestPayload() {
+function requestPayload(excludeSeen = false) {
   const maxWalkingValue = $('maxWalkingKm').value;
   return {
     lat: parseFloat($('lat').value),
@@ -609,6 +624,7 @@ function requestPayload() {
     limit: 5,
     lang: currentLang,
     anonymous_id: anonymousId(),
+    exclude_seen: excludeSeen,
   };
 }
 
@@ -630,16 +646,16 @@ function track(event, extra = {}) {
   }).catch(() => {});
 }
 
-async function runSearch() {
+async function runSearch({ excludeSeen = false } = {}) {
   clearError();
   loadingEl.classList.remove('hidden');
-  track('search_started');
+  track('search_started', { meta: { exclude_seen: excludeSeen } });
 
   try {
     const response = await fetch('/api/recommendations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestPayload()),
+      body: JSON.stringify(requestPayload(excludeSeen)),
     });
     if (!response.ok) {
       const text = await response.text();
@@ -649,6 +665,7 @@ async function runSearch() {
     sheetEl.classList.remove('open'); // start in peek so the map stays visible
     enterExploring();
     renderResults(data);
+    if (excludeSeen && !(data.recommendations || []).length) setError(t('no_more_others'));
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
     loadHistory();
   } catch (error) {
@@ -776,6 +793,9 @@ function buildCard(item, isTop) {
   const reasonsBox = fragment.querySelector('.feedback-reasons');
   fragment.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up'));
   fragment.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id));
+  const visitedBtn = fragment.querySelector('.mark-visited');
+  visitedBtn.textContent = t('mark_visited');
+  visitedBtn.addEventListener('click', () => markVisited(item));
   // Tap a card: highlight its pin, and (from peek) open the sheet to read details.
   article.addEventListener('click', (event) => {
     if (event.target.closest('a, button, summary, input')) return;
@@ -923,6 +943,30 @@ async function submitFeedback(recommendationId, rating, reason) {
   } catch (error) {
     alert(t('feedback_error', { error: error.message }));
   }
+}
+
+async function markVisited(item) {
+  // Tell the server (so it's excluded from every future search), then drop the
+  // card and its pin from the current results immediately.
+  try {
+    await fetch('/api/visited', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anonymous_id: anonymousId(), source_id: item.source_id }),
+    });
+  } catch (error) {}
+  if (lastResponse) {
+    lastResponse.recommendations = (lastResponse.recommendations || []).filter((rec) => rec.id !== item.id);
+    renderResults(lastResponse, { refit: false });
+  }
+}
+
+async function clearVisited() {
+  if (!confirm(t('visited_confirm'))) return;
+  try {
+    await fetch(`/api/visited?anonymous_id=${encodeURIComponent(anonymousId())}`, { method: 'DELETE' });
+  } catch (error) {}
+  alert(t('visited_cleared'));
 }
 
 async function loadHistory() {
