@@ -109,9 +109,13 @@ the matching `PRESET` (by `vibeKey`) or `null`.
 **`appliedSnapshot`** — the last *searched* state. Set on every search commit
 (`choosePreset`, Apply, and selecting-then-applying a recent).
 
-**Pending** — `isPending()` is `JSON.stringify(readState()) !==
-JSON.stringify(appliedSnapshot)` (interests compared sorted for stability; see
-`normalizeState`).
+**Pending** — computed over the **facet fields only** (`minutes`, `transport`, `group`,
+`interests`, `intensity`), **not** the cosmetic `vibeKey`. Otherwise tapping one filter
+would read as two changes, because customizing also clears the vibe label.
+`isPending()` compares the current facets to `appliedSnapshot`'s facets (interests
+compared as sorted sets; see `normalizeState`). The vibe label is display-only: set
+immediately when staging/selecting, restored on Reset, and never affects the search
+(the payload reads facets, not the vibe).
 
 **Behavior changes:**
 
@@ -133,7 +137,8 @@ the cards), shown only when `isPending()`:
 N changes              [ Reset ]  [ Apply ]
 ```
 
-`N` = count of facets (incl. vibe) whose value differs from `appliedSnapshot`. Staged
+`N` = count of facet fields (not the vibe label) whose value differs from
+`appliedSnapshot`. Staged
 `.fchip`s whose value differs from the snapshot get a `.changed` highlight so pending
 edits are visible at a glance.
 
