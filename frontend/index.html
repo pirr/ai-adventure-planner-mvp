@@ -17,12 +17,12 @@
 
   <header class="topbar">
     <div class="wordmark">
-      <span class="mark" aria-hidden="true">▲</span>
+      <span class="mark" aria-hidden="true"><i data-lucide="compass"></i></span>
       <span data-i18n="brand">Adventure Planner</span>
     </div>
     <div class="topbar-right">
-      <button id="editBtn" type="button" class="pill-btn hidden"><span aria-hidden="true">‹</span> <span data-i18n="edit_trip">Edit trip</span></button>
-      <button id="locateBtn" type="button" class="icon-btn hidden" title="Use my location" aria-label="Use my location">◎</button>
+      <button id="editBtn" type="button" class="pill-btn hidden"><i data-lucide="chevron-left" aria-hidden="true"></i> <span data-i18n="edit_trip">Edit trip</span></button>
+      <button id="locateBtn" type="button" class="icon-btn hidden" title="Use my location" aria-label="Use my location"><i data-lucide="locate-fixed"></i></button>
       <div class="lang-toggle" id="langToggle" aria-label="Language">
         <button type="button" class="lang-btn" data-lang="en">EN</button>
         <button type="button" class="lang-btn" data-lang="ru">RU</button>
@@ -43,12 +43,12 @@
         <p class="step-kicker" data-i18n="s1_kicker">Let's start</p>
         <h2 class="step-title" data-i18n="s1_title">How much time have you got?</h2>
         <div class="tile-grid" id="timeChips">
-          <button type="button" class="tile" data-minutes="30"><span class="tile-emoji">⚡</span><span class="tile-text" data-i18n="opt_30min">30 min</span></button>
-          <button type="button" class="tile" data-minutes="60"><span class="tile-emoji">☕</span><span class="tile-text" data-i18n="opt_1h">1 hour</span></button>
-          <button type="button" class="tile" data-minutes="120"><span class="tile-emoji">🥾</span><span class="tile-text" data-i18n="opt_2h">2 hours</span></button>
-          <button type="button" class="tile" data-minutes="240"><span class="tile-emoji">🚗</span><span class="tile-text" data-i18n="opt_4h">4 hours</span></button>
-          <button type="button" class="tile is-active" data-minutes="300"><span class="tile-emoji">🌄</span><span class="tile-text" data-i18n="opt_5h">5 hours</span></button>
-          <button type="button" class="tile" data-minutes="480"><span class="tile-emoji">🌞</span><span class="tile-text" data-i18n="opt_allday">All day</span></button>
+          <button type="button" class="tile" data-minutes="30"><span class="tile-emoji"><i data-lucide="zap"></i></span><span class="tile-text" data-i18n="opt_30min">30 min</span></button>
+          <button type="button" class="tile" data-minutes="60"><span class="tile-emoji"><i data-lucide="coffee"></i></span><span class="tile-text" data-i18n="opt_1h">1 hour</span></button>
+          <button type="button" class="tile" data-minutes="120"><span class="tile-emoji"><i data-lucide="footprints"></i></span><span class="tile-text" data-i18n="opt_2h">2 hours</span></button>
+          <button type="button" class="tile" data-minutes="240"><span class="tile-emoji"><i data-lucide="car-front"></i></span><span class="tile-text" data-i18n="opt_4h">4 hours</span></button>
+          <button type="button" class="tile is-active" data-minutes="300"><span class="tile-emoji"><i data-lucide="mountain"></i></span><span class="tile-text" data-i18n="opt_5h">5 hours</span></button>
+          <button type="button" class="tile" data-minutes="480"><span class="tile-emoji"><i data-lucide="sun"></i></span><span class="tile-text" data-i18n="opt_allday">All day</span></button>
         </div>
 
         <div class="field">
@@ -78,16 +78,16 @@
         <p class="step-kicker" data-i18n="s2_kicker">Your crew</p>
         <h2 class="step-title" data-i18n="s2_title">Who's coming along?</h2>
         <div class="tile-grid three" id="groupChips">
-          <button type="button" class="tile" data-group="solo"><span class="tile-emoji">🧍</span><span class="tile-text" data-i18n="g_solo">Solo</span></button>
-          <button type="button" class="tile" data-group="couple"><span class="tile-emoji">💑</span><span class="tile-text" data-i18n="g_couple">Couple</span></button>
-          <button type="button" class="tile is-active" data-group="family"><span class="tile-emoji">👨‍👩‍👧</span><span class="tile-text" data-i18n="g_family">Family</span></button>
+          <button type="button" class="tile" data-group="solo"><span class="tile-emoji"><i data-lucide="user"></i></span><span class="tile-text" data-i18n="g_solo">Solo</span></button>
+          <button type="button" class="tile" data-group="couple"><span class="tile-emoji"><i data-lucide="heart"></i></span><span class="tile-text" data-i18n="g_couple">Couple</span></button>
+          <button type="button" class="tile is-active" data-group="family"><span class="tile-emoji"><i data-lucide="users"></i></span><span class="tile-text" data-i18n="g_family">Family</span></button>
         </div>
 
         <span class="field-label" data-i18n="s2_how">How are you getting there?</span>
         <div class="tile-grid three" id="transportChips">
-          <button type="button" class="tile" data-transport="walk"><span class="tile-emoji">🚶</span><span class="tile-text" data-i18n="t_walk">Walk</span></button>
-          <button type="button" class="tile is-active" data-transport="car"><span class="tile-emoji">🚗</span><span class="tile-text" data-i18n="t_car">Car</span></button>
-          <button type="button" class="tile" data-transport="bike"><span class="tile-emoji">🚲</span><span class="tile-text" data-i18n="t_bike">Bike</span></button>
+          <button type="button" class="tile" data-transport="walk"><span class="tile-emoji"><i data-lucide="footprints"></i></span><span class="tile-text" data-i18n="t_walk">Walk</span></button>
+          <button type="button" class="tile is-active" data-transport="car"><span class="tile-emoji"><i data-lucide="car-front"></i></span><span class="tile-text" data-i18n="t_car">Car</span></button>
+          <button type="button" class="tile" data-transport="bike"><span class="tile-emoji"><i data-lucide="bike"></i></span><span class="tile-text" data-i18n="t_bike">Bike</span></button>
         </div>
 
         <div class="grid-two">
@@ -112,20 +112,20 @@
         <p class="step-kicker" data-i18n="s3_kicker">The fun part</p>
         <h2 class="step-title" data-i18n="s3_title">What are you in the mood for?</h2>
         <div class="tile-grid wrap" id="interestChips">
-          <button type="button" class="tile chip-tile is-active" data-interest="history"><span class="tile-emoji">🏛</span><span class="tile-text" data-i18n="c_history">History</span></button>
-          <button type="button" class="tile chip-tile is-active" data-interest="fortresses"><span class="tile-emoji">🏰</span><span class="tile-text" data-i18n="c_fortresses">Fortresses</span></button>
-          <button type="button" class="tile chip-tile is-active" data-interest="viewpoints"><span class="tile-emoji">🌅</span><span class="tile-text" data-i18n="c_viewpoints">Viewpoints</span></button>
-          <button type="button" class="tile chip-tile" data-interest="nature"><span class="tile-emoji">🌲</span><span class="tile-text" data-i18n="c_nature">Nature</span></button>
-          <button type="button" class="tile chip-tile" data-interest="water"><span class="tile-emoji">🌊</span><span class="tile-text" data-i18n="c_water">Water</span></button>
-          <button type="button" class="tile chip-tile" data-interest="food"><span class="tile-emoji">🍴</span><span class="tile-text" data-i18n="c_food">Food</span></button>
-          <button type="button" class="tile chip-tile" data-interest="surprise me"><span class="tile-emoji">🎲</span><span class="tile-text" data-i18n="c_surprise">Surprise me</span></button>
+          <button type="button" class="tile chip-tile is-active" data-interest="history"><span class="tile-emoji"><i data-lucide="landmark"></i></span><span class="tile-text" data-i18n="c_history">History</span></button>
+          <button type="button" class="tile chip-tile is-active" data-interest="fortresses"><span class="tile-emoji"><i data-lucide="castle"></i></span><span class="tile-text" data-i18n="c_fortresses">Fortresses</span></button>
+          <button type="button" class="tile chip-tile is-active" data-interest="viewpoints"><span class="tile-emoji"><i data-lucide="mountain-snow"></i></span><span class="tile-text" data-i18n="c_viewpoints">Viewpoints</span></button>
+          <button type="button" class="tile chip-tile" data-interest="nature"><span class="tile-emoji"><i data-lucide="trees"></i></span><span class="tile-text" data-i18n="c_nature">Nature</span></button>
+          <button type="button" class="tile chip-tile" data-interest="water"><span class="tile-emoji"><i data-lucide="waves"></i></span><span class="tile-text" data-i18n="c_water">Water</span></button>
+          <button type="button" class="tile chip-tile" data-interest="food"><span class="tile-emoji"><i data-lucide="utensils"></i></span><span class="tile-text" data-i18n="c_food">Food</span></button>
+          <button type="button" class="tile chip-tile" data-interest="surprise me"><span class="tile-emoji"><i data-lucide="dices"></i></span><span class="tile-text" data-i18n="c_surprise">Surprise me</span></button>
         </div>
 
         <span class="field-label" data-i18n="intensity">Intensity</span>
         <div class="tile-grid three" id="intensityChips">
-          <button type="button" class="tile is-active" data-intensity="easy"><span class="tile-emoji">🍃</span><span class="tile-text" data-i18n="i_easy">Easy</span></button>
-          <button type="button" class="tile" data-intensity="medium"><span class="tile-emoji">🚶‍♂️</span><span class="tile-text" data-i18n="i_medium">Medium</span></button>
-          <button type="button" class="tile" data-intensity="active"><span class="tile-emoji">🔥</span><span class="tile-text" data-i18n="i_active">Active</span></button>
+          <button type="button" class="tile is-active" data-intensity="easy"><span class="tile-emoji"><i data-lucide="leaf"></i></span><span class="tile-text" data-i18n="i_easy">Easy</span></button>
+          <button type="button" class="tile" data-intensity="medium"><span class="tile-emoji"><i data-lucide="activity"></i></span><span class="tile-text" data-i18n="i_medium">Medium</span></button>
+          <button type="button" class="tile" data-intensity="active"><span class="tile-emoji"><i data-lucide="flame"></i></span><span class="tile-text" data-i18n="i_active">Active</span></button>
         </div>
 
         <label class="toggle solo-toggle"><input id="useLiveData" type="checkbox" checked /><span class="track"></span><span data-i18n="use_live">Use live OSM / weather / routing</span></label>
@@ -134,7 +134,7 @@
           <button type="button" class="btn btn-back" data-back data-i18n="back">Back</button>
           <button id="searchBtn" type="button" class="btn btn-go">
             <span data-i18n="find_adventure">Find my adventure</span>
-            <span aria-hidden="true">🧭</span>
+            <i data-lucide="compass" aria-hidden="true"></i>
           </button>
         </div>
       </div>
@@ -168,7 +168,7 @@
   </section>
 
   <div id="loading" class="loading-overlay hidden">
-    <div class="compass" aria-hidden="true">⌖</div>
+    <div class="compass" aria-hidden="true"><i data-lucide="compass"></i></div>
     <h2 data-i18n="loading_title">Scouting your adventure</h2>
     <p data-i18n="loading_subtitle">Checking places, weather, travel time and risk rules.</p>
   </div>
@@ -211,6 +211,7 @@
     </article>
   </template>
 
+  <script src="/static/vendor/lucide-icons.js"></script>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script src="/static/app.js"></script>
 </body>

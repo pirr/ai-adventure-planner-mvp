@@ -480,6 +480,7 @@ function applyStaticI18n() {
   document.querySelectorAll('.lang-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.lang === currentLang);
   });
+  if (window.lucide) window.lucide.createIcons();
 }
 
 function setLang(lang) {
@@ -773,7 +774,10 @@ function buildCard(item, isTop) {
   `;
   renderPlaceWeather(fragment, item);
   fragment.querySelector('.breakdown').innerHTML = Object.entries(item.score_breakdown)
-    .map(([key, value]) => `<div class="item"><strong>${breakdownLabel(key)}:</strong> ${value}/100</div>`)
+    .map(([key, value]) => {
+      const tier = value >= 88 ? 'hi' : value < 65 ? 'lo' : '';
+      return `<div class="bd-row"><span class="bd-k">${breakdownLabel(key)}</span><span class="bd-bar"><i class="${tier}" style="width:${Math.max(0, Math.min(100, value))}%"></i></span><span class="bd-v">${value}</span></div>`;
+    })
     .join('');
   fragment.querySelector('.why').innerHTML = `
     <h3>${t('why_title')}</h3>
