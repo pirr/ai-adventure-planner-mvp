@@ -1,0 +1,339 @@
+/* ===========================================================================
+   Mood Launcher — production logic (vanilla). Loads AFTER app.js, so it can
+   call its globals: runSearch, currentLang, t, $, enterPlanning, ensureMap.
+   Strategy: the wizard chips/inputs stay in the DOM (hidden); presets set them
+   and call runSearch(). Inputs are the single source of truth for the payload.
+   =========================================================================== */
+(function () {
+  // ---- localized copy for the launcher (app i18n covers the rest) --------
+  var LX = {
+    en: {
+      vibe_q: "What\u2019s the", vibe_word: "vibe", or_pick: "Or pick a vibe",
+      everything: "Just show me everything nearby", perfect: "Perfect right now",
+      your_vibe: "Popular", time: "Time", interest: "Interest", crew: "Crew", effort: "Effort",
+      f_time: "How much time?", f_crew: "Who\u2019s coming?", f_effort: "Effort level", f_interest: "What are you into?",
+      morning: "Morning", afternoon: "Afternoon", evening: "Evening",
+      greet_morning: "Good morning", greet_afternoon: "Good afternoon", greet_evening: "Good evening",
+      ctx_morning: "This morning", ctx_afternoon: "This afternoon", ctx_evening: "This evening",
+      sky_morning: "Crisp", sky_afternoon: "Clear", sky_evening: "Golden", loc: "Tivat",
+      picked: "Map point", mine: "My location",
+      use_loc: "Use my location", loc_title: "Where are you starting from?", map_hint: "Tap the map to set your start",
+      enter_coords: "Enter coordinates", lat: "Latitude", lon: "Longitude", set_btn: "Set",
+    },
+    ru: {
+      vibe_q: "\u041a\u0430\u043a\u043e\u0439", vibe_word: "\u043d\u0430\u0441\u0442\u0440\u043e\u0439?", or_pick: "\u0418\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
+      everything: "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0432\u0441\u0451 \u0440\u044f\u0434\u043e\u043c", perfect: "\u0421\u0435\u0439\u0447\u0430\u0441 \u0441\u0430\u043c\u043e\u0435 \u0442\u043e",
+      your_vibe: "\u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u043e", time: "\u0412\u0440\u0435\u043c\u044f", interest: "\u0418\u043d\u0442\u0435\u0440\u0435\u0441", crew: "\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f", effort: "\u041d\u0430\u0433\u0440\u0443\u0437\u043a\u0430",
+      f_time: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438?", f_crew: "\u041a\u0442\u043e \u0438\u0434\u0451\u0442?", f_effort: "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0438", f_interest: "\u0427\u0442\u043e \u0438\u043d\u0442\u0435\u0440\u0435\u0441\u043d\u043e?",
+      morning: "\u0423\u0442\u0440\u043e", afternoon: "\u0414\u0435\u043d\u044c", evening: "\u0412\u0435\u0447\u0435\u0440",
+      greet_morning: "\u0414\u043e\u0431\u0440\u043e\u0435 \u0443\u0442\u0440\u043e", greet_afternoon: "\u0414\u043e\u0431\u0440\u044b\u0439 \u0434\u0435\u043d\u044c", greet_evening: "\u0414\u043e\u0431\u0440\u044b\u0439 \u0432\u0435\u0447\u0435\u0440",
+      ctx_morning: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0443\u0442\u0440\u043e\u043c", ctx_afternoon: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0434\u043d\u0451\u043c", ctx_evening: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0432\u0435\u0447\u0435\u0440\u043e\u043c",
+      sky_morning: "\u0421\u0432\u0435\u0436\u043e", sky_afternoon: "\u042f\u0441\u043d\u043e", sky_evening: "\u0417\u043e\u043b\u043e\u0442\u043e\u0439 \u0447\u0430\u0441", loc: "\u0422\u0438\u0432\u0430\u0442",
+      picked: "\u0422\u043e\u0447\u043a\u0430 \u043d\u0430 \u043a\u0430\u0440\u0442\u0435", mine: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e",
+      use_loc: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e", loc_title: "\u041e\u0442\u043a\u0443\u0434\u0430 \u043d\u0430\u0447\u043d\u0451\u043c?", map_hint: "\u041a\u043e\u0441\u043d\u0438\u0442\u0435\u0441\u044c \u043a\u0430\u0440\u0442\u044b, \u0447\u0442\u043e\u0431\u044b \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u0441\u0442\u0430\u0440\u0442",
+      enter_coords: "\u0412\u0432\u0435\u0441\u0442\u0438 \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u044b", lat: "\u0428\u0438\u0440\u043e\u0442\u0430", lon: "\u0414\u043e\u043b\u0433\u043e\u0442\u0430", set_btn: "\u0413\u043e\u0442\u043e\u0432\u043e",
+    },
+  };
+  function lx(k) { var d = LX[currentLang] || LX.en; return d[k] != null ? d[k] : LX.en[k]; }
+
+  // ---- presets (bundle time+crew+transport+intensity+interests) ----------
+  var PRESETS = [
+    { key: "quick", icon: "zap", grad: "linear-gradient(150deg,#2f7f6e,#163a2c)", dayparts: ["morning", "afternoon", "evening"],
+      time: 60, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "nature"],
+      en: { t: "Quick Escape", s: "Under an hour, on foot" }, ru: { t: "\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u0432\u044b\u0445\u043e\u0434", s: "\u041c\u0435\u043d\u044c\u0448\u0435 \u0447\u0430\u0441\u0430, \u043f\u0435\u0448\u043a\u043e\u043c" } },
+    { key: "coffee", icon: "coffee", grad: "linear-gradient(150deg,#c98b4a,#7a4a22)", dayparts: ["morning"],
+      time: 120, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "food"],
+      en: { t: "Coffee & a View", s: "A short, scenic start" }, ru: { t: "\u041a\u043e\u0444\u0435 \u0441 \u0432\u0438\u0434\u043e\u043c", s: "\u041a\u043e\u0440\u043e\u0442\u043a\u043e \u0438 \u0436\u0438\u0432\u043e\u043f\u0438\u0441\u043d\u043e" } },
+    { key: "family", icon: "users", grad: "linear-gradient(150deg,#3f97a6,#1f5a63)", dayparts: ["morning", "afternoon"],
+      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["history", "water", "nature"],
+      en: { t: "Family Day Out", s: "Easy & kid-friendly" }, ru: { t: "\u0421 \u0441\u0435\u043c\u044c\u0451\u0439", s: "\u041b\u0435\u0433\u043a\u043e, \u0441 \u0434\u0435\u0442\u044c\u043c\u0438" } },
+    { key: "sunset", icon: "mountain-snow", grad: "linear-gradient(150deg,#d6794e,#a84e28)", dayparts: ["afternoon", "evening"],
+      time: 120, crew: "couple", transport: "car", intensity: "easy", interests: ["viewpoints"],
+      en: { t: "Sunset Views", s: "Golden-hour viewpoints" }, ru: { t: "\u0417\u0430\u043a\u0430\u0442\u043d\u044b\u0435 \u0432\u0438\u0434\u044b", s: "\u0421\u043c\u043e\u0442\u0440\u043e\u0432\u044b\u0435 \u043d\u0430 \u0437\u0430\u043a\u0430\u0442\u0435" } },
+    { key: "history", icon: "castle", grad: "linear-gradient(150deg,#a86b3f,#5e3520)", dayparts: ["morning", "afternoon"],
+      time: 300, crew: "family", transport: "car", intensity: "medium", interests: ["history", "fortresses"],
+      en: { t: "History Hunt", s: "Fortresses & old towns" }, ru: { t: "\u041f\u043e \u0438\u0441\u0442\u043e\u0440\u0438\u0438", s: "\u041a\u0440\u0435\u043f\u043e\u0441\u0442\u0438 \u0438 \u0441\u0442\u0430\u0440\u044b\u0435 \u0433\u043e\u0440\u043e\u0434\u0430" } },
+    { key: "dinner", icon: "utensils", grad: "linear-gradient(150deg,#7a5230,#3a2414)", dayparts: ["evening"],
+      time: 240, crew: "couple", transport: "car", intensity: "easy", interests: ["food", "history"],
+      en: { t: "Dinner & a Stroll", s: "Old-town lanes & a bite" }, ru: { t: "\u0423\u0436\u0438\u043d \u0438 \u043f\u0440\u043e\u0433\u0443\u043b\u043a\u0430", s: "\u0423\u043b\u043e\u0447\u043a\u0438 \u0441\u0442\u0430\u0440\u043e\u0433\u043e \u0433\u043e\u0440\u043e\u0434\u0430" } },
+    { key: "water", icon: "waves", grad: "linear-gradient(150deg,#3f97a6,#1f4d3a)", dayparts: ["morning", "afternoon"],
+      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["water", "nature"],
+      en: { t: "By the Water", s: "Beaches & quiet coves" }, ru: { t: "\u0423 \u0432\u043e\u0434\u044b", s: "\u041f\u043b\u044f\u0436\u0438 \u0438 \u0431\u0443\u0445\u0442\u044b" } },
+    { key: "surprise", icon: "dices", grad: "linear-gradient(150deg,#6a4a86,#2c2750)", dayparts: ["morning", "afternoon", "evening"],
+      time: 300, crew: "solo", transport: "car", intensity: "medium", interests: ["history", "fortresses", "viewpoints", "water", "nature"],
+      en: { t: "Surprise Me", s: "Anything great nearby" }, ru: { t: "\u0423\u0434\u0438\u0432\u0438 \u043c\u0435\u043d\u044f", s: "\u0427\u0442\u043e-\u043d\u0438\u0431\u0443\u0434\u044c \u043a\u043b\u0430\u0441\u0441\u043d\u043e\u0435" } },
+  ];
+  var DAYPARTS = {
+    morning: { icon: "sunrise", temp: 16, feature: "coffee" },
+    afternoon: { icon: "sun", temp: 19, feature: "history" },
+    evening: { icon: "sunset", temp: 21, feature: "sunset" },
+  };
+
+  function defaultDaypart() {
+    var h = new Date().getHours();
+    if (h >= 5 && h < 11) return "morning";
+    if (h >= 11 && h < 17) return "afternoon";
+    return "evening";
+  }
+  var daypart = defaultDaypart();
+  var currentMood = null;
+  var placeLabel = null;
+  var sheetAutoOpened = false;
+  function locName() { return placeLabel || lx("loc"); }
+  function useMyLocation() { placeLabel = lx("mine"); updateContext(); if (window.requestGeolocation) window.requestGeolocation(); }
+  function theMap() {
+    try { if (window.appMap && window.appMap.on) return window.appMap; } catch (e) {}
+    try { if (typeof map !== "undefined" && map && map.on) return map; } catch (e) {}
+    return null;
+  }
+
+  // Tap anywhere on the start-screen map to set the start point (no recenter).
+  function onPlanningMapClick(e) {
+    if (!document.body.classList.contains("planning")) return;
+    placeLabel = lx("picked");
+    if (window.setLocation) window.setLocation(e.latlng.lat, e.latlng.lng, lx("picked"), { recenter: false });
+  }
+  function wireMapClick() {
+    var tries = 0;
+    (function attach() {
+      var m = theMap();
+      if (m) { m.off("click", onPlanningMapClick); m.on("click", onPlanningMapClick); return; }
+      if (tries++ < 25) setTimeout(attach, 100);
+    })();
+  }
+
+  // Launcher sheet: peek (location bar) <-> open (vibe presets).
+  function openLauncher() { var s = $("launchSheet"); if (s) s.classList.add("open"); invalidateSoon(); }
+  function toggleLauncher() { var s = $("launchSheet"); if (s) s.classList.toggle("open"); invalidateSoon(); }
+  function syncPlanningSheet() {
+    var s = $("launchSheet"); if (!s) return;
+    if (document.body.classList.contains("loc-set")) s.classList.add("open");
+    else s.classList.remove("open");
+    invalidateSoon();
+  }
+  function invalidateSoon() { if (window.appMap) setTimeout(function () { try { window.appMap.invalidateSize(); } catch (e) {} }, 460); }
+
+  // Any location set (tap / GPS / coords) funnels through app.js setOrigin,
+  // which dispatches 'origin-set'. React once: mark set, update chip, auto-open.
+  document.addEventListener("origin-set", function () {
+    if (!document.body.classList.contains("planning")) return;
+    document.body.classList.add("loc-set");
+    updateContext();
+    if (!sheetAutoOpened) { sheetAutoOpened = true; openLauncher(); }
+  });
+
+  function buildLocBar() {
+    var host = $("launchLoc"); if (!host) return;
+    host.innerHTML =
+      '<p class="loc-title">' + lx("loc_title") + '</p>' +
+      '<button type="button" class="loc-cta" id="locGps">' + icon("locate-fixed") + ' ' + lx("use_loc") + '</button>';
+    var lg = $("locGps"); if (lg) lg.addEventListener("click", useMyLocation);
+    refreshIcons();
+  }
+  function setMapHint() {
+    var h = $("mapHint"); if (!h) return;
+    h.innerHTML = icon("locate-fixed") + ' ' + lx("map_hint");
+    refreshIcons();
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function icon(name) { return '<i data-lucide="' + name + '"></i>'; }
+  function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
+  function pt(p) { return (p[currentLang] || p.en); }
+
+  // ---- write a preset's selection into the hidden wizard chips/inputs -----
+  function setSingle(containerId, attr, value) {
+    var c = $(containerId); if (!c) return;
+    c.querySelectorAll(".tile").forEach(function (tile) {
+      tile.classList.toggle("is-active", String(tile.dataset[attr]) === String(value));
+    });
+  }
+  function setInterests(list) {
+    var c = $("interestChips"); if (!c) return;
+    c.querySelectorAll(".tile").forEach(function (tile) {
+      tile.classList.toggle("is-active", list.indexOf(tile.dataset.interest) !== -1);
+    });
+  }
+  function applyPreset(p) {
+    setSingle("timeChips", "minutes", p.time);
+    setSingle("groupChips", "group", p.crew);
+    setSingle("transportChips", "transport", p.transport);
+    setSingle("intensityChips", "intensity", p.intensity);
+    setInterests(p.interests);
+  }
+
+  function choosePreset(p) {
+    currentMood = p;
+    applyPreset(p);
+    if (typeof window.runSearch === "function") window.runSearch();
+    buildFilterBar();
+  }
+
+  // ---- launcher UI -------------------------------------------------------
+  function buildLauncher() {
+    var host = $("launchBody"); if (!host) return;
+    var dp = DAYPARTS[daypart];
+    var list = PRESETS.filter(function (p) { return p.dayparts.indexOf(daypart) !== -1; });
+    var feature = list.filter(function (p) { return p.key === dp.feature; })[0] || list[0];
+    var grid = list.filter(function (p) { return p !== feature; });
+
+    var html = '';
+    html += '<div class="greet-row">';
+    html += '  <div class="greet">';
+    html += '    <span class="hello">' + icon(dp.icon) + ' ' + lx("ctx_" + daypart) + '</span>';
+    html += '    <h2>' + lx("vibe_q") + ' <span class="accent">' + lx("vibe_word") + '</span></h2>';
+    html += '  </div>';
+    html += '  <div class="daypart-switch">';
+    ["morning", "afternoon", "evening"].forEach(function (k) {
+      html += '<button type="button" class="dp-btn ' + (k === daypart ? "on" : "") + '" data-dp="' + k + '" title="' + lx(k) + '">' + icon(DAYPARTS[k].icon) + '</button>';
+    });
+    html += '  </div>';
+    html += '</div>';
+
+    html += '<details class="coord-entry"><summary>' + lx("enter_coords") + '</summary>';
+    html += '<div class="coord-row"><input id="mLat" inputmode="decimal" placeholder="' + lx("lat") + '"><input id="mLon" inputmode="decimal" placeholder="' + lx("lon") + '"><button type="button" class="coord-set" id="mSet">' + lx("set_btn") + '</button></div></details>';
+
+    if (feature) {
+      var f = pt(feature);
+      html += '<button type="button" class="foryou" data-preset="' + feature.key + '">';
+      html += '  <span class="foryou-ic">' + icon(feature.icon) + '</span>';
+      html += '  <span class="foryou-text">';
+      html += '    <span class="foryou-badge">' + icon("sparkles") + ' ' + lx("perfect") + '</span>';
+      html += '    <span class="foryou-title">' + f.t + '</span>';
+      html += '    <span class="foryou-sub">' + f.s + '</span>';
+      html += '  </span>';
+      html += '  <span class="foryou-go">' + icon("arrow-right") + '</span>';
+      html += '</button>';
+    }
+
+    html += '<div class="vibe-label">' + lx("or_pick") + '</div>';
+    html += '<div class="preset-grid">';
+    grid.forEach(function (p) {
+      var c = pt(p);
+      html += '<button type="button" class="preset-card" data-preset="' + p.key + '" style="background:' + p.grad + '">';
+      html += '  <span class="scrim"></span>';
+      html += '  <span class="p-ic">' + icon(p.icon) + '</span>';
+      html += '  <span class="p-title">' + c.t + '</span>';
+      html += '  <span class="p-sub">' + c.s + '</span>';
+      html += '</button>';
+    });
+    html += '</div>';
+    html += '<button type="button" class="everything" data-preset="surprise">' + icon("sparkles") + ' ' + lx("everything") + '</button>';
+
+    host.innerHTML = html;
+    host.querySelectorAll("[data-preset]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var p = PRESETS.filter(function (x) { return x.key === el.dataset.preset; })[0];
+        if (p) choosePreset(p);
+      });
+    });
+    host.querySelectorAll(".dp-btn").forEach(function (el) {
+      el.addEventListener("click", function () { daypart = el.dataset.dp; buildLauncher(); updateContext(); });
+    });
+    var ms = $("mSet"); if (ms) ms.addEventListener("click", function () {
+      var la = parseFloat(($("mLat") || {}).value), lo = parseFloat(($("mLon") || {}).value);
+      if (!isNaN(la) && !isNaN(lo) && window.setLocation) { window.setLocation(la, lo, lx("picked")); placeLabel = lx("picked"); updateContext(); }
+    });
+    refreshIcons();
+  }
+
+  // ---- top-bar context chips (location + weather) ------------------------
+  function updateContext() {
+    var wrap = $("ctxWrap"); if (!wrap) return;
+    var dp = DAYPARTS[daypart];
+    wrap.innerHTML = '<button type="button" class="ctx-chip btn" id="ctxLoc">' + icon("locate-fixed") + ' ' + locName() + '</button>';
+    var cl = $("ctxLoc"); if (cl) cl.addEventListener("click", useMyLocation);
+    refreshIcons();
+  }
+
+  // ---- results filter chips (read/write the same hidden chips) -----------
+  var FACETS = [
+    { key: "time", cont: "timeChips", attr: "minutes", multi: false, label: "time", title: "f_time" },
+    { key: "interest", cont: "interestChips", attr: "interest", multi: true, label: "interest", title: "f_interest" },
+    { key: "crew", cont: "groupChips", attr: "group", multi: false, label: "crew", title: "f_crew" },
+    { key: "effort", cont: "intensityChips", attr: "intensity", multi: false, label: "effort", title: "f_effort" },
+  ];
+  function tileText(tile) { var s = tile.querySelector(".tile-text"); return s ? s.textContent.trim() : tile.textContent.trim(); }
+  function tileIcon(tile) { var i = tile.querySelector("[data-lucide]"); return i ? i.getAttribute("data-lucide") : "circle"; }
+  function facetValue(f) {
+    var c = $(f.cont); if (!c) return "";
+    if (f.multi) {
+      var on = Array.prototype.slice.call(c.querySelectorAll(".tile.is-active"));
+      if (!on.length) return "\u2014";
+      return on.length > 1 ? tileText(on[0]) + " +" + (on.length - 1) : tileText(on[0]);
+    }
+    var a = c.querySelector(".tile.is-active");
+    return a ? tileText(a) : "\u2014";
+  }
+  var openFacetKey = null;
+  function buildFilterBar() {
+    var bar = $("filterbar"); if (!bar) return;
+    var html = '<button type="button" class="mood-pill" id="moodPill">' + icon(currentMood ? currentMood.icon : "dices") + ' ' +
+      (currentMood ? pt(currentMood).t : lx("your_vibe")) + ' ' + icon("chevron-down") + '</button>';
+    FACETS.forEach(function (f) {
+      html += '<button type="button" class="fchip" data-facet="' + f.key + '"><span class="fk">' + lx(f.label) + '</span><b>' + facetValue(f) + '</b>' + icon("chevron-down") + '</button>';
+    });
+    bar.innerHTML = html;
+    $("moodPill").addEventListener("click", function () { if (window.enterPlanning) window.enterPlanning(); setTimeout(syncPlanningSheet, 0); });
+    bar.querySelectorAll("[data-facet]").forEach(function (el) {
+      el.addEventListener("click", function () { toggleFacet(el.dataset.facet); });
+    });
+    renderFacetPanel();
+    refreshIcons();
+  }
+  function toggleFacet(key) { openFacetKey = (openFacetKey === key ? null : key); if (window.openSheet) window.openSheet(); renderFacetPanel(); syncChipActive(); }
+  function syncChipActive() {
+    var bar = $("filterbar"); if (!bar) return;
+    bar.querySelectorAll(".fchip").forEach(function (el) { el.classList.toggle("active", el.dataset.facet === openFacetKey); });
+  }
+  function renderFacetPanel() {
+    var panel = $("facetPanel"); if (!panel) return;
+    if (!openFacetKey) { panel.className = "facet-panel hidden"; panel.innerHTML = ""; return; }
+    var f = FACETS.filter(function (x) { return x.key === openFacetKey; })[0];
+    var c = $(f.cont); if (!c) return;
+    var html = '<h4>' + lx(f.title) + '</h4><div class="facet-opts">';
+    c.querySelectorAll(".tile").forEach(function (tile) {
+      var on = tile.classList.contains("is-active");
+      html += '<button type="button" class="facet-pill ' + (on ? "on" : "") + '" data-val="' + (tile.dataset[f.attr] || "") + '">' + icon(tileIcon(tile)) + ' ' + tileText(tile) + '</button>';
+    });
+    html += '</div>';
+    panel.className = "facet-panel";
+    panel.innerHTML = html;
+    panel.querySelectorAll(".facet-pill").forEach(function (pill) {
+      pill.addEventListener("click", function () {
+        if (f.multi) { setInterestToggle(f, pill.dataset.val); }
+        else { setSingle(f.cont, f.attr, pill.dataset.val); openFacetKey = null; }
+        currentMood = null;
+        if (typeof window.runSearch === "function") window.runSearch();
+        buildFilterBar();
+      });
+    });
+    refreshIcons();
+  }
+  function setInterestToggle(f, val) {
+    var c = $(f.cont); if (!c) return;
+    c.querySelectorAll(".tile").forEach(function (tile) {
+      if (String(tile.dataset[f.attr]) === String(val)) tile.classList.toggle("is-active");
+    });
+  }
+
+  // ---- re-render on language change --------------------------------------
+  document.querySelectorAll(".lang-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () { setTimeout(function () { buildLocBar(); buildLauncher(); updateContext(); setMapHint(); if (document.body.classList.contains("exploring")) buildFilterBar(); }, 0); });
+  });
+
+  // ---- boot --------------------------------------------------------------
+  function boot() {
+    if (typeof window.ensureMap === "function") window.ensureMap();
+    wireMapClick();
+    var grip = document.querySelector(".launch-grip"); if (grip) grip.addEventListener("click", toggleLauncher);
+    var eb = $("editBtn"); if (eb) eb.addEventListener("click", function () { setTimeout(syncPlanningSheet, 0); });
+    buildLocBar();
+    buildLauncher();
+    setMapHint();
+    updateContext();
+    refreshIcons();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
