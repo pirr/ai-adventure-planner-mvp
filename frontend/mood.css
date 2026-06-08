@@ -161,6 +161,31 @@ body.planning .filterbar, body.planning .facet-panel { display: none; }
 .facet-pill.on { background: var(--pine-800); border-color: var(--pine-800); color: var(--cream); }
 .facet-pill.on .lucide { color: var(--amber-400); }
 
+/* staged-change highlight on a filter chip */
+.fchip.changed { border-color: var(--clay-400); background: #fff6ee; }
+.fchip.changed b { color: var(--clay-500); }
+
+/* recent choices row */
+.recent-row { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 0 clamp(16px,3vw,24px) 12px; scrollbar-width: none; max-width: 560px; margin: 0 auto; }
+.recent-row::-webkit-scrollbar { height: 0; }
+.recent-row.hidden { display: none; }
+.recent-label { flex: 0 0 auto; font-family: var(--display); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.recent-chip { flex: 0 0 auto; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; background: var(--sand-200); border: 1.5px solid transparent; color: var(--pine-800);
+  padding: 7px 12px; border-radius: 999px; font-family: var(--display); font-weight: 700; font-size: 12.5px; cursor: pointer; transition: 0.18s var(--ease); }
+.recent-chip:hover { border-color: var(--pine-700); }
+.recent-chip .lucide { width: 14px; height: 14px; color: var(--clay-500); }
+
+/* apply / reset bar */
+.apply-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 clamp(16px,3vw,24px) 12px;
+  background: var(--pine-800); color: var(--cream); border-radius: var(--r-lg); padding: 10px 12px 10px 16px; box-shadow: var(--float-sm); }
+.apply-bar.hidden { display: none; }
+.apply-count { font-family: var(--display); font-weight: 700; font-size: 13px; }
+.apply-actions { display: inline-flex; align-items: center; gap: 8px; }
+.apply-reset { background: transparent; border: none; color: var(--sand-200); font-family: var(--display); font-weight: 700; font-size: 13px; padding: 8px 12px; cursor: pointer; }
+.apply-reset:hover { color: #fff; }
+.apply-go { background: var(--amber-400); color: var(--pine-900); border: none; border-radius: 999px; font-family: var(--display); font-weight: 800; font-size: 13px; padding: 9px 18px; cursor: pointer; transition: 0.18s var(--ease); }
+.apply-go:hover { filter: brightness(1.05); }
+
 /* expanded sheet: stack result cards full-width so they fit the screen */
 .sheet.open .carousel { flex-direction: column; overflow: visible; }
 .sheet.open .recommendation { flex: 0 0 auto; width: 100%; max-width: none; }
