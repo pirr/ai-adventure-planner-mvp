@@ -35,12 +35,13 @@ function ensureMap() {
   const lat = parseFloat($('lat').value) || 42.4304;
   const lon = parseFloat($('lon').value) || 18.6964;
   map = L.map('map', { zoomControl: false }).setView([lat, lon], 13);
+  window.appMap = map;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
   const youIcon = L.divIcon({ className: 'you-pin', html: '<span></span>', iconSize: [18, 18], iconAnchor: [9, 9] });
-  originMarker = L.marker([lat, lon], { draggable: true, icon: youIcon }).addTo(map);
+  originMarker = L.marker([lat, lon], { draggable: true, icon: youIcon });
   originMarker.on('dragend', () => {
     const { lat: a, lng: b } = originMarker.getLatLng();
     setOrigin(a, b, { recenter: false });
@@ -53,8 +54,12 @@ function setOrigin(lat, lon, { recenter = false } = {}) {
   const lonNum = Number(lon);
   $('lat').value = latNum.toFixed(6);
   $('lon').value = lonNum.toFixed(6);
-  if (originMarker) originMarker.setLatLng([latNum, lonNum]);
+  if (originMarker) {
+    originMarker.setLatLng([latNum, lonNum]);
+    if (map && !map.hasLayer(originMarker)) originMarker.addTo(map); // reveal pin on first set
+  }
   if (map && recenter) map.setView([latNum, lonNum], Math.max(map.getZoom(), 13));
+  document.dispatchEvent(new CustomEvent('origin-set', { detail: { lat: latNum, lon: lonNum } }));
 }
 
 function sheetHeight() {
@@ -145,6 +150,7 @@ function setMode(mode) {
 function enterExploring() {
   setMode('exploring');
   ensureMap();
+  if (originMarker && map && !map.hasLayer(originMarker)) originMarker.addTo(map);
   if (map) setTimeout(() => map.invalidateSize(), 80);
 }
 
@@ -522,8 +528,8 @@ document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('clic
 // ---------------------------------------------------------------------------
 // Location
 // ---------------------------------------------------------------------------
-function setLocation(lat, lon, label) {
-  setOrigin(lat, lon, { recenter: true });
+function setLocation(lat, lon, label, { recenter = true } = {}) {
+  setOrigin(lat, lon, { recenter });
   $('locationStatus').textContent = label;
 }
 
