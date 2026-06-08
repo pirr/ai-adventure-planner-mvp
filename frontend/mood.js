@@ -167,7 +167,7 @@
   function choosePreset(p) {
     currentMood = p;
     applyPreset(p);
-    if (typeof window.runSearch === "function") window.runSearch();
+    commitSearch();
     buildFilterBar();
   }
 
@@ -248,12 +248,13 @@
     refreshIcons();
   }
 
-  // ---- results filter chips (read/write the same hidden chips) -----------
+  // ---- results filters: read/write hidden chips, stage edits, apply once ----
   var FACETS = [
-    { key: "time", cont: "timeChips", attr: "minutes", multi: false, label: "time", title: "f_time" },
-    { key: "interest", cont: "interestChips", attr: "interest", multi: true, label: "interest", title: "f_interest" },
-    { key: "crew", cont: "groupChips", attr: "group", multi: false, label: "crew", title: "f_crew" },
-    { key: "effort", cont: "intensityChips", attr: "intensity", multi: false, label: "effort", title: "f_effort" },
+    { key: "time", cont: "timeChips", attr: "minutes", multi: false, label: "time", title: "f_time", field: "minutes" },
+    { key: "transport", cont: "transportChips", attr: "transport", multi: false, label: "transport", title: "f_transport", field: "transport" },
+    { key: "crew", cont: "groupChips", attr: "group", multi: false, label: "crew", title: "f_crew", field: "group" },
+    { key: "interest", cont: "interestChips", attr: "interest", multi: true, label: "interest", title: "f_interest", field: "interests" },
+    { key: "effort", cont: "intensityChips", attr: "intensity", multi: false, label: "effort", title: "f_effort", field: "intensity" },
   ];
   function tileText(tile) { var s = tile.querySelector(".tile-text"); return s ? s.textContent.trim() : tile.textContent.trim(); }
   function tileIcon(tile) { var i = tile.querySelector("[data-lucide]"); return i ? i.getAttribute("data-lucide") : "circle"; }
@@ -267,23 +268,127 @@
     var a = c.querySelector(".tile.is-active");
     return a ? tileText(a) : "\u2014";
   }
+
+  // --- state: read/write the hidden chips; vibe label is cosmetic ---
+  function activeVal(cont, attr) { var c = $(cont); if (!c) return null; var a = c.querySelector(".tile.is-active"); return a ? a.dataset[attr] : null; }
+  function activeVals(cont, attr) { var c = $(cont); if (!c) return []; return Array.prototype.slice.call(c.querySelectorAll(".tile.is-active")).map(function (t) { return t.dataset[attr]; }); }
+  function readFacets() {
+    return {
+      minutes: activeVal("timeChips", "minutes"),
+      transport: activeVal("transportChips", "transport"),
+      group: activeVal("groupChips", "group"),
+      intensity: activeVal("intensityChips", "intensity"),
+      interests: activeVals("interestChips", "interest").slice().sort(),
+    };
+  }
+  function readState() { var f = readFacets(); f.vibeKey = currentMood ? currentMood.key : null; return f; }
+  function presetByKey(k) { return PRESETS.filter(function (p) { return p.key === k; })[0] || null; }
+  function writeState(s) {
+    setSingle("timeChips", "minutes", s.minutes);
+    setSingle("transportChips", "transport", s.transport);
+    setSingle("groupChips", "group", s.group);
+    setSingle("intensityChips", "intensity", s.intensity);
+    setInterests((s.interests || []).slice());
+    currentMood = s.vibeKey ? presetByKey(s.vibeKey) : null;
+  }
+  function interestsEqual(a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); }
+  function facetsEqual(a, b) {
+    return a.minutes === b.minutes && a.transport === b.transport && a.group === b.group && a.intensity === b.intensity && interestsEqual(a.interests, b.interests);
+  }
+  var appliedSnapshot = null; // full state (incl. vibeKey) of the last searched filters
+  function isPending() { return !!appliedSnapshot && !facetsEqual(readFacets(), appliedSnapshot); }
+  function changeCount() {
+    if (!appliedSnapshot) return 0;
+    var f = readFacets(), n = 0;
+    ["minutes", "transport", "group", "intensity"].forEach(function (k) { if (f[k] !== appliedSnapshot[k]) n++; });
+    if (!interestsEqual(f.interests, appliedSnapshot.interests)) n++;
+    return n;
+  }
+  function facetChanged(f) {
+    if (!appliedSnapshot) return false;
+    var cur = readFacets();
+    if (f.multi) return !interestsEqual(cur.interests, appliedSnapshot.interests);
+    return cur[f.field] !== appliedSnapshot[f.field];
+  }
+
+  // --- commit a search (the only place runSearch fires from the filters) ---
+  function commitSearch() {
+    if (typeof window.runSearch === "function") window.runSearch();
+    var s = readState();
+    saveRecent(s);
+    appliedSnapshot = s;
+  }
+  function applyStaged() { commitSearch(); buildFilterBar(); }
+  function resetStaged() { if (appliedSnapshot) writeState(appliedSnapshot); buildFilterBar(); }
+
+  // --- recent choices (localStorage cache of the last 3) ---
+  var RECENT_KEY = "ap.recentChoices";
+  function loadRecents() { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch (e) { return []; } }
+  function persistRecents(list) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch (e) {} }
+  function sameChoice(a, b) {
+    return a.vibeKey === b.vibeKey && a.minutes === b.minutes && a.transport === b.transport && a.group === b.group && a.intensity === b.intensity &&
+      (a.interests || []).join(",") === (b.interests || []).join(",");
+  }
+  function saveRecent(state) {
+    var list = loadRecents().filter(function (x) { return !sameChoice(x, state); });
+    list.unshift(state);
+    persistRecents(list.slice(0, 3));
+  }
+  function valueLabel(cont, attr, val) {
+    var c = $(cont); if (!c || val == null) return val || "";
+    var t = c.querySelector('.tile[data-' + attr + '="' + val + '"]');
+    return t ? tileText(t) : String(val);
+  }
+  function recentLabel(s) {
+    if (s.vibeKey) { var p = presetByKey(s.vibeKey); if (p) return icon(p.icon) + " " + pt(p).t; }
+    return valueLabel("timeChips", "minutes", s.minutes) + " \u00b7 " + valueLabel("transportChips", "transport", s.transport) + " \u00b7 " + valueLabel("groupChips", "group", s.group);
+  }
+  function renderRecents() {
+    var row = $("recentRow"); if (!row) return;
+    var rec = loadRecents();
+    if (!rec.length || openFacetKey) { row.className = "recent-row hidden"; row.innerHTML = ""; return; }
+    var html = '<span class="recent-label">' + lx("recent") + "</span>";
+    rec.forEach(function (s, i) { html += '<button type="button" class="recent-chip" data-i="' + i + '">' + recentLabel(s) + "</button>"; });
+    row.className = "recent-row";
+    row.innerHTML = html;
+    row.querySelectorAll(".recent-chip").forEach(function (el) {
+      el.addEventListener("click", function () { writeState(rec[Number(el.dataset.i)]); buildFilterBar(); });
+    });
+    refreshIcons();
+  }
+
+  // --- apply / reset bar (shown only when there are staged changes) ---
+  function renderApplyBar() {
+    var bar = $("applyBar"); if (!bar) return;
+    if (!isPending()) { bar.className = "apply-bar hidden"; bar.innerHTML = ""; return; }
+    bar.className = "apply-bar";
+    bar.innerHTML = '<span class="apply-count">' + changeCount() + " " + lx("changes") + "</span>" +
+      '<span class="apply-actions"><button type="button" class="apply-reset" id="filterReset">' + lx("reset") + "</button>" +
+      '<button type="button" class="apply-go" id="filterApply">' + lx("apply") + "</button></span>";
+    $("filterReset").addEventListener("click", resetStaged);
+    $("filterApply").addEventListener("click", applyStaged);
+  }
+
+  // --- filter bar ---
   var openFacetKey = null;
   function buildFilterBar() {
     var bar = $("filterbar"); if (!bar) return;
-    var html = '<button type="button" class="mood-pill" id="moodPill">' + icon(currentMood ? currentMood.icon : "dices") + ' ' +
-      (currentMood ? pt(currentMood).t : lx("your_vibe")) + ' ' + icon("chevron-down") + '</button>';
+    var html = '<button type="button" class="mood-pill" id="moodPill">' + icon(currentMood ? currentMood.icon : "dices") + " " +
+      (currentMood ? pt(currentMood).t : lx("your_vibe")) + " " + icon("chevron-down") + "</button>";
     FACETS.forEach(function (f) {
-      html += '<button type="button" class="fchip" data-facet="' + f.key + '"><span class="fk">' + lx(f.label) + '</span><b>' + facetValue(f) + '</b>' + icon("chevron-down") + '</button>';
+      html += '<button type="button" class="fchip' + (facetChanged(f) ? " changed" : "") + '" data-facet="' + f.key + '"><span class="fk">' + lx(f.label) + "</span><b>" + facetValue(f) + "</b>" + icon("chevron-down") + "</button>";
     });
     bar.innerHTML = html;
-    $("moodPill").addEventListener("click", function () { if (window.enterPlanning) window.enterPlanning(); setTimeout(syncPlanningSheet, 0); });
+    $("moodPill").addEventListener("click", function () { resetStaged(); if (window.enterPlanning) window.enterPlanning(); setTimeout(syncPlanningSheet, 0); });
     bar.querySelectorAll("[data-facet]").forEach(function (el) {
       el.addEventListener("click", function () { toggleFacet(el.dataset.facet); });
     });
     renderFacetPanel();
+    renderRecents();
+    renderApplyBar();
     refreshIcons();
   }
-  function toggleFacet(key) { openFacetKey = (openFacetKey === key ? null : key); if (window.openSheet) window.openSheet(); renderFacetPanel(); syncChipActive(); }
+  function toggleFacet(key) { openFacetKey = (openFacetKey === key ? null : key); if (window.openSheet) window.openSheet(); renderFacetPanel(); renderRecents(); syncChipActive(); }
   function syncChipActive() {
     var bar = $("filterbar"); if (!bar) return;
     bar.querySelectorAll(".fchip").forEach(function (el) { el.classList.toggle("active", el.dataset.facet === openFacetKey); });
@@ -293,21 +398,20 @@
     if (!openFacetKey) { panel.className = "facet-panel hidden"; panel.innerHTML = ""; return; }
     var f = FACETS.filter(function (x) { return x.key === openFacetKey; })[0];
     var c = $(f.cont); if (!c) return;
-    var html = '<h4>' + lx(f.title) + '</h4><div class="facet-opts">';
+    var html = "<h4>" + lx(f.title) + '</h4><div class="facet-opts">';
     c.querySelectorAll(".tile").forEach(function (tile) {
       var on = tile.classList.contains("is-active");
-      html += '<button type="button" class="facet-pill ' + (on ? "on" : "") + '" data-val="' + (tile.dataset[f.attr] || "") + '">' + icon(tileIcon(tile)) + ' ' + tileText(tile) + '</button>';
+      html += '<button type="button" class="facet-pill ' + (on ? "on" : "") + '" data-val="' + (tile.dataset[f.attr] || "") + '">' + icon(tileIcon(tile)) + " " + tileText(tile) + "</button>";
     });
-    html += '</div>';
+    html += "</div>";
     panel.className = "facet-panel";
     panel.innerHTML = html;
     panel.querySelectorAll(".facet-pill").forEach(function (pill) {
       pill.addEventListener("click", function () {
         if (f.multi) { setInterestToggle(f, pill.dataset.val); }
         else { setSingle(f.cont, f.attr, pill.dataset.val); openFacetKey = null; }
-        currentMood = null;
-        if (typeof window.runSearch === "function") window.runSearch();
-        buildFilterBar();
+        currentMood = null;       // customizing clears the vibe label
+        buildFilterBar();         // stage only \u2014 NO runSearch
       });
     });
     refreshIcons();
@@ -329,7 +433,7 @@
     if (typeof window.ensureMap === "function") window.ensureMap();
     wireMapClick();
     var grip = document.querySelector(".launch-grip"); if (grip) grip.addEventListener("click", toggleLauncher);
-    var eb = $("editBtn"); if (eb) eb.addEventListener("click", function () { setTimeout(syncPlanningSheet, 0); });
+    var eb = $("editBtn"); if (eb) eb.addEventListener("click", function () { resetStaged(); setTimeout(syncPlanningSheet, 0); });
     buildLocBar();
     buildLauncher();
     setMapHint();
