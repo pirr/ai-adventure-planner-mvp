@@ -77,6 +77,23 @@ function panToWithOffset(latlng) {
   map.panTo(map.unproject(point, z), { animate: true, duration: 0.4 });
 }
 
+// Double-click a card: select the place, collapse the sheet to peek, and recenter
+// the map on the place at a closer zoom (offset above the peek sheet).
+function focusPlace(id, zoom = 16) {
+  const marker = markersById[id];
+  if (!map || !marker) return;
+  setActive(id, { pan: false, scroll: false });
+  sheetEl.classList.remove('open');
+  // Wait for the sheet's collapse transition so sheetHeight() is the peek height
+  // and the map has its post-collapse size, then recenter with the peek offset.
+  setTimeout(() => {
+    map.invalidateSize();
+    const latlng = L.latLng(marker._latlng2);
+    const point = map.project(latlng, zoom).add([0, sheetHeight() / 2 - 30]);
+    map.setView(map.unproject(point, zoom), zoom, { animate: true });
+  }, 360);
+}
+
 function renderResultMarkers(items, { fit = true } = {}) {
   if (!map || !resultsLayer) return;
   resultsLayer.clearLayers();
@@ -830,6 +847,11 @@ function buildCard(item, isTop) {
     if (event.target.closest('a, button, summary, input')) return;
     openSheet();
     setActive(item.id, { pan: false, scroll: true });
+  });
+  // Double-tap a card: focus its place on the map and collapse the sheet.
+  article.addEventListener('dblclick', (event) => {
+    if (event.target.closest('a, button, summary, input')) return;
+    focusPlace(item.id);
   });
   return article;
 }
