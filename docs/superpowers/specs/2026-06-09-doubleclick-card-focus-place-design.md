@@ -2,7 +2,11 @@
 
 **Date:** 2026-06-09
 **Branch:** `design/guided-explorer`
-**Status:** Design approved — ready for implementation plan
+**Status:** Implemented. **Revision (2026-06-09):** the focus interaction was moved
+from double-click to **single-click, in the open sheet only** — tapping a card in the
+open (vertical) list focuses the place (collapse + center + zoom 16); tapping a card in
+peek still expands the sheet to read details. The `dblclick` handler was removed; the
+`focusPlace` helper is unchanged.
 
 ## Summary
 

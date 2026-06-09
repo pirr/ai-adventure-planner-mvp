@@ -842,16 +842,16 @@ function buildCard(item, isTop) {
   const visitedBtn = fragment.querySelector('.mark-visited');
   visitedBtn.textContent = t('mark_visited');
   visitedBtn.addEventListener('click', () => markVisited(item));
-  // Tap a card: highlight its pin, and (from peek) open the sheet to read details.
+  // Tap a card: from peek, open the sheet to read details; from the open list,
+  // focus the place on the map (center + zoom) and collapse the sheet.
   article.addEventListener('click', (event) => {
     if (event.target.closest('a, button, summary, input')) return;
-    openSheet();
-    setActive(item.id, { pan: false, scroll: true });
-  });
-  // Double-tap a card: focus its place on the map and collapse the sheet.
-  article.addEventListener('dblclick', (event) => {
-    if (event.target.closest('a, button, summary, input')) return;
-    focusPlace(item.id);
+    if (sheetEl.classList.contains('open')) {
+      focusPlace(item.id);
+    } else {
+      openSheet();
+      setActive(item.id, { pan: false, scroll: true });
+    }
   });
   return article;
 }
