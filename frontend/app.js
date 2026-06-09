@@ -702,7 +702,9 @@ function renderLoading() {
 async function runSearch({ excludeSeen = false } = {}) {
   clearError();
   track('search_started', { meta: { exclude_seen: excludeSeen } });
-  sheetEl.classList.remove('open'); // peek so the map stays visible
+  // Collapse to peek only on the FIRST entry from planning; on re-searches (filter
+  // Apply / Show others) keep the sheet where it is so the open list isn't yanked shut.
+  if (!document.body.classList.contains('exploring')) sheetEl.classList.remove('open');
   enterExploring();                 // show the results sheet now (launcher hides)
   renderLoading();                  // spinner + text where the cards will be
 
