@@ -318,7 +318,7 @@
     saveRecent(s);
     appliedSnapshot = s;
   }
-  function applyStaged() { commitSearch(); buildFilterBar(); }
+  function applyStaged() { openFacetKey = null; commitSearch(); buildFilterBar(); }
   function resetStaged() { if (appliedSnapshot) writeState(appliedSnapshot); buildFilterBar(); }
 
   // --- recent choices (localStorage cache of the last 3) ---
