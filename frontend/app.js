@@ -1,6 +1,5 @@
 const $ = (id) => document.getElementById(id);
 const carouselEl = $('carousel');
-const loadingEl = $('loading');
 const errorBox = $('errorBox');
 const sheetEl = $('sheet');
 let lastRequestId = null;
@@ -689,10 +688,23 @@ function track(event, extra = {}) {
   }).catch(() => {});
 }
 
+// In-card loading: a centered compass spinner + text inside #carousel, shown while
+// the search runs and replaced by renderResults() (which rebuilds the carousel).
+function renderLoading() {
+  carouselEl.innerHTML =
+    '<div class="card-loading">' +
+      '<div class="compass" aria-hidden="true"><i data-lucide="compass"></i></div>' +
+      '<p>' + t('loading_title') + '</p>' +
+    '</div>';
+  if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+}
+
 async function runSearch({ excludeSeen = false } = {}) {
   clearError();
-  loadingEl.classList.remove('hidden');
   track('search_started', { meta: { exclude_seen: excludeSeen } });
+  sheetEl.classList.remove('open'); // peek so the map stays visible
+  enterExploring();                 // show the results sheet now (launcher hides)
+  renderLoading();                  // spinner + text where the cards will be
 
   try {
     const response = await fetch('/api/recommendations', {
@@ -705,18 +717,14 @@ async function runSearch({ excludeSeen = false } = {}) {
       throw new Error(text || `Request failed: ${response.status}`);
     }
     const data = await response.json();
-    sheetEl.classList.remove('open'); // start in peek so the map stays visible
-    enterExploring();
     renderResults(data);
     if (excludeSeen && !(data.recommendations || []).length) setError(t('no_more_others'));
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
     loadHistory();
   } catch (error) {
-    enterExploring();
+    carouselEl.innerHTML = ''; // clear the loading indicator
     openSheet();
     setError(t('search_failed', { error: error.message }));
-  } finally {
-    loadingEl.classList.add('hidden');
   }
 }
 

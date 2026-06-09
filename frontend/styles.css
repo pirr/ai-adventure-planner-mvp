@@ -345,6 +345,12 @@ body.planning .sheet { display: none; }
 .compass .lucide { width: 48px; height: 48px; stroke-width: 1.8; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* in-card loading (replaces the full-screen overlay) */
+.card-loading { flex: 0 0 100%; display: grid; place-items: center; gap: 4px; padding: 30px 16px; text-align: center; }
+.card-loading .compass { font-size: 34px; color: var(--clay-500); margin-bottom: 4px; }
+.card-loading .compass .lucide { width: 34px; height: 34px; }
+.card-loading p { font-family: var(--display); font-weight: 700; font-size: 14px; color: var(--ink-700); }
+
 :focus-visible { outline: 3px solid var(--clay-500); outline-offset: 2px; border-radius: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
