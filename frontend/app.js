@@ -24,6 +24,10 @@ let resultsLayer = null;
 let markersById = {};
 let activeId = null;
 let scrollRaf = null;
+// While we programmatically scroll a card into view, pause the scroll-spy so it
+// doesn't re-select whatever card is momentarily centered during the animation.
+let spyPaused = false;
+let spyResumeTimer = null;
 
 function scoreIcon(score, { active = false, top = false } = {}) {
   const cls = 'map-pin' + (active ? ' is-active' : '') + (top ? ' is-top' : '');
@@ -113,11 +117,20 @@ function setActive(id, { pan = true, scroll = false } = {}) {
 
 function scrollCardIntoView(id) {
   const card = carouselEl.querySelector(`.recommendation[data-id="${CSS.escape(id)}"]`);
-  if (card) card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  if (!card) return;
+  pauseSpy();
+  card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+function pauseSpy() {
+  spyPaused = true;
+  if (spyResumeTimer) clearTimeout(spyResumeTimer);
+  // Fallback in case 'scrollend' never fires (e.g. the card is already centered).
+  spyResumeTimer = setTimeout(() => { spyPaused = false; spyResumeTimer = null; }, 700);
 }
 
 function onCarouselScroll() {
-  if (scrollRaf) return;
+  if (spyPaused || scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = null;
     const center = carouselEl.scrollLeft + carouselEl.clientWidth / 2;
@@ -135,6 +148,12 @@ function onCarouselScroll() {
   });
 }
 carouselEl.addEventListener('scroll', onCarouselScroll, { passive: true });
+// Resume the spy as soon as the programmatic scroll settles (modern browsers);
+// the timeout in pauseSpy() covers browsers without 'scrollend'.
+carouselEl.addEventListener('scrollend', () => {
+  spyPaused = false;
+  if (spyResumeTimer) { clearTimeout(spyResumeTimer); spyResumeTimer = null; }
+});
 
 // ---------------------------------------------------------------------------
 // Mode switching: planning (wizard)  <->  exploring (map + sheet)
