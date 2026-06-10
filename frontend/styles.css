@@ -293,6 +293,29 @@ body.planning .sheet { display: none; }
   font-family: var(--display); font-size: 13px; font-weight: 800;
   letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
 }
+.load-more-card {
+  flex: 0 0 220px; max-width: 240px; min-height: 158px; scroll-snap-align: center;
+  display: grid; align-content: center; justify-items: start; gap: 7px;
+  border: 1.5px dashed var(--clay-400); border-radius: var(--r-lg);
+  background: #fffaf2; color: var(--clay-600); padding: 18px; text-align: left;
+  box-shadow: var(--float-xs);
+  transition: transform 0.2s var(--spring), border-color 0.18s var(--ease), background 0.18s var(--ease);
+}
+.load-more-card:hover { transform: translateY(-2px); border-color: var(--clay-500); background: #fbeee4; }
+.load-more-card:disabled { cursor: default; transform: none; opacity: 0.82; }
+.load-more-card.is-done { border-color: var(--line); background: var(--sand-200); color: var(--muted); }
+.load-more-icon {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px;
+  background: rgba(196,99,58,0.12); color: var(--clay-600);
+}
+.load-more-icon .lucide { width: 18px; height: 18px; }
+.load-more-card.is-loading .load-more-icon .lucide { animation: spin 1.1s linear infinite; }
+.load-more-title {
+  font-family: var(--display); font-weight: 800; font-size: 15px; line-height: 1.1; color: var(--ink-900);
+}
+.load-more-note {
+  color: var(--muted); font-size: 12.5px; font-weight: 700; line-height: 1.25;
+}
 
 .badges { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
 .decision-card .badges { display: none; }
@@ -378,6 +401,10 @@ body.planning .sheet { display: none; }
 .sheet:not(.open) .title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet:not(.open) .score { width: 44px; height: 44px; font-size: 16px; border-radius: 13px; }
 .sheet:not(.open) .card-mini { display: block; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet:not(.open) .load-more-card { flex-basis: 210px; min-height: 108px; height: 108px; padding: 13px 14px; gap: 5px; }
+.sheet:not(.open) .load-more-icon { width: 30px; height: 30px; border-radius: 9px; }
+.sheet:not(.open) .load-more-title { font-size: 13.5px; }
+.sheet:not(.open) .load-more-note { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
 
 @media (max-width: 420px) {
   .decision-plan { grid-template-columns: 1fr; }

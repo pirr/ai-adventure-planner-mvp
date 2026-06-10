@@ -23,11 +23,15 @@ let originMarker = null;
 let resultsLayer = null;
 let markersById = {};
 let activeId = null;
+let lastViewedCardId = null;
 let scrollRaf = null;
+let loadingMore = false;
+let canLoadMore = true;
 // While we programmatically scroll a card into view, pause the scroll-spy so it
 // doesn't re-select whatever card is momentarily centered during the animation.
 let spyPaused = false;
 let spyResumeTimer = null;
+let spyResumeOnScrollEnd = true;
 
 function scoreIcon(score, { active = false, top = false } = {}) {
   const cls = 'map-pin' + (active ? ' is-active' : '') + (top ? ' is-top' : '');
@@ -117,6 +121,7 @@ function renderResultMarkers(items, { fit = true } = {}) {
 
 function setActive(id, { pan = true, scroll = false } = {}) {
   if (!id) return;
+  lastViewedCardId = id;
   if (id !== activeId) {
     activeId = id;
     Object.entries(markersById).forEach(([mid, marker]) => {
@@ -132,42 +137,75 @@ function setActive(id, { pan = true, scroll = false } = {}) {
   if (scroll) scrollCardIntoView(id);
 }
 
-function scrollCardIntoView(id) {
+function scrollCardIntoView(id, { behavior = 'smooth' } = {}) {
   const card = carouselEl.querySelector(`.recommendation[data-id="${CSS.escape(id)}"]`);
   if (!card) return;
   pauseSpy();
-  card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  card.scrollIntoView({ behavior, inline: 'center', block: 'nearest' });
 }
 
-function pauseSpy() {
+function centeredCardId() {
+  const center = carouselEl.scrollLeft + carouselEl.clientWidth / 2;
+  let best = null;
+  let bestDist = Infinity;
+  carouselEl.querySelectorAll('.recommendation').forEach((card) => {
+    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+    const dist = Math.abs(cardCenter - center);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = card;
+    }
+  });
+  return best && best.dataset.id;
+}
+
+function rememberedCardId({ preferCentered = false } = {}) {
+  return preferCentered
+    ? centeredCardId() || lastViewedCardId || activeId
+    : lastViewedCardId || activeId || centeredCardId();
+}
+
+function restoreCardAfterSheetOpen(targetId = rememberedCardId()) {
+  if (!targetId) return;
+  requestAnimationFrame(() => {
+    setActive(targetId, { pan: false, scroll: false });
+    scrollCardIntoView(targetId, { behavior: 'auto' });
+  });
+}
+
+function pauseSpy(duration = 700, { resumeOnScrollEnd = true } = {}) {
   spyPaused = true;
+  spyResumeOnScrollEnd = resumeOnScrollEnd;
   if (spyResumeTimer) clearTimeout(spyResumeTimer);
   // Fallback in case 'scrollend' never fires (e.g. the card is already centered).
-  spyResumeTimer = setTimeout(() => { spyPaused = false; spyResumeTimer = null; }, 700);
+  spyResumeTimer = setTimeout(() => {
+    spyPaused = false;
+    spyResumeOnScrollEnd = true;
+    spyResumeTimer = null;
+  }, duration);
+}
+
+function maybeLoadMoreOnScroll() {
+  if (!lastResponse || loadingMore || !canLoadMore) return;
+  const remaining = carouselEl.scrollWidth - carouselEl.scrollLeft - carouselEl.clientWidth;
+  const threshold = Math.max(180, carouselEl.clientWidth * 0.45);
+  if (remaining <= threshold) loadMoreResults();
 }
 
 function onCarouselScroll() {
+  maybeLoadMoreOnScroll();
   if (spyPaused || scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = null;
-    const center = carouselEl.scrollLeft + carouselEl.clientWidth / 2;
-    let best = null;
-    let bestDist = Infinity;
-    carouselEl.querySelectorAll('.recommendation').forEach((card) => {
-      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-      const dist = Math.abs(cardCenter - center);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = card;
-      }
-    });
-    if (best) setActive(best.dataset.id, { pan: true, scroll: false });
+    const id = centeredCardId();
+    if (id) setActive(id, { pan: true, scroll: false });
   });
 }
 carouselEl.addEventListener('scroll', onCarouselScroll, { passive: true });
 // Resume the spy as soon as the programmatic scroll settles (modern browsers);
 // the timeout in pauseSpy() covers browsers without 'scrollend'.
 carouselEl.addEventListener('scrollend', () => {
+  if (!spyResumeOnScrollEnd) return;
   spyPaused = false;
   if (spyResumeTimer) { clearTimeout(spyResumeTimer); spyResumeTimer = null; }
 });
@@ -195,12 +233,19 @@ function enterPlanning() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function openSheet() {
+function openSheet(targetId = rememberedCardId()) {
+  if (targetId) lastViewedCardId = targetId;
   sheetEl.classList.add('open');
+  restoreCardAfterSheetOpen(targetId);
 }
 
 function toggleSheet() {
+  const willOpen = !sheetEl.classList.contains('open');
+  const targetId = rememberedCardId({ preferCentered: !willOpen });
+  if (targetId) lastViewedCardId = targetId;
+  pauseSpy(700, { resumeOnScrollEnd: false });
   sheetEl.classList.toggle('open');
+  if (willOpen) restoreCardAfterSheetOpen(targetId);
   if (map) setTimeout(() => map.invalidateSize(), 360);
 }
 
@@ -279,7 +324,7 @@ const I18N = {
     visited_cleared: 'Visited places cleared.',
     mark_visited: "I've been here",
     show_others: 'Show others',
-    no_more_others: 'No new places left — showing the best matches again.',
+    no_more_others: 'No new places left.',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
     history_confirm: 'Delete your local history (recent searches, feedback and events)?',
@@ -314,6 +359,7 @@ const I18N = {
     data_word: 'data',
     best_trip_now: 'Best trip right now',
     other_good_options: 'Other good options',
+    loading_others: 'Finding more places...',
     excellent_fit: 'Excellent fit',
     good_fit: 'Good fit',
     possible_fit: 'Possible fit',
@@ -445,7 +491,7 @@ const I18N = {
     visited_cleared: 'Посещённые места очищены.',
     mark_visited: 'Я здесь был',
     show_others: 'Другие места',
-    no_more_others: 'Новых мест не осталось — снова показываем лучшие варианты.',
+    no_more_others: 'Новых мест не осталось.',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
     history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
@@ -480,6 +526,7 @@ const I18N = {
     data_word: 'данные',
     best_trip_now: 'Лучшая поездка сейчас',
     other_good_options: 'Другие хорошие варианты',
+    loading_others: 'Ищем ещё места...',
     excellent_fit: 'Отлично подходит',
     good_fit: 'Хорошо подходит',
     possible_fit: 'Можно рассмотреть',
@@ -691,7 +738,7 @@ function selectedInterests() {
 }
 
 $('searchBtn').addEventListener('click', () => runSearch());
-$('showOthersBtn').addEventListener('click', () => runSearch({ excludeSeen: true }));
+$('showOthersBtn').addEventListener('click', () => loadMoreResults({ scrollToNew: true }));
 $('clearHistoryBtn').addEventListener('click', clearHistory);
 $('clearVisitedBtn').addEventListener('click', clearVisited);
 
@@ -755,8 +802,20 @@ function renderLoading() {
   if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 }
 
+function annotateRequestId(data) {
+  (data.recommendations || []).forEach((item) => {
+    if (!item._request_id) item._request_id = data.request_id;
+  });
+}
+
+function recommendationKey(item) {
+  return item.source_id || item.id;
+}
+
 async function runSearch({ excludeSeen = false } = {}) {
   clearError();
+  loadingMore = false;
+  canLoadMore = true;
   track('search_started', { meta: { exclude_seen: excludeSeen } });
   // Collapse to peek only on the FIRST entry from planning; on re-searches (filter
   // Apply / Show others) keep the sheet where it is so the open list isn't yanked shut.
@@ -777,6 +836,7 @@ async function runSearch({ excludeSeen = false } = {}) {
       throw new Error(text || `Request failed: ${response.status}`);
     }
     const data = await response.json();
+    annotateRequestId(data);
     renderResults(data);
     if (excludeSeen && !(data.recommendations || []).length) setError(t('no_more_others'));
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
@@ -788,6 +848,73 @@ async function runSearch({ excludeSeen = false } = {}) {
   }
 }
 
+async function loadMoreResults({ scrollToNew = false } = {}) {
+  if (loadingMore) return;
+  if (!canLoadMore) {
+    setError(t('no_more_others'));
+    renderLoadMoreCard();
+    return;
+  }
+  if (!lastResponse) {
+    runSearch({ excludeSeen: true });
+    return;
+  }
+  clearError();
+  loadingMore = true;
+  renderLoadMoreCard();
+  track('search_started', { meta: { exclude_seen: true, load_more: true } });
+  const payload = requestPayload(true);
+  lastPayload = payload;
+  const previousScrollLeft = carouselEl.scrollLeft;
+
+  try {
+    const response = await fetch('/api/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Request failed: ${response.status}`);
+    }
+    const data = await response.json();
+    annotateRequestId(data);
+    const current = lastResponse.recommendations || [];
+    const seen = new Set(current.map(recommendationKey));
+    const fresh = (data.recommendations || []).filter((item) => !seen.has(recommendationKey(item)));
+
+    if (!fresh.length) {
+      canLoadMore = false;
+      setError(t('no_more_others'));
+      track('search_completed', { request_id: data.request_id, meta: { count: 0, load_more: true } });
+      renderLoadMoreCard();
+      return;
+    }
+
+    const combined = {
+      ...lastResponse,
+      request_id: data.request_id,
+      generated_at: data.generated_at,
+      recommendations: [...current, ...fresh],
+      rejected_alternatives: data.rejected_alternatives || lastResponse.rejected_alternatives || [],
+      data_warnings: data.data_warnings || lastResponse.data_warnings || [],
+    };
+    renderResults(combined, { refit: false });
+    if (scrollToNew) {
+      requestAnimationFrame(() => setActive(fresh[0].id, { pan: false, scroll: true }));
+    } else {
+      carouselEl.scrollLeft = previousScrollLeft;
+    }
+    track('search_completed', { request_id: data.request_id, meta: { count: fresh.length, load_more: true } });
+    loadHistory();
+  } catch (error) {
+    setError(t('search_failed', { error: error.message }));
+  } finally {
+    loadingMore = false;
+    renderLoadMoreCard();
+  }
+}
+
 function minutes(value) {
   if (value < 60) return `${value} ${t('unit_min')}`;
   const h = Math.floor(value / 60);
@@ -796,6 +923,7 @@ function minutes(value) {
 }
 
 function renderResults(data, { refit = true } = {}) {
+  annotateRequestId(data);
   lastResponse = data;
   lastRequestId = data.request_id;
   const items = data.recommendations || [];
@@ -937,6 +1065,27 @@ function renderDecisionSummary(item) {
   `;
 }
 
+function renderLoadMoreCard() {
+  const existing = carouselEl.querySelector('.load-more-card');
+  if (existing) existing.remove();
+  if (!lastResponse || !(lastResponse.recommendations || []).length) return;
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'load-more-card';
+  if (loadingMore) button.classList.add('is-loading');
+  if (!canLoadMore) button.classList.add('is-done');
+  button.disabled = loadingMore || !canLoadMore;
+  button.innerHTML = `
+    <span class="load-more-icon" aria-hidden="true"><i data-lucide="${loadingMore ? 'loader-circle' : 'shuffle'}"></i></span>
+    <span class="load-more-title">${loadingMore ? t('loading_others') : t('show_others')}</span>
+    <span class="load-more-note">${canLoadMore ? t('other_good_options') : t('no_more_others')}</span>
+  `;
+  button.addEventListener('click', () => loadMoreResults({ scrollToNew: true }));
+  carouselEl.appendChild(button);
+  if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+}
+
 function renderCards(items) {
   carouselEl.innerHTML = '';
   items.forEach((item, index) => {
@@ -948,6 +1097,8 @@ function renderCards(items) {
     }
     carouselEl.appendChild(buildCard(item, index === 0));
   });
+  renderLoadMoreCard();
+  if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 }
 
 function buildCard(item, isTop) {
@@ -969,6 +1120,7 @@ function buildCard(item, isTop) {
   renderPhoto(fragment, item, isTop);
   fragment.querySelector('.score-num').textContent = item.adventure_score;
   fragment.querySelector('.breakdown-summary').textContent = t('score_breakdown');
+  const requestId = item._request_id || lastRequestId;
 
   const mapLink = fragment.querySelector('.map-link');
   mapLink.textContent = isTop ? t('start_route') : t('open_maps');
@@ -978,10 +1130,10 @@ function buildCard(item, isTop) {
   appleLink.textContent = t('open_apple_maps');
   appleLink.href = item.apple_map_url;
   mapLink.addEventListener('click', () =>
-    track('maps_opened', { request_id: lastRequestId, recommendation_id: item.id, meta: { provider: 'google' } }),
+    track('maps_opened', { request_id: requestId, recommendation_id: item.id, meta: { provider: 'google' } }),
   );
   appleLink.addEventListener('click', () =>
-    track('maps_opened', { request_id: lastRequestId, recommendation_id: item.id, meta: { provider: 'apple' } }),
+    track('maps_opened', { request_id: requestId, recommendation_id: item.id, meta: { provider: 'apple' } }),
   );
 
   fragment.querySelector('.feedback-up').textContent = t('useful');
@@ -1012,12 +1164,12 @@ function buildCard(item, isTop) {
   const details = fragment.querySelector('details.breakdown-wrap');
   if (details) {
     details.addEventListener('toggle', () => {
-      if (details.open) track('recommendation_opened', { request_id: lastRequestId, recommendation_id: item.id });
+      if (details.open) track('recommendation_opened', { request_id: requestId, recommendation_id: item.id });
     });
   }
   const reasonsBox = fragment.querySelector('.feedback-reasons');
-  fragment.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up'));
-  fragment.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id));
+  fragment.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up', null, requestId));
+  fragment.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id, requestId));
   const visitedBtn = fragment.querySelector('.mark-visited');
   visitedBtn.textContent = t('mark_visited');
   visitedBtn.addEventListener('click', () => markVisited(item));
@@ -1028,7 +1180,7 @@ function buildCard(item, isTop) {
     if (sheetEl.classList.contains('open')) {
       focusPlace(item.id);
     } else {
-      openSheet();
+      openSheet(item.id);
       setActive(item.id, { pan: false, scroll: true });
     }
   });
@@ -1130,7 +1282,7 @@ function renderRejected(items) {
 
 const FEEDBACK_REASONS = ['too_far', 'too_difficult', 'bad_weather', 'not_interesting', 'inaccurate', 'other'];
 
-function toggleReasonPicker(box, recommendationId) {
+function toggleReasonPicker(box, recommendationId, requestId = lastRequestId) {
   if (!box.classList.contains('hidden')) {
     box.classList.add('hidden');
     return;
@@ -1143,20 +1295,20 @@ function toggleReasonPicker(box, recommendationId) {
   box.querySelectorAll('.pill').forEach((chip) => {
     chip.addEventListener('click', () => {
       box.classList.add('hidden');
-      submitFeedback(recommendationId, 'down', chip.dataset.reason);
+      submitFeedback(recommendationId, 'down', chip.dataset.reason, requestId);
     });
   });
   box.classList.remove('hidden');
 }
 
-async function submitFeedback(recommendationId, rating, reason) {
-  if (!lastRequestId) return;
+async function submitFeedback(recommendationId, rating, reason, requestId = lastRequestId) {
+  if (!requestId) return;
   try {
     await fetch('/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        request_id: lastRequestId,
+        request_id: requestId,
         recommendation_id: recommendationId,
         rating,
         reason: reason || null,
@@ -1164,7 +1316,7 @@ async function submitFeedback(recommendationId, rating, reason) {
       }),
     });
     track('feedback_submitted', {
-      request_id: lastRequestId,
+      request_id: requestId,
       recommendation_id: recommendationId,
       meta: { rating, reason: reason || null },
     });
