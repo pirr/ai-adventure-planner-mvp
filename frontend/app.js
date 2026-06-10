@@ -4,6 +4,7 @@ const errorBox = $('errorBox');
 const sheetEl = $('sheet');
 let lastRequestId = null;
 let lastResponse = null;
+let lastPayload = null;
 
 function anonymousId() {
   let id = localStorage.getItem('anon_id');
@@ -284,6 +285,7 @@ const I18N = {
     history_confirm: 'Delete your local history (recent searches, feedback and events)?',
     score_breakdown: 'Score breakdown',
     open_maps: 'Maps',
+    start_route: 'Start route',
     open_apple_maps: 'Apple',
     useful: '👍',
     not_useful: '👎',
@@ -310,6 +312,29 @@ const I18N = {
     confidence_fallback: 'fallback',
     confidence_estimated: 'estimated',
     data_word: 'data',
+    best_trip_now: 'Best trip right now',
+    other_good_options: 'Other good options',
+    excellent_fit: 'Excellent fit',
+    good_fit: 'Good fit',
+    possible_fit: 'Possible fit',
+    low_confidence_fit: 'Low confidence',
+    leave_now: 'Leave now',
+    back_by: 'Back by {time}',
+    route_each_way: '{mode} {v} each way',
+    mode_car: 'Drive',
+    mode_walk: 'Walk',
+    mode_bike: 'Bike',
+    weather_unavailable: 'Weather not available',
+    practical_title: 'Trip facts',
+    arrival_weather_short: 'Arrival',
+    group_fit_short: 'Group fit {score}/100',
+    opening_hours: 'Hours: {value}',
+    entrance_fee: 'Entry: {value}',
+    free_entry: 'free',
+    paid_entry: 'paid or ticketed',
+    accessibility: 'Access: {value}',
+    dog_policy: 'Dogs: {value}',
+    no_extra_facts: 'No extra place facts in source data',
     bd_time_fit: 'Time Fit',
     bd_weather_fit: 'Weather Fit',
     bd_distance_fit: 'Distance Fit',
@@ -319,7 +344,9 @@ const I18N = {
     bd_place_quality: 'Place Quality',
     bd_personal_preference_fit: 'Personal Fit',
     why_title: 'Why here',
+    why_now_title: 'Why now',
     risks_title: 'Worth knowing',
+    watch_out_title: 'Watch out',
     no_risk: 'No major risk detected by MVP rules.',
     unit_min: 'min',
     unit_h: 'h',
@@ -424,6 +451,7 @@ const I18N = {
     history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
     score_breakdown: 'Разбор оценки',
     open_maps: 'Карты',
+    start_route: 'Начать маршрут',
     open_apple_maps: 'Apple',
     useful: '👍',
     not_useful: '👎',
@@ -450,6 +478,29 @@ const I18N = {
     confidence_fallback: 'резервные',
     confidence_estimated: 'оценочные',
     data_word: 'данные',
+    best_trip_now: 'Лучшая поездка сейчас',
+    other_good_options: 'Другие хорошие варианты',
+    excellent_fit: 'Отлично подходит',
+    good_fit: 'Хорошо подходит',
+    possible_fit: 'Можно рассмотреть',
+    low_confidence_fit: 'Низкая уверенность',
+    leave_now: 'Выезд сейчас',
+    back_by: 'Назад к {time}',
+    route_each_way: '{mode} {v} в одну сторону',
+    mode_car: 'На машине',
+    mode_walk: 'Пешком',
+    mode_bike: 'На велосипеде',
+    weather_unavailable: 'Погода недоступна',
+    practical_title: 'Факты поездки',
+    arrival_weather_short: 'Прибытие',
+    group_fit_short: 'Группа {score}/100',
+    opening_hours: 'Часы: {value}',
+    entrance_fee: 'Вход: {value}',
+    free_entry: 'бесплатно',
+    paid_entry: 'платный или по билету',
+    accessibility: 'Доступ: {value}',
+    dog_policy: 'Собаки: {value}',
+    no_extra_facts: 'Доп. фактов нет в исходных данных',
     bd_time_fit: 'Время',
     bd_weather_fit: 'Погода',
     bd_distance_fit: 'Дорога',
@@ -459,7 +510,9 @@ const I18N = {
     bd_place_quality: 'Качество места',
     bd_personal_preference_fit: 'Личные предпочтения',
     why_title: 'Почему сюда',
+    why_now_title: 'Почему сейчас',
     risks_title: 'Стоит знать',
+    watch_out_title: 'Обратите внимание',
     no_risk: 'Существенных рисков по правилам MVP не выявлено.',
     unit_min: 'мин',
     unit_h: 'ч',
@@ -609,6 +662,9 @@ function wireSingleSelect(containerId) {
     tile.addEventListener('click', () => {
       container.querySelectorAll('.tile').forEach((t2) => t2.classList.remove('is-active'));
       tile.classList.add('is-active');
+      if (containerId === 'groupChips' && ['solo', 'couple'].includes(tile.dataset.group)) {
+        $('childrenAges').value = '';
+      }
     });
   });
 }
@@ -651,9 +707,9 @@ function requestPayload(excludeSeen = false) {
   return {
     lat: parseFloat($('lat').value),
     lon: parseFloat($('lon').value),
-    available_minutes: parseInt(activeData('timeChips', 'minutes', '300'), 10),
+    available_minutes: parseInt(activeData('timeChips', 'minutes', '120'), 10),
     transport_mode: activeData('transportChips', 'transport', 'car'),
-    group_type: activeData('groupChips', 'group', 'family'),
+    group_type: activeData('groupChips', 'group', 'solo'),
     children_ages: parseChildrenAges($('childrenAges').value),
     with_dog: $('withDog').checked,
     with_elderly: $('withElderly').checked,
@@ -707,12 +763,14 @@ async function runSearch({ excludeSeen = false } = {}) {
   if (!document.body.classList.contains('exploring')) sheetEl.classList.remove('open');
   enterExploring();                 // show the results sheet now (launcher hides)
   renderLoading();                  // spinner + text where the cards will be
+  const payload = requestPayload(excludeSeen);
+  lastPayload = payload;
 
   try {
     const response = await fetch('/api/recommendations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestPayload(excludeSeen)),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       const text = await response.text();
@@ -783,9 +841,113 @@ function renderWarnings(warnings) {
   `;
 }
 
+function fitLabel(score) {
+  if (score >= 88) return t('excellent_fit');
+  if (score >= 75) return t('good_fit');
+  if (score >= 60) return t('possible_fit');
+  return t('low_confidence_fit');
+}
+
+function routeModeLabel() {
+  const mode = (lastPayload && lastPayload.transport_mode) || activeData('transportChips', 'transport', 'car');
+  return t('mode_' + mode);
+}
+
+function oneWayTravelMinutes(item) {
+  return Math.max(1, Math.round((item.travel_minutes || 0) / 2));
+}
+
+function clockTime(date) {
+  const locale = currentLang === 'ru' ? 'ru-RU' : 'en-US';
+  return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function backBy(item) {
+  const total = Number(item.total_minutes) || 0;
+  return clockTime(new Date(Date.now() + total * 60 * 1000));
+}
+
+function confidenceLabel(value) {
+  return `${t('confidence_' + (value || 'estimated'))} ${t('data_word')}`;
+}
+
+function arrivalWeatherText(item) {
+  const arrival = item.arrival_weather;
+  if (!arrival) return t('weather_unavailable');
+  const temp = arrival.temperature_c != null ? ` · ${Math.round(arrival.temperature_c)}°C` : '';
+  return `${arrival.summary}${temp}`;
+}
+
+function tagValue(tags, keys) {
+  for (const key of keys) {
+    if (tags && tags[key] != null && String(tags[key]).trim() !== '') return String(tags[key]).trim();
+  }
+  return '';
+}
+
+function readableTagValue(value) {
+  return value.replaceAll('_', ' ');
+}
+
+function readableFeeValue(value) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'no' || normalized === 'free') return t('free_entry');
+  if (normalized === 'yes') return t('paid_entry');
+  return readableTagValue(value);
+}
+
+function practicalFacts(item) {
+  const tags = item.tags || {};
+  const facts = [
+    t('badge_total', { v: minutes(item.total_minutes) }),
+    t('route_each_way', { mode: routeModeLabel(), v: minutes(oneWayTravelMinutes(item)) }),
+    t('badge_walk', { km: item.walking_km.toFixed(1) }),
+    t('difficulty_' + item.difficulty),
+    `${t('arrival_weather_short')}: ${arrivalWeatherText(item)}`,
+    t('group_fit_short', { score: item.score_breakdown.group_fit }),
+    confidenceLabel(item.data_confidence),
+  ];
+  const hours = tagValue(tags, ['opening_hours']);
+  const fee = tagValue(tags, ['fee', 'charge', 'entrance_fee']);
+  const access = tagValue(tags, ['wheelchair']);
+  const dogs = tagValue(tags, ['dog', 'dogs']);
+  if (hours) facts.push(t('opening_hours', { value: readableTagValue(hours) }));
+  if (fee) facts.push(t('entrance_fee', { value: readableFeeValue(fee) }));
+  if (access) facts.push(t('accessibility', { value: readableTagValue(access) }));
+  if (dogs) facts.push(t('dog_policy', { value: readableTagValue(dogs) }));
+  return facts;
+}
+
+function renderDecisionSummary(item) {
+  const routeLine = t('route_each_way', { mode: routeModeLabel(), v: minutes(oneWayTravelMinutes(item)) });
+  const facts = practicalFacts(item);
+  return `
+    <div class="decision-plan">
+      <span>${t('leave_now')}</span>
+      <span>${t('back_by', { time: backBy(item) })}</span>
+      <span>${escapeHtml(routeLine)}</span>
+      <span>${escapeHtml(item.walking_km.toFixed(1))} km · ${t('difficulty_' + item.difficulty)}</span>
+    </div>
+    <div class="practical-panel">
+      <h3>${t('practical_title')}</h3>
+      <div class="practical-grid">
+        ${facts.map((fact) => `<span>${escapeHtml(fact)}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderCards(items) {
   carouselEl.innerHTML = '';
-  items.forEach((item, index) => carouselEl.appendChild(buildCard(item, index === 0)));
+  items.forEach((item, index) => {
+    if (index === 1) {
+      const label = document.createElement('h3');
+      label.className = 'other-options-label';
+      label.textContent = t('other_good_options');
+      carouselEl.appendChild(label);
+    }
+    carouselEl.appendChild(buildCard(item, index === 0));
+  });
 }
 
 function buildCard(item, isTop) {
@@ -793,17 +955,24 @@ function buildCard(item, isTop) {
   const fragment = template.content.cloneNode(true);
   const article = fragment.querySelector('.recommendation');
   article.dataset.id = item.id;
-  if (isTop) article.classList.add('is-top');
+  if (isTop) article.classList.add('is-top', 'decision-card');
 
+  if (isTop) {
+    fragment.querySelector('.recommendation-body').insertAdjacentHTML('afterbegin', `<p class="decision-kicker">${t('best_trip_now')}</p>`);
+  }
   fragment.querySelector('.title').textContent = item.title;
   fragment.querySelector('.description').textContent = item.summary || item.description;
-  fragment.querySelector('.card-mini').textContent = `${minutes(item.total_minutes)} · ${item.walking_km.toFixed(1)} km · ${t('difficulty_' + item.difficulty)}`;
+  fragment.querySelector('.card-mini').textContent = isTop
+    ? `${fitLabel(item.adventure_score)} · ${t('score_label', { score: item.adventure_score })}`
+    : `${minutes(item.total_minutes)} · ${item.walking_km.toFixed(1)} km · ${t('difficulty_' + item.difficulty)}`;
+  if (isTop) fragment.querySelector('.card-mini').insertAdjacentHTML('afterend', renderDecisionSummary(item));
   renderPhoto(fragment, item, isTop);
   fragment.querySelector('.score-num').textContent = item.adventure_score;
   fragment.querySelector('.breakdown-summary').textContent = t('score_breakdown');
 
   const mapLink = fragment.querySelector('.map-link');
-  mapLink.textContent = t('open_maps');
+  mapLink.textContent = isTop ? t('start_route') : t('open_maps');
+  if (isTop) mapLink.classList.add('route-primary');
   mapLink.href = item.map_url;
   const appleLink = fragment.querySelector('.apple-map-link');
   appleLink.textContent = t('open_apple_maps');
@@ -832,12 +1001,12 @@ function buildCard(item, isTop) {
     })
     .join('');
   fragment.querySelector('.why').innerHTML = `
-    <h3>${t('why_title')}</h3>
+    <h3>${isTop ? t('why_now_title') : t('why_title')}</h3>
     ${item.why.map((text) => `<div class="item good">✓ ${escapeHtml(text)}</div>`).join('')}
     ${item.data_confidence_note ? `<div class="item">${escapeHtml(item.data_confidence_note)}</div>` : ''}
   `;
   fragment.querySelector('.warnings').innerHTML = item.warnings.length
-    ? `<h3>${t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`
+    ? `<h3>${isTop ? t('watch_out_title') : t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`
     : `<div class="item good">${t('no_risk')}</div>`;
 
   const details = fragment.querySelector('details.breakdown-wrap');
@@ -874,15 +1043,14 @@ function renderPhoto(node, item, isTop) {
   const photo = item.photo;
 
   if (flag && isTop) {
-    flag.textContent = t('pick_today');
+    flag.textContent = t('best_trip_now');
     flag.classList.remove('hidden');
   }
 
   if (!photo || !photo.url) {
     img.remove();
     credit.remove(); // no source -> drop the empty credit bar
-    if (isTop) media.classList.remove('hidden'); // keep a plain placeholder so the flag shows
-    else media.remove();
+    media.remove();
     return;
   }
   img.src = photo.url;

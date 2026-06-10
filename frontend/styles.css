@@ -252,6 +252,12 @@ body.planning .sheet { display: none; }
 .pick-flag .lucide { width: 11px; height: 11px; }
 
 .recommendation-body { padding: 15px 16px 16px; }
+.decision-card .recommendation-body { padding: 18px 18px 18px; }
+.decision-kicker {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
+  font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--clay-500);
+}
 .card-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 .card-head-text { min-width: 0; }
 .title { font-family: var(--display); font-weight: 800; font-size: 19px; line-height: 1.1; letter-spacing: -0.01em; color: var(--ink-900); }
@@ -260,7 +266,36 @@ body.planning .sheet { display: none; }
 .is-top .score { background: var(--clay-500); color: #fff; }
 .card-mini { margin-top: 9px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 
+.decision-plan {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  margin-top: 13px;
+}
+.decision-plan span {
+  min-width: 0; border: 1.5px solid var(--line); border-radius: var(--r-sm);
+  background: var(--cream); color: var(--pine-800); padding: 9px 10px;
+  font-size: 12.5px; font-weight: 800; line-height: 1.25;
+}
+.practical-panel {
+  margin-top: 14px; padding-top: 13px; border-top: 1.5px solid var(--line-2);
+}
+.practical-panel h3 {
+  font-family: var(--display); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); margin-bottom: 9px;
+}
+.practical-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+.practical-grid span {
+  display: inline-flex; align-items: center; max-width: 100%;
+  border-radius: 999px; background: var(--sand-200); color: var(--ink-500);
+  padding: 6px 10px; font-size: 12px; font-weight: 700; line-height: 1.25;
+}
+.other-options-label {
+  flex: 0 0 100%; margin: 4px 2px 0; scroll-snap-align: start;
+  font-family: var(--display); font-size: 13px; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+
 .badges { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
+.decision-card .badges { display: none; }
 .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: var(--sand-200); color: var(--pine-700); padding: 5px 11px; font-size: 12px; font-weight: 700; }
 .badge .lucide { width: 12px; height: 12px; }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
@@ -311,6 +346,8 @@ body.planning .sheet { display: none; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .actions .btn { min-height: 42px; padding: 9px 15px; font-size: 13px; white-space: nowrap; }
+.actions .route-primary { background: var(--clay-500); box-shadow: 0 14px 26px -12px rgba(168,78,40,0.9); }
+.actions .route-primary:hover { background: var(--clay-600); }
 .feedback-reasons { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 12px; }
 .feedback-reasons .pill { border: 1.5px solid var(--line); background: var(--paper); border-radius: 999px; padding: 8px 13px; font-weight: 700; font-size: 13px; }
 .feedback-reasons .pill:hover { border-color: var(--clay-400); }
@@ -327,7 +364,12 @@ body.planning .sheet { display: none; }
 /* ---- compact (peek) layout: short cards so the map stays visible ---- */
 .sheet:not(.open) .card-detail { display: none; }
 .sheet.open .card-mini { display: none; }
+.sheet.open .decision-card .card-mini { display: block; }
 .sheet:not(.open) .description { display: none; }
+.sheet:not(.open) .decision-kicker,
+.sheet:not(.open) .decision-plan,
+.sheet:not(.open) .practical-panel,
+.sheet:not(.open) .other-options-label { display: none; }
 .sheet:not(.open) .recommendation { display: flex; align-items: stretch; height: 108px; flex-basis: 90%; }
 .sheet:not(.open) .place-media { width: 108px; min-width: 108px; height: 108px; aspect-ratio: auto; border-radius: 0; }
 .sheet:not(.open) .pick-flag { top: 7px; left: 7px; font-size: 9.5px; padding: 3px 8px; }
@@ -336,6 +378,11 @@ body.planning .sheet { display: none; }
 .sheet:not(.open) .title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet:not(.open) .score { width: 44px; height: 44px; font-size: 16px; border-radius: 13px; }
 .sheet:not(.open) .card-mini { display: block; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 420px) {
+  .decision-plan { grid-template-columns: 1fr; }
+  .practical-grid span { width: 100%; border-radius: var(--r-sm); }
+}
 
 /* --------------------------------------------------------------- loading */
 .loading-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-content: center; justify-items: center; gap: 6px; text-align: center; background: radial-gradient(120% 80% at 50% 30%, var(--pine-700), var(--pine-900)); color: var(--sand-300); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
