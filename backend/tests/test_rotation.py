@@ -15,6 +15,15 @@ TIVAT = dict(
     interests=["history", "fortresses", "viewpoints"],
 )
 
+TIVAT_WALK = dict(
+    lat=42.4304,
+    lon=18.6964,
+    available_minutes=120,
+    transport_mode="walk",
+    use_live_data=False,
+    interests=["history", "fortresses", "viewpoints"],
+)
+
 
 def _run(req: AdventureRequest):
     return asyncio.run(build_recommendations(req, provider=TemplateProvider()))
@@ -32,6 +41,19 @@ def test_visited_place_is_never_recommended(tmp_path, monkeypatch):
     resp = _run(AdventureRequest(**TIVAT, anonymous_id="u", limit=5))
     assert resp.recommendations  # the rest still come through
     assert "sample:kotor-old-town" not in {r.source_id for r in resp.recommendations}
+
+
+def test_walk_search_excludes_far_over_budget_places(tmp_path, monkeypatch):
+    _store(tmp_path, monkeypatch)
+    resp = _run(AdventureRequest(**TIVAT_WALK, group_type="solo", limit=5))
+    ids = {r.source_id for r in resp.recommendations}
+
+    assert resp.recommendations
+    assert "sample:budva-old-town" not in ids
+    assert "sample:kotor-old-town" not in ids
+    assert all(r.travel_minutes <= TIVAT_WALK["available_minutes"] for r in resp.recommendations)
+    assert all(r.total_minutes <= TIVAT_WALK["available_minutes"] + 15 for r in resp.recommendations)
+    assert all(r.score_breakdown.distance_fit > 15 for r in resp.recommendations)
 
 
 def test_show_others_rotates_to_unseen(tmp_path, monkeypatch):

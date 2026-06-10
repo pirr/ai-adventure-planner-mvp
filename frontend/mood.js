@@ -8,11 +8,13 @@
   // ---- localized copy for the launcher (app i18n covers the rest) --------
   var LX = {
     en: {
-      vibe_q: "What\u2019s the", vibe_word: "vibe", or_pick: "Or pick a vibe",
+      vibe_q: "Ready for a", vibe_word: "trip?", or_pick: "Or pick a vibe",
       everything: "Just show me everything nearby", perfect: "Perfect right now",
+      best_now: "Find best trip now", best_near: "Best near me", best_now_sub: "I will choose the strongest ready-to-go plan.",
       your_vibe: "Popular", time: "Time", interest: "Interest", crew: "Crew", effort: "Effort",
       transport: "Transport", f_transport: "How are you getting there?", recent: "Recent", apply: "Apply", reset: "Reset", changes: "changed",
       f_time: "How much time?", f_crew: "Who\u2019s coming?", f_effort: "Effort level", f_interest: "What are you into?",
+      advanced: "Advanced",
       morning: "Morning", afternoon: "Afternoon", evening: "Evening",
       greet_morning: "Good morning", greet_afternoon: "Good afternoon", greet_evening: "Good evening",
       ctx_morning: "This morning", ctx_afternoon: "This afternoon", ctx_evening: "This evening",
@@ -22,11 +24,13 @@
       enter_coords: "Enter coordinates", lat: "Latitude", lon: "Longitude", set_btn: "Set",
     },
     ru: {
-      vibe_q: "\u041a\u0430\u043a\u043e\u0439", vibe_word: "\u043d\u0430\u0441\u0442\u0440\u043e\u0439?", or_pick: "\u0418\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
+      vibe_q: "\u0413\u043e\u0442\u043e\u0432\u044b", vibe_word: "\u043f\u043e\u0435\u0445\u0430\u0442\u044c?", or_pick: "\u0418\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
       everything: "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0432\u0441\u0451 \u0440\u044f\u0434\u043e\u043c", perfect: "\u0421\u0435\u0439\u0447\u0430\u0441 \u0441\u0430\u043c\u043e\u0435 \u0442\u043e",
+      best_now: "\u041d\u0430\u0439\u0442\u0438 \u043b\u0443\u0447\u0448\u0443\u044e \u043f\u043e\u0435\u0437\u0434\u043a\u0443", best_near: "\u041b\u0443\u0447\u0448\u0435\u0435 \u0440\u044f\u0434\u043e\u043c", best_now_sub: "\u042f \u0432\u044b\u0431\u0435\u0440\u0443 \u0433\u043e\u0442\u043e\u0432\u044b\u0439 \u043f\u043b\u0430\u043d \u0441 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u043e\u043c.",
       your_vibe: "\u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u043e", time: "\u0412\u0440\u0435\u043c\u044f", interest: "\u0418\u043d\u0442\u0435\u0440\u0435\u0441", crew: "\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f", effort: "\u041d\u0430\u0433\u0440\u0443\u0437\u043a\u0430",
       transport: "\u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442", f_transport: "\u041a\u0430\u043a \u0434\u043e\u0431\u0438\u0440\u0430\u0435\u0442\u0435\u0441\u044c?", recent: "\u041d\u0435\u0434\u0430\u0432\u043d\u0435\u0435", apply: "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c", reset: "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c", changes: "\u0438\u0437\u043c.",
       f_time: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438?", f_crew: "\u041a\u0442\u043e \u0438\u0434\u0451\u0442?", f_effort: "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0438", f_interest: "\u0427\u0442\u043e \u0438\u043d\u0442\u0435\u0440\u0435\u0441\u043d\u043e?",
+      advanced: "\u0414\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u043e",
       morning: "\u0423\u0442\u0440\u043e", afternoon: "\u0414\u0435\u043d\u044c", evening: "\u0412\u0435\u0447\u0435\u0440",
       greet_morning: "\u0414\u043e\u0431\u0440\u043e\u0435 \u0443\u0442\u0440\u043e", greet_afternoon: "\u0414\u043e\u0431\u0440\u044b\u0439 \u0434\u0435\u043d\u044c", greet_evening: "\u0414\u043e\u0431\u0440\u044b\u0439 \u0432\u0435\u0447\u0435\u0440",
       ctx_morning: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0443\u0442\u0440\u043e\u043c", ctx_afternoon: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0434\u043d\u0451\u043c", ctx_evening: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0432\u0435\u0447\u0435\u0440\u043e\u043c",
@@ -41,28 +45,28 @@
   // ---- presets (bundle time+crew+transport+intensity+interests) ----------
   var PRESETS = [
     { key: "quick", icon: "zap", grad: "linear-gradient(150deg,#2f7f6e,#163a2c)", dayparts: ["morning", "afternoon", "evening"],
-      time: 60, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "nature"],
+      time: 60, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "nature"], childrenAges: [], maxWalkingKm: 1.5,
       en: { t: "Quick Escape", s: "Under an hour, on foot" }, ru: { t: "\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u0432\u044b\u0445\u043e\u0434", s: "\u041c\u0435\u043d\u044c\u0448\u0435 \u0447\u0430\u0441\u0430, \u043f\u0435\u0448\u043a\u043e\u043c" } },
     { key: "coffee", icon: "coffee", grad: "linear-gradient(150deg,#c98b4a,#7a4a22)", dayparts: ["morning"],
-      time: 120, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "food"],
+      time: 120, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "food"], childrenAges: [], maxWalkingKm: 2,
       en: { t: "Coffee & a View", s: "A short, scenic start" }, ru: { t: "\u041a\u043e\u0444\u0435 \u0441 \u0432\u0438\u0434\u043e\u043c", s: "\u041a\u043e\u0440\u043e\u0442\u043a\u043e \u0438 \u0436\u0438\u0432\u043e\u043f\u0438\u0441\u043d\u043e" } },
     { key: "family", icon: "users", grad: "linear-gradient(150deg,#3f97a6,#1f5a63)", dayparts: ["morning", "afternoon"],
-      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["history", "water", "nature"],
+      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["history", "water", "nature"], childrenAges: [], maxWalkingKm: 2.5,
       en: { t: "Family Day Out", s: "Easy & kid-friendly" }, ru: { t: "\u0421 \u0441\u0435\u043c\u044c\u0451\u0439", s: "\u041b\u0435\u0433\u043a\u043e, \u0441 \u0434\u0435\u0442\u044c\u043c\u0438" } },
     { key: "sunset", icon: "mountain-snow", grad: "linear-gradient(150deg,#d6794e,#a84e28)", dayparts: ["afternoon", "evening"],
-      time: 120, crew: "couple", transport: "car", intensity: "easy", interests: ["viewpoints"],
+      time: 120, crew: "couple", transport: "car", intensity: "easy", interests: ["viewpoints"], childrenAges: [], maxWalkingKm: 2.5,
       en: { t: "Sunset Views", s: "Golden-hour viewpoints" }, ru: { t: "\u0417\u0430\u043a\u0430\u0442\u043d\u044b\u0435 \u0432\u0438\u0434\u044b", s: "\u0421\u043c\u043e\u0442\u0440\u043e\u0432\u044b\u0435 \u043d\u0430 \u0437\u0430\u043a\u0430\u0442\u0435" } },
     { key: "history", icon: "castle", grad: "linear-gradient(150deg,#a86b3f,#5e3520)", dayparts: ["morning", "afternoon"],
-      time: 300, crew: "family", transport: "car", intensity: "medium", interests: ["history", "fortresses"],
+      time: 300, crew: "family", transport: "car", intensity: "medium", interests: ["history", "fortresses"], childrenAges: [], maxWalkingKm: 3,
       en: { t: "History Hunt", s: "Fortresses & old towns" }, ru: { t: "\u041f\u043e \u0438\u0441\u0442\u043e\u0440\u0438\u0438", s: "\u041a\u0440\u0435\u043f\u043e\u0441\u0442\u0438 \u0438 \u0441\u0442\u0430\u0440\u044b\u0435 \u0433\u043e\u0440\u043e\u0434\u0430" } },
     { key: "dinner", icon: "utensils", grad: "linear-gradient(150deg,#7a5230,#3a2414)", dayparts: ["evening"],
-      time: 240, crew: "couple", transport: "car", intensity: "easy", interests: ["food", "history"],
+      time: 240, crew: "couple", transport: "car", intensity: "easy", interests: ["food", "history"], childrenAges: [], maxWalkingKm: 2,
       en: { t: "Dinner & a Stroll", s: "Old-town lanes & a bite" }, ru: { t: "\u0423\u0436\u0438\u043d \u0438 \u043f\u0440\u043e\u0433\u0443\u043b\u043a\u0430", s: "\u0423\u043b\u043e\u0447\u043a\u0438 \u0441\u0442\u0430\u0440\u043e\u0433\u043e \u0433\u043e\u0440\u043e\u0434\u0430" } },
     { key: "water", icon: "waves", grad: "linear-gradient(150deg,#3f97a6,#1f4d3a)", dayparts: ["morning", "afternoon"],
-      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["water", "nature"],
+      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["water", "nature"], childrenAges: [], maxWalkingKm: 2.5,
       en: { t: "By the Water", s: "Beaches & quiet coves" }, ru: { t: "\u0423 \u0432\u043e\u0434\u044b", s: "\u041f\u043b\u044f\u0436\u0438 \u0438 \u0431\u0443\u0445\u0442\u044b" } },
     { key: "surprise", icon: "dices", grad: "linear-gradient(150deg,#6a4a86,#2c2750)", dayparts: ["morning", "afternoon", "evening"],
-      time: 300, crew: "solo", transport: "car", intensity: "medium", interests: ["history", "fortresses", "viewpoints", "water", "nature"],
+      time: 300, crew: "solo", transport: "car", intensity: "medium", interests: ["history", "fortresses", "viewpoints", "water", "nature"], childrenAges: [], maxWalkingKm: 5,
       en: { t: "Surprise Me", s: "Anything great nearby" }, ru: { t: "\u0423\u0434\u0438\u0432\u0438 \u043c\u0435\u043d\u044f", s: "\u0427\u0442\u043e-\u043d\u0438\u0431\u0443\u0434\u044c \u043a\u043b\u0430\u0441\u0441\u043d\u043e\u0435" } },
   ];
   var DAYPARTS = {
@@ -81,6 +85,20 @@
   var currentMood = null;
   var placeLabel = null;
   var sheetAutoOpened = false;
+  function smartNowPreset() {
+    var interests = {
+      morning: ["viewpoints", "food", "nature"],
+      afternoon: ["history", "viewpoints", "nature"],
+      evening: ["viewpoints", "food"],
+    }[daypart] || ["viewpoints", "nature"];
+    return {
+      key: "now", icon: "sparkles", time: 120, crew: "solo", transport: "car",
+      intensity: "easy", interests: interests, childrenAges: [], maxWalkingKm: 3,
+      useLiveData: true,
+      en: { t: "Best trip now", s: "Ready-to-go plan" },
+      ru: { t: "\u041b\u0443\u0447\u0448\u0435\u0435 \u0441\u0435\u0439\u0447\u0430\u0441", s: "\u0413\u043e\u0442\u043e\u0432\u044b\u0439 \u043f\u043b\u0430\u043d" },
+    };
+  }
   function locName() { return placeLabel || lx("loc"); }
   function useMyLocation() { placeLabel = lx("mine"); updateContext(); if (window.requestGeolocation) window.requestGeolocation(); }
   function theMap() {
@@ -156,12 +174,24 @@
       tile.classList.toggle("is-active", list.indexOf(tile.dataset.interest) !== -1);
     });
   }
+  function setInput(id, value) { var el = $(id); if (el) el.value = value == null ? "" : String(value); }
+  function setChecked(id, value) { var el = $(id); if (el) el.checked = !!value; }
+  function normalizeCrewState(crew) {
+    if (crew === "solo" || crew === "couple") setInput("childrenAges", "");
+  }
   function applyPreset(p) {
     setSingle("timeChips", "minutes", p.time);
     setSingle("groupChips", "group", p.crew);
     setSingle("transportChips", "transport", p.transport);
     setSingle("intensityChips", "intensity", p.intensity);
     setInterests(p.interests);
+    setInput("childrenAges", (p.childrenAges || []).join(", "));
+    setInput("maxWalkingKm", p.maxWalkingKm);
+    setChecked("withDog", p.withDog);
+    setChecked("withElderly", p.withElderly);
+    setChecked("reducedMobility", p.reducedMobility);
+    if (p.useLiveData !== undefined) setChecked("useLiveData", p.useLiveData);
+    normalizeCrewState(p.crew);
   }
 
   function choosePreset(p) {
@@ -170,14 +200,16 @@
     commitSearch();
     buildFilterBar();
   }
+  function chooseNow() {
+    choosePreset(smartNowPreset());
+  }
 
   // ---- launcher UI -------------------------------------------------------
   function buildLauncher() {
     var host = $("launchBody"); if (!host) return;
     var dp = DAYPARTS[daypart];
     var list = PRESETS.filter(function (p) { return p.dayparts.indexOf(daypart) !== -1; });
-    var feature = list.filter(function (p) { return p.key === dp.feature; })[0] || list[0];
-    var grid = list.filter(function (p) { return p !== feature; });
+    var grid = list;
 
     var html = '';
     html += '<div class="greet-row">';
@@ -192,21 +224,15 @@
     html += '  </div>';
     html += '</div>';
 
-    html += '<details class="coord-entry"><summary>' + lx("enter_coords") + '</summary>';
-    html += '<div class="coord-row"><input id="mLat" inputmode="decimal" placeholder="' + lx("lat") + '"><input id="mLon" inputmode="decimal" placeholder="' + lx("lon") + '"><button type="button" class="coord-set" id="mSet">' + lx("set_btn") + '</button></div></details>';
-
-    if (feature) {
-      var f = pt(feature);
-      html += '<button type="button" class="foryou" data-preset="' + feature.key + '">';
-      html += '  <span class="foryou-ic">' + icon(feature.icon) + '</span>';
-      html += '  <span class="foryou-text">';
-      html += '    <span class="foryou-badge">' + icon("sparkles") + ' ' + lx("perfect") + '</span>';
-      html += '    <span class="foryou-title">' + f.t + '</span>';
-      html += '    <span class="foryou-sub">' + f.s + '</span>';
-      html += '  </span>';
-      html += '  <span class="foryou-go">' + icon("arrow-right") + '</span>';
-      html += '</button>';
-    }
+    html += '<button type="button" class="foryou best-now" id="bestNowBtn">';
+    html += '  <span class="foryou-ic">' + icon("sparkles") + '</span>';
+    html += '  <span class="foryou-text">';
+    html += '    <span class="foryou-badge">' + icon("locate-fixed") + ' ' + lx("best_near") + '</span>';
+    html += '    <span class="foryou-title">' + lx("best_now") + '</span>';
+    html += '    <span class="foryou-sub">' + lx("best_now_sub") + '</span>';
+    html += '  </span>';
+    html += '  <span class="foryou-go">' + icon("arrow-right") + '</span>';
+    html += '</button>';
 
     html += '<div class="vibe-label">' + lx("or_pick") + '</div>';
     html += '<div class="preset-grid">';
@@ -221,8 +247,11 @@
     });
     html += '</div>';
     html += '<button type="button" class="everything" data-preset="surprise">' + icon("sparkles") + ' ' + lx("everything") + '</button>';
+    html += '<details class="coord-entry advanced-entry"><summary>' + lx("advanced") + '</summary>';
+    html += '<div class="coord-row"><input id="mLat" inputmode="decimal" placeholder="' + lx("lat") + '"><input id="mLon" inputmode="decimal" placeholder="' + lx("lon") + '"><button type="button" class="coord-set" id="mSet">' + lx("set_btn") + '</button></div></details>';
 
     host.innerHTML = html;
+    var now = $("bestNowBtn"); if (now) now.addEventListener("click", chooseNow);
     host.querySelectorAll("[data-preset]").forEach(function (el) {
       el.addEventListener("click", function () {
         var p = PRESETS.filter(function (x) { return x.key === el.dataset.preset; })[0];
@@ -242,7 +271,6 @@
   // ---- top-bar context chips (location + weather) ------------------------
   function updateContext() {
     var wrap = $("ctxWrap"); if (!wrap) return;
-    var dp = DAYPARTS[daypart];
     wrap.innerHTML = '<button type="button" class="ctx-chip btn" id="ctxLoc">' + icon("locate-fixed") + ' ' + locName() + '</button>';
     var cl = $("ctxLoc"); if (cl) cl.addEventListener("click", useMyLocation);
     refreshIcons();
@@ -281,8 +309,18 @@
       interests: activeVals("interestChips", "interest").slice().sort(),
     };
   }
-  function readState() { var f = readFacets(); f.vibeKey = currentMood ? currentMood.key : null; return f; }
-  function presetByKey(k) { return PRESETS.filter(function (p) { return p.key === k; })[0] || null; }
+  function readState() {
+    var f = readFacets();
+    f.vibeKey = currentMood ? currentMood.key : null;
+    f.childrenAges = ($("childrenAges") || {}).value || "";
+    f.maxWalkingKm = ($("maxWalkingKm") || {}).value || "";
+    f.withDog = !!(($("withDog") || {}).checked);
+    f.withElderly = !!(($("withElderly") || {}).checked);
+    f.reducedMobility = !!(($("reducedMobility") || {}).checked);
+    f.useLiveData = !!(($("useLiveData") || {}).checked);
+    return f;
+  }
+  function presetByKey(k) { return k === "now" ? smartNowPreset() : PRESETS.filter(function (p) { return p.key === k; })[0] || null; }
   function writeState(s) {
     setSingle("timeChips", "minutes", s.minutes);
     setSingle("transportChips", "transport", s.transport);
@@ -290,6 +328,13 @@
     setSingle("intensityChips", "intensity", s.intensity);
     setInterests((s.interests || []).slice());
     currentMood = s.vibeKey ? presetByKey(s.vibeKey) : null;
+    setInput("childrenAges", s.childrenAges || "");
+    setInput("maxWalkingKm", s.maxWalkingKm || "");
+    setChecked("withDog", s.withDog);
+    setChecked("withElderly", s.withElderly);
+    setChecked("reducedMobility", s.reducedMobility);
+    if (s.useLiveData !== undefined) setChecked("useLiveData", s.useLiveData);
+    normalizeCrewState(s.group);
   }
   function interestsEqual(a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); }
   function facetsEqual(a, b) {
@@ -409,7 +454,7 @@
     panel.querySelectorAll(".facet-pill").forEach(function (pill) {
       pill.addEventListener("click", function () {
         if (f.multi) { setInterestToggle(f, pill.dataset.val); }
-        else { setSingle(f.cont, f.attr, pill.dataset.val); openFacetKey = null; }
+        else { setSingle(f.cont, f.attr, pill.dataset.val); if (f.key === "crew") normalizeCrewState(pill.dataset.val); openFacetKey = null; }
         currentMood = null;       // customizing clears the vibe label
         buildFilterBar();         // stage only \u2014 NO runSearch
       });

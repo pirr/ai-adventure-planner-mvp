@@ -61,7 +61,7 @@ body.planning:not(.loc-set) .map-hint {
   display: flex; flex-direction: column; overflow: hidden;
   transition: height 0.42s var(--spring);
 }
-.launch-sheet.open { height: min(64vh, 560px); }
+.launch-sheet.open { height: min(72vh, 620px); }
 body.exploring .launch-sheet { display: none; }
 .launch-grip { display: grid; place-items: center; padding: 11px 0 4px; flex: 0 0 auto; cursor: pointer; }
 
@@ -93,6 +93,7 @@ body.exploring .launch-sheet { display: none; }
 .foryou { position: relative; overflow: hidden; display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
   padding: 14px; border-radius: var(--r-lg); margin-bottom: 18px; color: #fff;
   background: linear-gradient(125deg, var(--clay-500), var(--pine-700)); box-shadow: var(--float-sm); transition: transform 0.18s var(--spring); }
+.best-now { padding: 16px; margin-bottom: 20px; background: linear-gradient(125deg, var(--pine-800), var(--clay-500)); }
 .foryou:hover { transform: translateY(-2px); }
 .foryou:active { transform: translateY(0) scale(0.99); }
 .foryou-ic { flex: 0 0 auto; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: rgba(255,255,255,0.18); color: var(--amber-400); }
@@ -101,6 +102,7 @@ body.exploring .launch-sheet { display: none; }
 .foryou-badge { display: inline-flex; align-items: center; gap: 5px; font-family: var(--display); font-weight: 800; font-size: 9.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--amber-400); }
 .foryou-badge .lucide { width: 11px; height: 11px; }
 .foryou-title { font-family: var(--display); font-weight: 800; font-size: 16.5px; letter-spacing: -0.01em; }
+.best-now .foryou-title { font-size: 18px; }
 .foryou-sub { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.86); line-height: 1.25; }
 .foryou-go { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.92); color: var(--pine-800); display: grid; place-items: center; }
 .foryou-go .lucide { width: 16px; height: 16px; stroke-width: 2.6; }
@@ -128,6 +130,8 @@ body.exploring .launch-sheet { display: none; }
   font-family: var(--display); font-weight: 700; font-size: 14px; transition: 0.18s var(--ease); }
 .everything:hover { border-color: var(--pine-700); color: var(--pine-700); }
 .everything .lucide { width: 17px; height: 17px; }
+.advanced-entry { margin: 12px 0 0; border-top: 1.5px solid var(--line); padding-top: 10px; }
+.advanced-entry > summary { color: var(--muted); }
 
 /* results sheet: keep a focused, centered column on wide screens too */
 .sheet { width: min(100%, 760px) !important; }
