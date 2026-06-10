@@ -30,6 +30,15 @@ def _explainer_provider(request: AdventureRequest) -> LLMProvider:
     return provider if _ab_bucket(request.anonymous_id) == 1 else TemplateProvider()
 
 
+def _is_recommendable(candidate: ScoredCandidate, request: AdventureRequest) -> bool:
+    # Scores can explain weak fits, but cards should still be practically doable.
+    if candidate.route.round_trip_minutes > request.available_minutes:
+        return False
+    if candidate.total_minutes > request.available_minutes + 15:
+        return False
+    return candidate.breakdown.distance_fit > 15
+
+
 async def build_recommendations(request: AdventureRequest, provider: LLMProvider | None = None) -> AdventureResponse:
     request_id = str(uuid.uuid4())
     # Personal Preference Fit signal from this user's past feedback (cold-start safe).
@@ -89,7 +98,7 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         rescored.append(refreshed)
 
     final = sorted(rescored + rest, key=order_key, reverse=True)
-    top = final[: request.limit]
+    top = [item for item in final if _is_recommendable(item, request)][: request.limit]
     photos = await asyncio.gather(*[get_place_photo(item.place, request.use_live_data) for item in top])
     recommendations = [to_recommendation(item, photo) for item, photo in zip(top, photos)]
     explainer = provider if provider is not None else _explainer_provider(request)
