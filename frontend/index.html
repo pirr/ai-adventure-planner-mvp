@@ -3,204 +3,225 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#16a34a" />
-  <title>AI Adventure Planner MVP</title>
+  <meta name="theme-color" content="#163a2c" />
+  <title>AI Adventure Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=5" />
+  <link rel="stylesheet" href="/static/mood.css?v=11" />
 </head>
-<body>
-  <main class="app">
-    <section class="hero card green-card">
-      <div class="logo-row">
-        <div class="logo">A</div>
-        <span>MVP 0.1</span>
-        <div class="lang-toggle" id="langToggle" aria-label="Language">
-          <button type="button" class="lang-btn" data-lang="en">EN</button>
-          <button type="button" class="lang-btn" data-lang="ru">RU</button>
+<body class="planning">
+  <div id="map"></div>
+  <div class="map-scrim" aria-hidden="true"></div>
+  <div class="map-hint" id="mapHint" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="wordmark">
+      <span class="mark" aria-hidden="true"><i data-lucide="compass"></i></span>
+      <span data-i18n="brand">Adventure Planner</span>
+    </div>
+    <div class="ctx-wrap" id="ctxWrap"></div>
+    <div class="topbar-right">
+      <button id="editBtn" type="button" class="pill-btn hidden"><i data-lucide="chevron-left" aria-hidden="true"></i> <span data-i18n="edit_trip">Edit trip</span></button>
+      <button id="locateBtn" type="button" class="icon-btn hidden" title="Use my location" aria-label="Use my location"><i data-lucide="locate-fixed"></i></button>
+      <div class="lang-toggle" id="langToggle" aria-label="Language">
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+        <button type="button" class="lang-btn" data-lang="ru">RU</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== PLANNING MODE: guided wizard ===================== -->
+  <main class="planner" id="planner">
+    <section class="wizard" id="wizard">
+      <div class="progress">
+        <div class="progress-track"><span class="progress-fill" id="progressFill"></span></div>
+        <p class="progress-label" id="progressLabel"></p>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="step is-active" data-step="1">
+        <p class="step-kicker" data-i18n="s1_kicker">Let's start</p>
+        <h2 class="step-title" data-i18n="s1_title">How much time have you got?</h2>
+        <div class="tile-grid" id="timeChips">
+          <button type="button" class="tile" data-minutes="30"><span class="tile-emoji"><i data-lucide="zap"></i></span><span class="tile-text" data-i18n="opt_30min">30 min</span></button>
+          <button type="button" class="tile" data-minutes="60"><span class="tile-emoji"><i data-lucide="coffee"></i></span><span class="tile-text" data-i18n="opt_1h">1 hour</span></button>
+          <button type="button" class="tile" data-minutes="120"><span class="tile-emoji"><i data-lucide="footprints"></i></span><span class="tile-text" data-i18n="opt_2h">2 hours</span></button>
+          <button type="button" class="tile" data-minutes="240"><span class="tile-emoji"><i data-lucide="car-front"></i></span><span class="tile-text" data-i18n="opt_4h">4 hours</span></button>
+          <button type="button" class="tile is-active" data-minutes="300"><span class="tile-emoji"><i data-lucide="mountain"></i></span><span class="tile-text" data-i18n="opt_5h">5 hours</span></button>
+          <button type="button" class="tile" data-minutes="480"><span class="tile-emoji"><i data-lucide="sun"></i></span><span class="tile-text" data-i18n="opt_allday">All day</span></button>
+        </div>
+
+        <div class="field">
+          <span class="field-label" data-i18n="s1_where">Where are you starting from?</span>
+          <div class="loc-actions">
+            <button id="useLocationBtn" type="button" class="btn btn-line" data-i18n="use_location">Use my location</button>
+            <button id="demoBtn" type="button" class="btn btn-line" data-i18n="use_demo">Use Tivat demo</button>
+          </div>
+          <p id="locationStatus" class="status-text" data-i18n="loc_not_set">Location is not set yet.</p>
+          <details class="coords">
+            <summary data-i18n="enter_coords">Enter coordinates</summary>
+            <div class="grid-two">
+              <label class="input-field"><span data-i18n="latitude">Latitude</span><input id="lat" type="number" step="0.000001" value="42.4304" /></label>
+              <label class="input-field"><span data-i18n="longitude">Longitude</span><input id="lon" type="number" step="0.000001" value="18.6964" /></label>
+            </div>
+          </details>
+        </div>
+
+        <div class="step-nav">
+          <span></span>
+          <button type="button" class="btn btn-next" data-next data-i18n="next">Next</button>
         </div>
       </div>
-      <h1 data-i18n="hero_title">Find a mini-adventure nearby</h1>
-      <p data-i18n="hero_subtitle">Enter your time, transport and interests. The app ranks nearby places using weather, route effort and fit.</p>
-      <div class="hero-actions">
-        <button id="useLocationBtn" class="button primary" data-i18n="use_location">Use my location</button>
-        <button id="demoBtn" class="button ghost" data-i18n="use_demo">Use Tivat demo</button>
-      </div>
-      <p id="locationStatus" class="status-text" data-i18n="loc_not_set">Location is not set yet.</p>
-    </section>
 
-    <section class="card request-card">
-      <h2 data-i18n="trip_request">Trip request</h2>
-      <label>
-        <span data-i18n="free_text">Free text</span>
-        <textarea id="requestText">Family trip for 5 hours with fortress, history and views.</textarea>
-      </label>
-
-      <div class="grid two">
-        <label>
-          <span data-i18n="latitude">Latitude</span>
-          <input id="lat" type="number" step="0.000001" value="42.4304" />
-        </label>
-        <label>
-          <span data-i18n="longitude">Longitude</span>
-          <input id="lon" type="number" step="0.000001" value="18.6964" />
-        </label>
-      </div>
-
-      <div class="grid two">
-        <label>
-          <span data-i18n="available_time">Available time</span>
-          <select id="availableMinutes">
-            <option value="30" data-i18n="opt_30min">30 min</option>
-            <option value="60" data-i18n="opt_1h">1 hour</option>
-            <option value="120" data-i18n="opt_2h">2 hours</option>
-            <option value="240" data-i18n="opt_4h">4 hours</option>
-            <option value="300" selected data-i18n="opt_5h">5 hours</option>
-            <option value="480" data-i18n="opt_allday">All day</option>
-          </select>
-        </label>
-        <label>
-          <span data-i18n="transport">Transport</span>
-          <select id="transportMode">
-            <option value="walk" data-i18n="t_walk">Walk</option>
-            <option value="car" selected data-i18n="t_car">Car</option>
-            <option value="bike" data-i18n="t_bike">Bike</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="grid two">
-        <label>
-          <span data-i18n="group">Group</span>
-          <select id="groupType">
-            <option value="solo" data-i18n="g_solo">Solo</option>
-            <option value="couple" data-i18n="g_couple">Couple</option>
-            <option value="family" selected data-i18n="g_family">Family</option>
-          </select>
-        </label>
-        <label>
-          <span data-i18n="intensity">Intensity</span>
-          <select id="intensity">
-            <option value="easy" selected data-i18n="i_easy">Easy</option>
-            <option value="medium" data-i18n="i_medium">Medium</option>
-            <option value="active" data-i18n="i_active">Active</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="grid two">
-        <label>
-          <span data-i18n="children_ages">Children ages</span>
-          <input id="childrenAges" value="6, 13" />
-        </label>
-        <label>
-          <span data-i18n="max_walking">Max walking km</span>
-          <input id="maxWalkingKm" type="number" step="0.1" value="3" />
-        </label>
-      </div>
-
-      <label><span data-i18n="context">Context</span></label>
-      <label class="switch-row">
-        <input id="withDog" type="checkbox" />
-        <span data-i18n="with_dog">With a dog</span>
-      </label>
-      <label class="switch-row">
-        <input id="withElderly" type="checkbox" />
-        <span data-i18n="with_elderly">With older adults</span>
-      </label>
-      <label class="switch-row">
-        <input id="reducedMobility" type="checkbox" />
-        <span data-i18n="reduced_mobility">Reduced mobility</span>
-      </label>
-
-      <label>
-        <span data-i18n="interests">Interests</span>
-        <div class="chips" id="interestChips">
-          <button type="button" class="chip active" data-interest="history" data-i18n="c_history">History</button>
-          <button type="button" class="chip active" data-interest="fortresses" data-i18n="c_fortresses">Fortresses</button>
-          <button type="button" class="chip active" data-interest="viewpoints" data-i18n="c_viewpoints">Viewpoints</button>
-          <button type="button" class="chip" data-interest="nature" data-i18n="c_nature">Nature</button>
-          <button type="button" class="chip" data-interest="water" data-i18n="c_water">Water</button>
-          <button type="button" class="chip" data-interest="food" data-i18n="c_food">Food</button>
-          <button type="button" class="chip" data-interest="surprise me" data-i18n="c_surprise">Surprise me</button>
+      <!-- STEP 2 -->
+      <div class="step" data-step="2">
+        <p class="step-kicker" data-i18n="s2_kicker">Your crew</p>
+        <h2 class="step-title" data-i18n="s2_title">Who's coming along?</h2>
+        <div class="tile-grid three" id="groupChips">
+          <button type="button" class="tile" data-group="solo"><span class="tile-emoji"><i data-lucide="user"></i></span><span class="tile-text" data-i18n="g_solo">Solo</span></button>
+          <button type="button" class="tile" data-group="couple"><span class="tile-emoji"><i data-lucide="heart"></i></span><span class="tile-text" data-i18n="g_couple">Couple</span></button>
+          <button type="button" class="tile is-active" data-group="family"><span class="tile-emoji"><i data-lucide="users"></i></span><span class="tile-text" data-i18n="g_family">Family</span></button>
         </div>
-      </label>
 
-      <label class="switch-row">
-        <input id="useLiveData" type="checkbox" checked />
-        <span data-i18n="use_live">Use live OSM / weather / routing when available</span>
-      </label>
+        <span class="field-label" data-i18n="s2_how">How are you getting there?</span>
+        <div class="tile-grid three" id="transportChips">
+          <button type="button" class="tile" data-transport="walk"><span class="tile-emoji"><i data-lucide="footprints"></i></span><span class="tile-text" data-i18n="t_walk">Walk</span></button>
+          <button type="button" class="tile is-active" data-transport="car"><span class="tile-emoji"><i data-lucide="car-front"></i></span><span class="tile-text" data-i18n="t_car">Car</span></button>
+          <button type="button" class="tile" data-transport="bike"><span class="tile-emoji"><i data-lucide="bike"></i></span><span class="tile-text" data-i18n="t_bike">Bike</span></button>
+        </div>
 
-      <button id="searchBtn" class="button primary big" data-i18n="find_adventure">Find adventure</button>
-    </section>
+        <div class="grid-two">
+          <label class="input-field"><span data-i18n="children_ages">Children ages</span><input id="childrenAges" value="6, 13" /></label>
+          <label class="input-field"><span data-i18n="max_walking">Max walking km</span><input id="maxWalkingKm" type="number" step="0.1" value="3" /></label>
+        </div>
 
-    <details id="mapPanel" class="card map-panel" open>
-      <summary data-i18n="map_title">Map</summary>
-      <div id="map"></div>
-      <p class="status-text map-hint" data-i18n="map_hint">Tap the map or drag the pin to set your location.</p>
-    </details>
+        <div class="toggles">
+          <label class="toggle"><input id="withDog" type="checkbox" /><span class="track"></span><span data-i18n="with_dog">With a dog</span></label>
+          <label class="toggle"><input id="withElderly" type="checkbox" /><span class="track"></span><span data-i18n="with_elderly">With older adults</span></label>
+          <label class="toggle"><input id="reducedMobility" type="checkbox" /><span class="track"></span><span data-i18n="reduced_mobility">Reduced mobility</span></label>
+        </div>
 
-    <section id="loading" class="card loading hidden">
-      <div class="spinner"></div>
-      <h2 data-i18n="loading_title">Analyzing options</h2>
-      <p data-i18n="loading_subtitle">Checking places, weather, travel time and risk rules.</p>
-    </section>
-
-    <section id="errorBox" class="card error hidden"></section>
-
-    <section id="results" class="results hidden">
-      <div class="section-title">
-        <h2 data-i18n="results_title">Recommendations</h2>
-        <span id="requestIdBadge"></span>
+        <div class="step-nav">
+          <button type="button" class="btn btn-back" data-back data-i18n="back">Back</button>
+          <button type="button" class="btn btn-next" data-next data-i18n="next">Next</button>
+        </div>
       </div>
-      <div id="weatherBox" class="card"></div>
-      <div id="dataWarnings"></div>
-      <div id="cards"></div>
-      <div id="rejectedBox" class="card"></div>
+
+      <!-- STEP 3 -->
+      <div class="step" data-step="3">
+        <p class="step-kicker" data-i18n="s3_kicker">The fun part</p>
+        <h2 class="step-title" data-i18n="s3_title">What are you in the mood for?</h2>
+        <div class="tile-grid wrap" id="interestChips">
+          <button type="button" class="tile chip-tile is-active" data-interest="history"><span class="tile-emoji"><i data-lucide="landmark"></i></span><span class="tile-text" data-i18n="c_history">History</span></button>
+          <button type="button" class="tile chip-tile is-active" data-interest="fortresses"><span class="tile-emoji"><i data-lucide="castle"></i></span><span class="tile-text" data-i18n="c_fortresses">Fortresses</span></button>
+          <button type="button" class="tile chip-tile is-active" data-interest="viewpoints"><span class="tile-emoji"><i data-lucide="mountain-snow"></i></span><span class="tile-text" data-i18n="c_viewpoints">Viewpoints</span></button>
+          <button type="button" class="tile chip-tile" data-interest="nature"><span class="tile-emoji"><i data-lucide="trees"></i></span><span class="tile-text" data-i18n="c_nature">Nature</span></button>
+          <button type="button" class="tile chip-tile" data-interest="water"><span class="tile-emoji"><i data-lucide="waves"></i></span><span class="tile-text" data-i18n="c_water">Water</span></button>
+          <button type="button" class="tile chip-tile" data-interest="food"><span class="tile-emoji"><i data-lucide="utensils"></i></span><span class="tile-text" data-i18n="c_food">Food</span></button>
+          <button type="button" class="tile chip-tile" data-interest="surprise me"><span class="tile-emoji"><i data-lucide="dices"></i></span><span class="tile-text" data-i18n="c_surprise">Surprise me</span></button>
+        </div>
+
+        <span class="field-label" data-i18n="intensity">Intensity</span>
+        <div class="tile-grid three" id="intensityChips">
+          <button type="button" class="tile is-active" data-intensity="easy"><span class="tile-emoji"><i data-lucide="leaf"></i></span><span class="tile-text" data-i18n="i_easy">Easy</span></button>
+          <button type="button" class="tile" data-intensity="medium"><span class="tile-emoji"><i data-lucide="activity"></i></span><span class="tile-text" data-i18n="i_medium">Medium</span></button>
+          <button type="button" class="tile" data-intensity="active"><span class="tile-emoji"><i data-lucide="flame"></i></span><span class="tile-text" data-i18n="i_active">Active</span></button>
+        </div>
+
+        <label class="toggle solo-toggle"><input id="useLiveData" type="checkbox" checked /><span class="track"></span><span data-i18n="use_live">Use live OSM / weather / routing</span></label>
+
+        <div class="step-nav">
+          <button type="button" class="btn btn-back" data-back data-i18n="back">Back</button>
+          <button id="searchBtn" type="button" class="btn btn-go">
+            <span data-i18n="find_adventure">Find my adventure</span>
+            <i data-lucide="compass" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
     </section>
 
-    <section id="historySection" class="card hidden">
-      <div class="section-title">
-        <h2 data-i18n="history_title">Recently seen</h2>
-        <button id="clearHistoryBtn" type="button" class="button ghost" data-i18n="clear_history">Clear my history</button>
-      </div>
+    <details id="historySection" class="history hidden">
+      <summary data-i18n="history_title">Recently seen</summary>
       <div id="historyList"></div>
-    </section>
+      <div class="history-actions">
+        <button id="clearHistoryBtn" type="button" class="link-btn" data-i18n="clear_history">Clear my history</button>
+        <button id="clearVisitedBtn" type="button" class="link-btn" data-i18n="clear_visited">Clear visited</button>
+      </div>
+    </details>
   </main>
 
+  <!-- ===================== MOOD LAUNCHER: results-first entry ============ -->
+  <section class="launch-sheet" id="launchSheet">
+    <div class="launch-grip"><span></span></div>
+    <div class="launch-loc" id="launchLoc"></div>
+    <div class="launch-body" id="launchBody"></div>
+  </section>
+
+  <!-- ===================== EXPLORING MODE: map + sheet ===================== -->
+  <section class="sheet" id="sheet">
+    <button class="sheet-handle" id="sheetHandle" aria-label="Expand or collapse panel"><span></span></button>
+    <div class="sheet-head">
+      <h2 class="sheet-title" data-i18n="results_title">Your adventures</h2>
+      <span class="sheet-count" id="sheetCount"></span>
+      <button id="showOthersBtn" type="button" class="pill-btn hidden" data-i18n="show_others">Show others</button>
+    </div>
+    <div class="filterbar" id="filterbar"></div>
+    <div class="facet-panel hidden" id="facetPanel"></div>
+    <div class="recent-row hidden" id="recentRow"></div>
+    <div class="apply-bar hidden" id="applyBar"></div>
+    <div class="sheet-body">
+      <div id="errorBox" class="error hidden"></div>
+      <div id="weatherBox" class="weather-strip extra"></div>
+      <div id="dataWarnings" class="extra"></div>
+      <div id="carousel" class="carousel"></div>
+      <details id="rejectedBox" class="rejected extra hidden"></details>
+    </div>
+  </section>
+
   <template id="recommendationTemplate">
-    <article class="card recommendation">
+    <article class="recommendation">
       <figure class="place-media hidden">
         <img class="photo" alt="" loading="lazy" />
         <figcaption class="photo-credit"></figcaption>
+        <span class="pick-flag hidden" data-i18n="pick_today">Top pick</span>
       </figure>
       <div class="recommendation-body">
         <div class="card-head">
-          <div>
+          <div class="card-head-text">
             <h3 class="title"></h3>
             <p class="description"></p>
           </div>
-          <div class="score"></div>
+          <div class="score" aria-hidden="true"><span class="score-num"></span></div>
         </div>
-        <div class="badges"></div>
-        <div class="place-weather"></div>
-        <details>
-          <summary class="breakdown-summary">Score breakdown</summary>
-          <div class="breakdown"></div>
-        </details>
-        <div class="why"></div>
-        <div class="warnings"></div>
-        <div class="actions">
-          <a class="button primary map-link" target="_blank" rel="noopener">Google Maps</a>
-          <a class="button ghost apple-map-link" target="_blank" rel="noopener">Apple Maps</a>
-          <button class="button ghost feedback-up">👍 Useful</button>
-          <button class="button ghost feedback-down">👎 Not useful</button>
+        <p class="card-mini"></p>
+        <div class="card-detail">
+          <div class="badges"></div>
+          <div class="place-weather"></div>
+          <div class="why"></div>
+          <details class="breakdown-wrap">
+            <summary class="breakdown-summary">Score breakdown</summary>
+            <div class="breakdown"></div>
+          </details>
+          <div class="warnings"></div>
+          <div class="actions">
+            <a class="btn btn-solid map-link" target="_blank" rel="noopener">Google Maps</a>
+            <a class="btn btn-line apple-map-link" target="_blank" rel="noopener">Apple Maps</a>
+            <button type="button" class="btn btn-ghost feedback-up">👍</button>
+            <button type="button" class="btn btn-ghost feedback-down">👎</button>
+            <button type="button" class="btn btn-ghost mark-visited"></button>
+          </div>
+          <div class="feedback-reasons hidden"></div>
         </div>
-        <div class="feedback-reasons hidden"></div>
       </div>
     </article>
   </template>
 
+  <script src="/static/vendor/lucide-icons.js?v=4"></script>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=14"></script>
+  <script src="/static/mood.js?v=13"></script>
 </body>
 </html>
