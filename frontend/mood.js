@@ -293,7 +293,26 @@
       .catch(function () { describeFail(); });
   }
 
-  function wireMic() {}
+  function wireMic() {
+    var btn = $("describeMic"); if (!btn) return;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var rec = null;
+    btn.addEventListener("click", function () {
+      if (rec) { rec.stop(); return; }   // tap again = stop listening
+      rec = new SR();
+      rec.lang = currentLang === "ru" ? "ru-RU" : "en-US";
+      rec.interimResults = true;
+      rec.onresult = function (e) {
+        var text = Array.prototype.map.call(e.results, function (r) { return r[0].transcript; }).join(" ").trim();
+        var input = $("describeInput"); if (input) input.value = text;
+        if (e.results[e.results.length - 1].isFinal) submitDescribe();
+      };
+      rec.onend = function () { rec = null; btn.classList.remove("listening"); };
+      rec.onerror = function () { rec = null; btn.classList.remove("listening"); };
+      btn.classList.add("listening");
+      rec.start();
+    });
+  }
 
   // ---- launcher UI -------------------------------------------------------
   function buildLauncher() {
