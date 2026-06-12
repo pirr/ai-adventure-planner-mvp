@@ -107,3 +107,86 @@ def test_parse_messages_mention_whitelist_and_language():
     assert "surprise me" in messages[0]["content"]      # interest whitelist is in the prompt
     assert messages[-1]["role"] == "user"
     assert "пару часов с собакой" in messages[-1]["content"]
+
+
+# --- /api/features + /api/parse-request ---------------------------------------
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+from app.services.llm.base import LLMProvider  # noqa: E402
+
+client = TestClient(app)
+
+
+class FakeParseProvider(LLMProvider):
+    def __init__(self, result=None, error=None):
+        self.result, self.error, self.calls = result, error, 0
+
+    async def parse_situation(self, text, lang):
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return self.result
+
+
+class FakeStorage:
+    def __init__(self, grant=1):
+        self.grant = grant
+
+    def reserve_api_calls(self, api, anonymous_id, requested, *, daily_limit, user_daily_limit):
+        return self.grant
+
+
+def _enable(monkeypatch, provider, grant=1):
+    monkeypatch.setattr("app.main.get_llm_provider", lambda: provider)
+    monkeypatch.setattr("app.main.storage", FakeStorage(grant))
+
+
+def test_features_off_with_template_provider(monkeypatch):
+    # Pin the provider: the suite must not depend on the ambient .env LLM config.
+    monkeypatch.setattr("app.main.get_llm_provider", lambda: TemplateProvider())
+    assert client.get("/api/features").json() == {"parse": False}
+    res = client.post("/api/parse-request", json={"text": "two hours", "anonymous_id": "u"})
+    assert res.status_code == 404
+
+
+def test_features_on_with_real_provider(monkeypatch):
+    _enable(monkeypatch, FakeParseProvider())
+    assert client.get("/api/features").json() == {"parse": True}
+
+
+def test_parse_request_returns_parsed_fields(monkeypatch):
+    provider = FakeParseProvider(result=ParsedSituation(available_minutes=90, with_dog=True))
+    _enable(monkeypatch, provider)
+    res = client.post("/api/parse-request", json={"text": "1.5h with dog", "anonymous_id": "u"})
+    assert res.status_code == 200
+    body = res.json()["parsed"]
+    assert body["available_minutes"] == 90 and body["with_dog"] is True
+    assert provider.calls == 1
+
+
+def test_parse_request_nothing_recognized(monkeypatch):
+    _enable(monkeypatch, FakeParseProvider(result=ParsedSituation()))  # all-None
+    res = client.post("/api/parse-request", json={"text": "asdf qwer", "anonymous_id": "u"})
+    assert res.status_code == 200 and res.json()["parsed"] is None
+
+
+def test_parse_request_none_from_provider(monkeypatch):
+    _enable(monkeypatch, FakeParseProvider(result=None))
+    res = client.post("/api/parse-request", json={"text": "asdf qwer", "anonymous_id": "u"})
+    assert res.status_code == 200 and res.json()["parsed"] is None
+
+
+def test_parse_request_provider_error_is_502(monkeypatch):
+    _enable(monkeypatch, FakeParseProvider(error=RuntimeError("boom")))
+    res = client.post("/api/parse-request", json={"text": "two hours", "anonymous_id": "u"})
+    assert res.status_code == 502
+
+
+def test_parse_request_budget_exhausted_is_429_and_skips_provider(monkeypatch):
+    provider = FakeParseProvider(result=ParsedSituation(available_minutes=90))
+    _enable(monkeypatch, provider, grant=0)
+    res = client.post("/api/parse-request", json={"text": "two hours", "anonymous_id": "u"})
+    assert res.status_code == 429
+    assert provider.calls == 0
