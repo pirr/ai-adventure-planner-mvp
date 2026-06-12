@@ -6,6 +6,7 @@ from urllib.parse import quote, unquote, urlparse
 
 from app.config import settings
 from app.schemas import PlaceCandidate, PlacePhoto
+from app.services import google_places
 from app.services.net import http_client
 
 
@@ -116,10 +117,19 @@ async def get_place_photo(place: PlaceCandidate, use_live_data: bool) -> PlacePh
         return tagged_photo
 
     wikidata_id = _wikidata_id(place.tags.get("wikidata"))
-    if not wikidata_id:
-        return None
+    if wikidata_id:
+        try:
+            photo = await _photo_from_wikidata(wikidata_id)
+            if photo:
+                return photo
+        except Exception:
+            pass
 
-    try:
-        return await _photo_from_wikidata(wikidata_id)
-    except Exception:
-        return None
+    # Free sources exhausted; fall back to Google when enrichment found one
+    # (each media resolution is a billed call, so it stays last in line).
+    if place.google_photo_name:
+        try:
+            return await google_places.resolve_photo(place.google_photo_name, place.google_photo_attribution)
+        except Exception:
+            return None
+    return None

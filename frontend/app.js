@@ -115,7 +115,15 @@ function renderResultMarkers(items, { fit = true } = {}) {
   });
   if (fit && points.length) {
     const all = originMarker ? [[originMarker.getLatLng().lat, originMarker.getLatLng().lng], ...points] : points;
-    map.fitBounds(L.latLngBounds(all), { paddingTopLeft: [40, 92], paddingBottomRight: [40, sheetHeight() + 24] });
+    // Fit for the peek-state map. When the sheet is fully open (e.g. a search
+    // applied from the filters) sheetHeight() can exceed the map height, and
+    // padding >= viewport makes Leaflet zoom to max with the pins off-screen.
+    const bottomPad = Math.min(sheetHeight() + 24, Math.round(map.getSize().y * 0.45));
+    map.fitBounds(L.latLngBounds(all), {
+      paddingTopLeft: [40, 92],
+      paddingBottomRight: [40, bottomPad],
+      maxZoom: 15,
+    });
   }
 }
 
@@ -225,11 +233,15 @@ function enterExploring() {
   setMode('exploring');
   ensureMap();
   if (originMarker && map && !map.hasLayer(originMarker)) originMarker.addTo(map);
+  if (resultsLayer && map && !map.hasLayer(resultsLayer)) resultsLayer.addTo(map);
   if (map) setTimeout(() => map.invalidateSize(), 80);
 }
 
 function enterPlanning() {
   setMode('planning');
+  // Hide result pins while picking a start point: stale pins look like a second
+  // selected place and swallow map taps meant to move the start marker.
+  if (resultsLayer && map && map.hasLayer(resultsLayer)) map.removeLayer(resultsLayer);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -335,6 +347,7 @@ const I18N = {
     useful: '👍',
     not_useful: '👎',
     photo_source: 'Photo: {source}',
+    rating_label: '★ {rating} ({count}) · Google',
     place_weather_title: 'Weather at destination',
     on_arrival: 'On arrival',
     forecast_arrival: 'arrival',
@@ -502,6 +515,7 @@ const I18N = {
     useful: '👍',
     not_useful: '👎',
     photo_source: 'Фото: {source}',
+    rating_label: '★ {rating} ({count}) · Google',
     place_weather_title: 'Погода в месте назначения',
     on_arrival: 'По прибытии',
     forecast_arrival: 'прибытие',
@@ -812,7 +826,13 @@ function recommendationKey(item) {
   return item.source_id || item.id;
 }
 
+// Bumped on every fresh search; in-flight responses from an older search or
+// load-more compare against it and drop their result instead of rendering
+// stale places (with refit:false) over the new result set.
+let searchGeneration = 0;
+
 async function runSearch({ excludeSeen = false } = {}) {
+  const generation = ++searchGeneration;
   clearError();
   loadingMore = false;
   canLoadMore = true;
@@ -836,6 +856,7 @@ async function runSearch({ excludeSeen = false } = {}) {
       throw new Error(text || `Request failed: ${response.status}`);
     }
     const data = await response.json();
+    if (generation !== searchGeneration) return; // superseded by a newer search
     annotateRequestId(data);
     renderResults(data);
     if (excludeSeen && !(data.recommendations || []).length) setError(t('no_more_others'));
@@ -863,6 +884,7 @@ async function loadMoreResults({ scrollToNew = false } = {}) {
   loadingMore = true;
   renderLoadMoreCard();
   track('search_started', { meta: { exclude_seen: true, load_more: true } });
+  const generation = searchGeneration;
   const payload = requestPayload(true);
   lastPayload = payload;
   const previousScrollLeft = carouselEl.scrollLeft;
@@ -878,6 +900,7 @@ async function loadMoreResults({ scrollToNew = false } = {}) {
       throw new Error(text || `Request failed: ${response.status}`);
     }
     const data = await response.json();
+    if (generation !== searchGeneration) return; // a fresh search replaced these results
     annotateRequestId(data);
     const current = lastResponse.recommendations || [];
     const seen = new Set(current.map(recommendationKey));
@@ -936,7 +959,12 @@ function renderResults(data, { refit = true } = {}) {
   activeId = null;
   renderResultMarkers(items, { fit: refit });
   const target = (refit ? null : keep) || (items[0] && items[0].id);
-  if (target) setActive(target, { pan: false, scroll: refit });
+  if (target) {
+    setActive(target, { pan: false, scroll: false });
+    // Jump (not smooth-scroll) the carousel back on a fresh search: a long
+    // smooth scroll outlives the spy pause and pans the map off the overview.
+    if (refit) scrollCardIntoView(target, { behavior: 'auto' });
+  }
 }
 
 function renderWeather(weather) {
@@ -1112,6 +1140,17 @@ function buildCard(item, isTop) {
     fragment.querySelector('.recommendation-body').insertAdjacentHTML('afterbegin', `<p class="decision-kicker">${t('best_trip_now')}</p>`);
   }
   fragment.querySelector('.title').textContent = item.title;
+  if (item.rating != null) {
+    // The "· Google" suffix is required attribution for Places data.
+    const locale = currentLang === 'ru' ? 'ru-RU' : 'en-US';
+    const ratingEl = document.createElement('p');
+    ratingEl.className = 'g-rating';
+    ratingEl.textContent = t('rating_label', {
+      rating: item.rating.toFixed(1),
+      count: (item.rating_count || 0).toLocaleString(locale),
+    });
+    fragment.querySelector('.title').insertAdjacentElement('afterend', ratingEl);
+  }
   fragment.querySelector('.description').textContent = item.summary || item.description;
   fragment.querySelector('.card-mini').textContent = isTop
     ? `${fitLabel(item.adventure_score)} · ${t('score_label', { score: item.adventure_score })}`

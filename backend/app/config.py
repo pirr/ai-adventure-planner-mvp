@@ -51,6 +51,24 @@ class Settings:
     # A/B test the LLM explanations vs templates: when on (and an LLM is
     # configured), bucket users by anonymous_id — half see templates as control.
     ab_test_enabled: bool = os.getenv("AB_TEST_ENABLED", "false").lower() == "true"
+    # Optional Google Places enrichment (0.3). Off unless an API key is set:
+    # without a key the recommendation pipeline is unchanged (OSM-only quality
+    # and photos). The key stays backend-only — never shipped to the browser.
+    google_places_api_key: str | None = os.getenv("GOOGLE_PLACES_API_KEY") or None
+    google_places_url: str = os.getenv("GOOGLE_PLACES_URL", "https://places.googleapis.com/v1")
+    google_places_timeout_seconds: float = float(os.getenv("GOOGLE_PLACES_TIMEOUT_SECONDS", "5"))
+    # In-process cache TTL per place. Google ToS allows caching most fields up
+    # to 30 days; keep the default well inside that.
+    google_places_cache_ttl_seconds: int = int(os.getenv("GOOGLE_PLACES_CACHE_TTL_SECONDS", "86400"))
+    # Max places enriched per request (cost cap; the re-scoring pool is <= limit+5 <= 15).
+    google_places_max_enriched: int = int(os.getenv("GOOGLE_PLACES_MAX_ENRICHED", "15"))
+    # App-side daily budgets for Google calls. Keep the global limit *below*
+    # the Cloud Console quota cap so the app cuts off first. 0 disables
+    # enrichment entirely.
+    google_places_daily_limit: int = int(os.getenv("GOOGLE_PLACES_DAILY_LIMIT", "800"))
+    # Per-anonymous_id daily cap (~4 enriched searches). Soft fairness control:
+    # the id is client-supplied, so the global limit is the real backstop.
+    google_places_user_daily_limit: int = int(os.getenv("GOOGLE_PLACES_USER_DAILY_LIMIT", "60"))
 
 
 settings = Settings()

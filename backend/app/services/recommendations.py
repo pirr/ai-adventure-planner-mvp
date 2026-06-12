@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.config import settings
 from app.schemas import AdventureRequest, AdventureResponse
+from app.services import google_places
 from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import get_route
@@ -81,18 +82,42 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
     # drops in the ranking. Limiting the pool keeps this to one extra request.
     pool_size = min(len(scored), request.limit + 5)
     pool, rest = scored[:pool_size], scored[pool_size:]
+    # Google enrichment (optional, key-gated) only covers the pool: ratings
+    # sharpen place_quality right where ranking is decided, at bounded cost.
+    # create_task starts the calls now so they overlap the forecast await.
+    enrichment_task = (
+        asyncio.create_task(
+            google_places.enrich_places([candidate.place for candidate in pool], request.anonymous_id, request.lang)
+        )
+        if request.use_live_data and google_places.enabled()
+        else None
+    )
     forecasts = await get_destination_forecasts(
         [(candidate.place.lat, candidate.place.lon) for candidate in pool], request.use_live_data, request.lang
     )
+    google_warnings: list[str] = []
+    google_info: dict[str, google_places.GooglePlaceInfo] = {}
+    if enrichment_task is not None:
+        google_info, google_warnings = await enrichment_task
     rescored = []
     for candidate, forecast in zip(pool, forecasts):
+        place = candidate.place
+        info = google_info.get(place.source_id)
+        if info is not None:
+            place.rating = info.rating
+            place.rating_count = info.rating_count
+            place.google_photo_name = info.photo_name
+            place.google_photo_attribution = info.photo_attribution
+            place.quality_score = google_places.blended_quality(place.quality_score, info.rating, info.rating_count)
         if forecast is None:
-            rescored.append(candidate)
+            # No destination forecast, but an enriched place still needs its
+            # score refreshed (with the origin weather) to pick up the rating.
+            rescored.append(score_candidate(place, candidate.route, weather, request, profile) if info else candidate)
             continue
         arrival_weather, timeline = forecast.at_arrival(
             candidate.route.one_way_minutes, candidate.place.estimated_activity_minutes, request.lang
         )
-        refreshed = score_candidate(candidate.place, candidate.route, arrival_weather, request, profile)
+        refreshed = score_candidate(place, candidate.route, arrival_weather, request, profile)
         refreshed.arrival_weather = arrival_weather
         refreshed.forecast = timeline
         rescored.append(refreshed)
@@ -111,5 +136,5 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         weather=weather,
         recommendations=recommendations,
         rejected_alternatives=rejected,
-        data_warnings=weather_warnings + place_warnings,
+        data_warnings=weather_warnings + place_warnings + google_warnings,
     )
