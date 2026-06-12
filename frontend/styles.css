@@ -262,6 +262,7 @@ body.planning .sheet { display: none; }
 .card-head-text { min-width: 0; }
 .title { font-family: var(--display); font-weight: 800; font-size: 19px; line-height: 1.1; letter-spacing: -0.01em; color: var(--ink-900); }
 .description { margin-top: 6px; color: var(--ink-500); font-size: 13.5px; line-height: 1.45; }
+.g-rating { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .score { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 15px; background: var(--pine-800); color: var(--sand-300); display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 19px; box-shadow: var(--float-xs); }
 .is-top .score { background: var(--clay-500); color: #fff; }
 .card-mini { margin-top: 9px; font-size: 12.5px; font-weight: 600; color: var(--muted); }

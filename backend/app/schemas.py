@@ -82,6 +82,11 @@ class PlaceCandidate(BaseModel):
     estimated_walking_km: float = 1.0
     difficulty: Literal["easy", "medium", "hard"] = "easy"
     quality_score: int = Field(default=60, ge=0, le=100)
+    # Google Places enrichment (0.3); None when the place wasn't enriched.
+    rating: float | None = Field(default=None, ge=0, le=5)
+    rating_count: int | None = Field(default=None, ge=0)
+    google_photo_name: str | None = None
+    google_photo_attribution: str | None = None
 
 
 class RouteInfo(BaseModel):
@@ -129,6 +134,9 @@ class Recommendation(BaseModel):
     distance_km: float
     walking_km: float
     difficulty: str
+    # Google rating; shown with mandatory "Google" attribution when present.
+    rating: float | None = None
+    rating_count: int | None = None
     description: str
     # summary + data_confidence_note are filled by the LLM layer when enabled and
     # grounded; otherwise they stay None and the rule-based `why` is used as-is.

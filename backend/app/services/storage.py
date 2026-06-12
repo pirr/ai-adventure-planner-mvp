@@ -83,6 +83,17 @@ class Storage:
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY (anonymous_id, source_id)
                 );
+
+                -- 0.3: daily budget counters for paid external APIs (Google Places).
+                -- scope "global" (key "") caps total spend; scope "user" (key =
+                -- anonymous_id) keeps one user from draining the shared budget.
+                CREATE TABLE IF NOT EXISTS api_usage (
+                    day TEXT NOT NULL,
+                    scope TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (day, scope, key)
+                );
                 """
             )
             # Migrate pre-0.2 databases that predate the anonymous_id columns.
@@ -301,6 +312,48 @@ class Storage:
         seen = {row["source_id"] for row in rows if row["seen"]}
         visited = {row["source_id"] for row in rows if row["visited"]}
         return {"seen": seen, "visited": visited}
+
+    @staticmethod
+    def _usage_day() -> str:
+        """Today's UTC budget bucket; patchable in tests to simulate day rollover."""
+        return datetime.utcnow().strftime("%Y-%m-%d")
+
+    def reserve_google_calls(self, anonymous_id: str | None, requested: int) -> int:
+        """Grant up to `requested` Google Places calls within today's budgets.
+
+        Returns min(requested, global remaining, user remaining) and records
+        the grant against both counters in one transaction, so concurrent
+        requests can't overdraw. Requests without an anonymous_id get nothing:
+        they can't be rate-limited individually, so they don't get to spend
+        the budget. Failed calls still count (never under-counts spend).
+        """
+        if requested <= 0 or not anonymous_id:
+            return 0
+        day = self._usage_day()
+        with self._connect() as conn:
+            counters = (("global", ""), ("user", anonymous_id))
+            used: dict[str, int] = {}
+            for scope, key in counters:
+                row = conn.execute(
+                    "SELECT count FROM api_usage WHERE day=? AND scope=? AND key=?",
+                    (day, scope, key),
+                ).fetchone()
+                used[scope] = row["count"] if row else 0
+            granted = min(
+                requested,
+                max(0, settings.google_places_daily_limit - used["global"]),
+                max(0, settings.google_places_user_daily_limit - used["user"]),
+            )
+            if granted > 0:
+                for scope, key in counters:
+                    conn.execute(
+                        "INSERT INTO api_usage (day, scope, key, count) VALUES (?, ?, ?, ?) "
+                        "ON CONFLICT(day, scope, key) DO UPDATE SET count = count + excluded.count",
+                        (day, scope, key, granted),
+                    )
+            # Counters are only read for "today", so old rows are dead weight.
+            conn.execute("DELETE FROM api_usage WHERE day < date(?, '-7 days')", (day,))
+        return granted
 
     def delete_user_data(self, anonymous_id: str | None) -> int:
         if not anonymous_id:

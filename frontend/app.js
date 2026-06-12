@@ -335,6 +335,7 @@ const I18N = {
     useful: '👍',
     not_useful: '👎',
     photo_source: 'Photo: {source}',
+    rating_label: '★ {rating} ({count}) · Google',
     place_weather_title: 'Weather at destination',
     on_arrival: 'On arrival',
     forecast_arrival: 'arrival',
@@ -502,6 +503,7 @@ const I18N = {
     useful: '👍',
     not_useful: '👎',
     photo_source: 'Фото: {source}',
+    rating_label: '★ {rating} ({count}) · Google',
     place_weather_title: 'Погода в месте назначения',
     on_arrival: 'По прибытии',
     forecast_arrival: 'прибытие',
@@ -1112,6 +1114,17 @@ function buildCard(item, isTop) {
     fragment.querySelector('.recommendation-body').insertAdjacentHTML('afterbegin', `<p class="decision-kicker">${t('best_trip_now')}</p>`);
   }
   fragment.querySelector('.title').textContent = item.title;
+  if (item.rating != null) {
+    // The "· Google" suffix is required attribution for Places data.
+    const locale = currentLang === 'ru' ? 'ru-RU' : 'en-US';
+    const ratingEl = document.createElement('p');
+    ratingEl.className = 'g-rating';
+    ratingEl.textContent = t('rating_label', {
+      rating: item.rating.toFixed(1),
+      count: (item.rating_count || 0).toLocaleString(locale),
+    });
+    fragment.querySelector('.title').insertAdjacentElement('afterend', ratingEl);
+  }
   fragment.querySelector('.description').textContent = item.summary || item.description;
   fragment.querySelector('.card-mini').textContent = isTop
     ? `${fitLabel(item.adventure_score)} · ${t('score_label', { score: item.adventure_score })}`
