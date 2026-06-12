@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.schemas import AdventureRequest, Recommendation
+from app.schemas import AdventureRequest, ParsedSituation, Recommendation
 
 
 @dataclass
@@ -32,3 +32,9 @@ class LLMProvider:
 
     async def explain(self, payload: ExplanationInput) -> list[Explanation | None] | None:
         raise NotImplementedError
+
+    async def parse_situation(self, text: str, lang: str) -> ParsedSituation | None:
+        """Map a free-text trip description onto AdventureRequest fields.
+        None means 'cannot parse' — also the default, so the TemplateProvider
+        (and any provider that doesn't override this) reports no support."""
+        return None

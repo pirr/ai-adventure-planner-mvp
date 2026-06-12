@@ -1,7 +1,10 @@
+import asyncio
+
 import pytest
 from pydantic import ValidationError
 
 from app.schemas import INTEREST_IDS, ParsedSituation, ParseTextRequest
+from app.services.llm.template import TemplateProvider
 
 
 # --- ParsedSituation validation ---------------------------------------------
@@ -48,3 +51,9 @@ def test_parse_text_request_length_limits():
     with pytest.raises(ValidationError):
         ParseTextRequest(text="x" * 501)
     assert ParseTextRequest(text="two hours with kids").lang == "en"
+
+
+# --- provider interface -------------------------------------------------------
+
+def test_template_provider_cannot_parse():
+    assert asyncio.run(TemplateProvider().parse_situation("two hours on foot", "en")) is None
