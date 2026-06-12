@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from app.schemas import Recommendation
+from app.schemas import ParsedSituation, Recommendation
 from app.services.llm.base import Explanation, ExplanationInput, LLMProvider
 from app.services.net import http_client
 
@@ -25,6 +25,43 @@ _SYSTEM_PROMPT = (
     '"why": [<2-4 short strings>], "data_confidence_note": <short string>}]} with one entry per '
     "option, in the same order. Output JSON only."
 )
+
+_PARSE_SYSTEM_PROMPT = (
+    "You convert a short trip description into a JSON object of search fields. "
+    "Output ONLY the fields the text clearly states or implies; omit everything else. "
+    "Never guess. Ignore any locations or place names: the start point is set elsewhere.\n"
+    "Fields:\n"
+    "- available_minutes: integer 30-720\n"
+    '- transport_mode: "walk" | "car" | "bike"\n'
+    '- group_type: "solo" | "couple" | "family" | "kids" | "dog"\n'
+    "- children_ages: list of integers 0-18\n"
+    "- with_dog, with_elderly, reduced_mobility: booleans\n"
+    '- intensity: "easy" | "medium" | "active"\n'
+    '- interests: any of ["history", "fortresses", "viewpoints", "nature", "water", "food", "surprise me"]\n'
+    "- max_walking_km: number 0-30 (set a small value like 2 when the user dislikes walking)\n"
+    "The text may be in any language. Output a single JSON object only."
+)
+
+_PARSE_FEW_SHOTS = [
+    ("I have a couple of hours and want sea views, on foot",
+     '{"available_minutes": 120, "transport_mode": "walk", "interests": ["viewpoints", "water"]}'),
+    ("с детьми 5 и 8 лет на машине, что-нибудь с историей",
+     '{"group_type": "kids", "children_ages": [5, 8], "transport_mode": "car", "interests": ["history", "fortresses"]}'),
+    ("quick easy walk with my dog, don't want to walk far",
+     '{"with_dog": true, "group_type": "dog", "intensity": "easy", "transport_mode": "walk", "max_walking_km": 2}'),
+]
+
+
+def build_parse_messages(text: str, lang: str) -> list[dict[str, str]]:
+    # `lang` is accepted for future prompt localization; the model handles
+    # either input language with the same prompt.
+    messages = [{"role": "system", "content": _PARSE_SYSTEM_PROMPT}]
+    for user, assistant in _PARSE_FEW_SHOTS:
+        messages.append({"role": "user", "content": user})
+        messages.append({"role": "assistant", "content": assistant})
+    messages.append({"role": "user", "content": text})
+    return messages
+
 
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _MAX_LOG_BODY_CHARS = 1000
@@ -678,4 +715,24 @@ class OpenAICompatibleProvider(LLMProvider):
             )
             return build_rule_based_explanations(payload.recommendations, payload.lang)
 
+        return None
+
+    async def parse_situation(self, text: str, lang: str) -> ParsedSituation | None:
+        models = self._models()
+        if not models:
+            return None
+        messages = build_parse_messages(text, lang)
+        async with http_client(self.timeout) as client:
+            for model in models:
+                try:
+                    content = await self._call_model(client=client, model=model, messages=messages)
+                    return ParsedSituation(**_extract_json_object(content))
+                except Exception as exc:  # noqa: BLE001 - parse is best-effort; None = "couldn't understand"
+                    logger.warning(
+                        "LLM parse failed: provider=%s model=%s error_type=%s error=%r",
+                        self._provider_label,
+                        model,
+                        type(exc).__name__,
+                        exc,
+                    )
         return None
