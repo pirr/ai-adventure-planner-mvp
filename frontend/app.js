@@ -225,11 +225,15 @@ function enterExploring() {
   setMode('exploring');
   ensureMap();
   if (originMarker && map && !map.hasLayer(originMarker)) originMarker.addTo(map);
+  if (resultsLayer && map && !map.hasLayer(resultsLayer)) resultsLayer.addTo(map);
   if (map) setTimeout(() => map.invalidateSize(), 80);
 }
 
 function enterPlanning() {
   setMode('planning');
+  // Hide result pins while picking a start point: stale pins look like a second
+  // selected place and swallow map taps meant to move the start marker.
+  if (resultsLayer && map && map.hasLayer(resultsLayer)) map.removeLayer(resultsLayer);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
