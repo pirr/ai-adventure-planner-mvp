@@ -72,13 +72,22 @@ body.planning #map, body.planning .map-scrim { display: none; }
 
 .map-pin { background: none !important; border: none !important; }
 .map-pin .pin-score {
+  position: relative;
   display: flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: 14px 14px 14px 4px;
   background: var(--pine-800); color: var(--sand-300); border: 2.5px solid var(--cream-hi);
   font-family: var(--display); font-weight: 800; font-size: 14px; box-shadow: var(--float-sm);
   transition: transform 0.22s var(--spring), background 0.2s var(--ease);
 }
-.map-pin.is-top .pin-score { background: var(--clay-500); color: #fff; }
+/* Top pick gets a star badge, not the selection color: orange fill is reserved
+   for .is-active so only one pin ever looks selected. */
+.map-pin.is-top .pin-score::after {
+  content: "★"; position: absolute; top: -8px; right: -8px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--amber-400); color: var(--pine-900);
+  font-size: 10px; line-height: 16px; text-align: center;
+  border: 1.5px solid var(--cream-hi);
+}
 .map-pin.is-active .pin-score { transform: scale(1.2) translateY(-3px); background: var(--clay-500); color: #fff; box-shadow: 0 14px 26px -8px rgba(168,78,40,0.85); }
 .you-pin { background: none !important; border: none !important; }
 .you-pin span { display: block; width: 18px; height: 18px; border-radius: 50%; background: #2f7fd6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(47,127,214,0.22); }
