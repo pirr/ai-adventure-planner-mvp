@@ -403,10 +403,10 @@ class OpenAICompatibleProvider(LLMProvider):
 
         return models
 
-    def _body(self, payload: ExplanationInput, model: str) -> dict[str, Any]:
+    def _body(self, messages: list[dict[str, str]], model: str) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": model,
-            "messages": build_messages(payload),
+            "messages": messages,
             "temperature": 0.2,
         }
 
@@ -477,22 +477,22 @@ class OpenAICompatibleProvider(LLMProvider):
         *,
         client: httpx.AsyncClient,
         model: str,
-        payload: ExplanationInput,
+        messages: list[dict[str, str]],
     ) -> str:
         url = f"{self.base_url}/chat/completions"
-        body = self._body(payload, model)
+        body = self._body(messages, model)
         headers = self._headers()
 
         last_error: Exception | None = None
 
         logger.info(
-            "LLM request: provider=%s model=%s url=%s json_mode=%s body_keys=%s recommendation_count=%s",
+            "LLM request: provider=%s model=%s url=%s json_mode=%s body_keys=%s message_count=%s",
             self._provider_label,
             model,
             url,
             self.json_mode,
             sorted(body.keys()),
-            len(payload.recommendations),
+            len(messages),
         )
 
         for attempt in range(self.max_retries + 1):
@@ -627,13 +627,15 @@ class OpenAICompatibleProvider(LLMProvider):
             payload.lang,
         )
 
+        messages = build_messages(payload)
+
         async with http_client(self.timeout) as client:
             for index, model in enumerate(models):
                 try:
                     content = await self._call_model(
                         client=client,
                         model=model,
-                        payload=payload,
+                        messages=messages,
                     )
 
                     explanations = parse_explanations(content, payload.recommendations)

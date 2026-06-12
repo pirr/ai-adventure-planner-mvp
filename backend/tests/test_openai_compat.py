@@ -7,7 +7,7 @@ import httpx
 from app.schemas import AdventureRequest, Recommendation, ScoreBreakdown
 from app.services.llm import openai_compat
 from app.services.llm.base import ExplanationInput
-from app.services.llm.openai_compat import OpenAICompatibleProvider, parse_explanations
+from app.services.llm.openai_compat import OpenAICompatibleProvider, build_messages, parse_explanations
 
 
 def _rec(rec_id="r1", **over) -> Recommendation:
@@ -108,17 +108,17 @@ def test_content_from_response_errors_without_choices():
 
 def test_body_skips_response_format_for_gemini():
     gemini = OpenAICompatibleProvider(base_url="https://generativelanguage.googleapis.com/v1beta/openai", model="gemini-2.5-flash", gemini_reasoning_effort="low")
-    body = gemini._body(_payload([_rec()]), "gemini-2.5-flash")
+    body = gemini._body(build_messages(_payload([_rec()])), "gemini-2.5-flash")
     assert "response_format" not in body
     assert body["reasoning_effort"] == "low"
 
 
 def test_body_includes_response_format_for_non_gemini():
     openai = OpenAICompatibleProvider(base_url="https://api.openai.com/v1", model="gpt-4o-mini")
-    body = openai._body(_payload([_rec()]), "gpt-4o-mini")
+    body = openai._body(build_messages(_payload([_rec()])), "gpt-4o-mini")
     assert body["response_format"] == {"type": "json_object"}
     no_json = OpenAICompatibleProvider(base_url="https://api.openai.com/v1", model="m", json_mode=False)
-    assert "response_format" not in no_json._body(_payload([_rec()]), "m")
+    assert "response_format" not in no_json._body(build_messages(_payload([_rec()])), "m")
 
 
 def test_retry_delay_honors_retry_after_header():
