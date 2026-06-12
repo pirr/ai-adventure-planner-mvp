@@ -195,6 +195,7 @@
   }
 
   function choosePreset(p) {
+    if (window.setRequestText) window.setRequestText(null);
     currentMood = p;
     applyPreset(p);
     commitSearch();
@@ -363,7 +364,10 @@
     saveRecent(s);
     appliedSnapshot = s;
   }
-  function applyStaged() { openFacetKey = null; commitSearch(); buildFilterBar(); }
+  function applyStaged() {
+    if (window.setRequestText) window.setRequestText(null);
+    openFacetKey = null; commitSearch(); buildFilterBar();
+  }
   function resetStaged() { if (appliedSnapshot) writeState(appliedSnapshot); buildFilterBar(); }
 
   // --- recent choices (localStorage cache of the last 3) ---

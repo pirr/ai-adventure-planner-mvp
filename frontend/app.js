@@ -32,6 +32,10 @@ let canLoadMore = true;
 let spyPaused = false;
 let spyResumeTimer = null;
 let spyResumeOnScrollEnd = true;
+// Free-text description that produced the current search; rides along as
+// request_text so the explanation LLM sees the user's own words.
+let pendingRequestText = null;
+window.setRequestText = (text) => { pendingRequestText = text || null; };
 
 function scoreIcon(score, { active = false, top = false } = {}) {
   const cls = 'map-pin' + (active ? ' is-active' : '') + (top ? ' is-top' : '');
@@ -781,7 +785,7 @@ function requestPayload(excludeSeen = false) {
     intensity: activeData('intensityChips', 'intensity', 'easy'),
     interests: selectedInterests(),
     max_walking_km: maxWalkingValue === '' ? null : parseFloat(maxWalkingValue),
-    request_text: null,
+    request_text: pendingRequestText,
     use_live_data: $('useLiveData').checked,
     limit: 5,
     lang: currentLang,
