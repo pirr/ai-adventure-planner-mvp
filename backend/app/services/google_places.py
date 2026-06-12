@@ -126,7 +126,13 @@ async def enrich_places(
             continue
         misses.append(place)
 
-    granted = storage.reserve_google_calls(anonymous_id, len(misses))
+    granted = storage.reserve_api_calls(
+        "google",
+        anonymous_id,
+        len(misses),
+        daily_limit=settings.google_places_daily_limit,
+        user_daily_limit=settings.google_places_user_daily_limit,
+    )
     if misses and granted == 0:
         logger.info("google places: daily budget exhausted or no anonymous_id, skipping %d lookups", len(misses))
     to_fetch = misses[:granted]

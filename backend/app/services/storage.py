@@ -318,20 +318,29 @@ class Storage:
         """Today's UTC budget bucket; patchable in tests to simulate day rollover."""
         return datetime.utcnow().strftime("%Y-%m-%d")
 
-    def reserve_google_calls(self, anonymous_id: str | None, requested: int) -> int:
-        """Grant up to `requested` Google Places calls within today's budgets.
+    def reserve_api_calls(
+        self,
+        api: str,
+        anonymous_id: str | None,
+        requested: int,
+        *,
+        daily_limit: int,
+        user_daily_limit: int,
+    ) -> int:
+        """Grant up to `requested` calls of `api` within today's budgets.
 
         Returns min(requested, global remaining, user remaining) and records
         the grant against both counters in one transaction, so concurrent
-        requests can't overdraw. Requests without an anonymous_id get nothing:
-        they can't be rate-limited individually, so they don't get to spend
-        the budget. Failed calls still count (never under-counts spend).
+        requests can't overdraw. Budgets are independent per `api` (scope is
+        prefixed). Requests without an anonymous_id get nothing: they can't be
+        rate-limited individually, so they don't get to spend the budget.
+        Failed calls still count (never under-counts spend).
         """
         if requested <= 0 or not anonymous_id:
             return 0
         day = self._usage_day()
         with self._connect() as conn:
-            counters = (("global", ""), ("user", anonymous_id))
+            counters = ((f"{api}:global", ""), (f"{api}:user", anonymous_id))
             used: dict[str, int] = {}
             for scope, key in counters:
                 row = conn.execute(
@@ -341,8 +350,8 @@ class Storage:
                 used[scope] = row["count"] if row else 0
             granted = min(
                 requested,
-                max(0, settings.google_places_daily_limit - used["global"]),
-                max(0, settings.google_places_user_daily_limit - used["user"]),
+                max(0, daily_limit - used[f"{api}:global"]),
+                max(0, user_daily_limit - used[f"{api}:user"]),
             )
             if granted > 0:
                 for scope, key in counters:

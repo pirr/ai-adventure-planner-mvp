@@ -132,7 +132,7 @@ def test_enrich_cache_hits_consume_no_budget(google_env, monkeypatch):
     asyncio.run(enrich_places([_place()], "u"))
     asyncio.run(enrich_places([_place()], "u"))
     with store._connect() as conn:
-        row = conn.execute("SELECT count FROM api_usage WHERE scope='global'").fetchone()
+        row = conn.execute("SELECT count FROM api_usage WHERE scope='google:global'").fetchone()
     assert row["count"] == 1
 
 
@@ -152,43 +152,55 @@ def test_enrich_disabled_without_key(monkeypatch):
     assert results == {} and warnings == []
 
 
-# --- storage.reserve_google_calls ------------------------------------------
+# --- storage.reserve_api_calls ----------------------------------------------
 
-def _budget_store(tmp_path, monkeypatch, daily=100, per_user=50):
-    cfg = _settings(google_places_daily_limit=daily, google_places_user_daily_limit=per_user)
-    monkeypatch.setattr("app.services.storage.settings", cfg)
+def _budget_store(tmp_path):
     return Storage(tmp_path / "budget.db")
 
 
-def test_reserve_clamps_to_the_tighter_limit(tmp_path, monkeypatch):
-    store = _budget_store(tmp_path, monkeypatch, daily=10, per_user=3)
-    assert store.reserve_google_calls("u", 5) == 3
+def _reserve(store, anonymous_id, requested, daily=100, per_user=50):
+    return store.reserve_api_calls(
+        "google", anonymous_id, requested, daily_limit=daily, user_daily_limit=per_user
+    )
 
 
-def test_users_share_the_global_budget(tmp_path, monkeypatch):
-    store = _budget_store(tmp_path, monkeypatch, daily=5, per_user=5)
-    assert store.reserve_google_calls("a", 3) == 3
-    assert store.reserve_google_calls("b", 3) == 2  # only 2 left globally
+def test_reserve_clamps_to_the_tighter_limit(tmp_path):
+    store = _budget_store(tmp_path)
+    assert _reserve(store, "u", 5, daily=10, per_user=3) == 3
 
 
-def test_reserve_requires_an_anonymous_id(tmp_path, monkeypatch):
-    store = _budget_store(tmp_path, monkeypatch)
-    assert store.reserve_google_calls(None, 5) == 0
+def test_users_share_the_global_budget(tmp_path):
+    store = _budget_store(tmp_path)
+    assert _reserve(store, "a", 3, daily=5, per_user=5) == 3
+    assert _reserve(store, "b", 3, daily=5, per_user=5) == 2  # only 2 left globally
+
+
+def test_reserve_requires_an_anonymous_id(tmp_path):
+    store = _budget_store(tmp_path)
+    assert _reserve(store, None, 5) == 0
 
 
 def test_budget_resets_on_a_new_day(tmp_path, monkeypatch):
-    store = _budget_store(tmp_path, monkeypatch, daily=2, per_user=2)
-    assert store.reserve_google_calls("u", 2) == 2
-    assert store.reserve_google_calls("u", 1) == 0
+    store = _budget_store(tmp_path)
+    assert _reserve(store, "u", 2, daily=2, per_user=2) == 2
+    assert _reserve(store, "u", 1, daily=2, per_user=2) == 0
     monkeypatch.setattr(Storage, "_usage_day", staticmethod(lambda: "2099-01-01"))
-    assert store.reserve_google_calls("u", 1) == 1
+    assert _reserve(store, "u", 1, daily=2, per_user=2) == 1
 
 
-def test_old_usage_rows_are_pruned(tmp_path, monkeypatch):
-    store = _budget_store(tmp_path, monkeypatch)
+def test_budgets_are_independent_per_api(tmp_path):
+    store = _budget_store(tmp_path)
+    assert store.reserve_api_calls("google", "u", 2, daily_limit=2, user_daily_limit=2) == 2
+    # "google" budget drained; "parse" budget untouched
+    assert store.reserve_api_calls("google", "u", 1, daily_limit=2, user_daily_limit=2) == 0
+    assert store.reserve_api_calls("parse", "u", 1, daily_limit=2, user_daily_limit=2) == 1
+
+
+def test_old_usage_rows_are_pruned(tmp_path):
+    store = _budget_store(tmp_path)
     with store._connect() as conn:
         conn.execute("INSERT INTO api_usage (day, scope, key, count) VALUES ('2020-01-01', 'global', '', 9)")
-    store.reserve_google_calls("u", 1)
+    _reserve(store, "u", 1)
     with store._connect() as conn:
         days = [row["day"] for row in conn.execute("SELECT day FROM api_usage")]
     assert "2020-01-01" not in days
