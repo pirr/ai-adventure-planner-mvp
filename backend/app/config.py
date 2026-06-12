@@ -48,6 +48,15 @@ class Settings:
     llm_max_explained: int = int(os.getenv("LLM_MAX_EXPLAINED", "5"))
     llm_fallback_models: tuple[str] = tuple(os.getenv("LLM_FALLBACK_MODELS", "").split(","))
     gemini_reasoning_effort: str | None = os.getenv("GEMINI_REASONING_EFFORT", "")
+    # Free-text situation parsing ("Describe your trip"). Requires a real LLM
+    # provider; with the TemplateProvider the feature reports disabled
+    # regardless of this flag.
+    llm_parse_enabled: bool = os.getenv("LLM_PARSE_ENABLED", "true").lower() == "true"
+    # App-side daily budgets for parse calls (same pattern as Google
+    # enrichment). 0 disables the feature. Global is the real backstop:
+    # anonymous_id is client-supplied.
+    llm_parse_daily_limit: int = int(os.getenv("LLM_PARSE_DAILY_LIMIT", "500"))
+    llm_parse_user_daily_limit: int = int(os.getenv("LLM_PARSE_USER_DAILY_LIMIT", "30"))
     # A/B test the LLM explanations vs templates: when on (and an LLM is
     # configured), bucket users by anonymous_id — half see templates as control.
     ab_test_enabled: bool = os.getenv("AB_TEST_ENABLED", "false").lower() == "true"
