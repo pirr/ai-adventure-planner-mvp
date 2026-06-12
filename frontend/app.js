@@ -88,6 +88,9 @@ function focusPlace(id, zoom = 16) {
   if (!map || !marker) return;
   setActive(id, { pan: false, scroll: false });
   sheetEl.classList.remove('open');
+  // The open list scrolls vertically, so the horizontal peek strip is still at
+  // its old position — snap it to the chosen card once the row layout is back.
+  requestAnimationFrame(() => scrollCardIntoView(id, { behavior: 'auto' }));
   // Wait for the sheet's collapse transition so sheetHeight() is the peek height
   // and the map has its post-collapse size, then recenter with the peek offset.
   setTimeout(() => {
@@ -167,10 +170,8 @@ function centeredCardId() {
   return best && best.dataset.id;
 }
 
-function rememberedCardId({ preferCentered = false } = {}) {
-  return preferCentered
-    ? centeredCardId() || lastViewedCardId || activeId
-    : lastViewedCardId || activeId || centeredCardId();
+function rememberedCardId() {
+  return lastViewedCardId || activeId || centeredCardId();
 }
 
 function restoreCardAfterSheetOpen(targetId = rememberedCardId()) {
@@ -252,12 +253,14 @@ function openSheet(targetId = rememberedCardId()) {
 }
 
 function toggleSheet() {
-  const willOpen = !sheetEl.classList.contains('open');
-  const targetId = rememberedCardId({ preferCentered: !willOpen });
+  // The open list is vertical, so centeredCardId() (horizontal math) means
+  // nothing there; restore the last viewed/active card in both directions so
+  // the peek strip lands on the place the user last selected.
+  const targetId = rememberedCardId();
   if (targetId) lastViewedCardId = targetId;
   pauseSpy(700, { resumeOnScrollEnd: false });
   sheetEl.classList.toggle('open');
-  if (willOpen) restoreCardAfterSheetOpen(targetId);
+  restoreCardAfterSheetOpen(targetId);
   if (map) setTimeout(() => map.invalidateSize(), 360);
 }
 
