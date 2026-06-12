@@ -243,7 +243,15 @@
     var p = smartNowPreset();   // missing fields keep time-of-day defaults
     if (parsed.available_minutes != null) p.time = snapMinutes(parsed.available_minutes);
     if (parsed.transport_mode) p.transport = parsed.transport_mode;
-    if (parsed.group_type) p.crew = parsed.group_type;
+    if (parsed.group_type) {
+      // The crew chips only have solo/couple/family tiles. Scoring treats
+      // "kids" like "family" (has_children) and "dog" like with_dog, so the
+      // mapping loses nothing.
+      var crew = parsed.group_type;
+      if (crew === "kids") crew = "family";
+      if (crew === "dog") { crew = "solo"; p.withDog = true; }
+      p.crew = crew;
+    }
     if (parsed.intensity) p.intensity = parsed.intensity;
     if (parsed.interests) p.interests = parsed.interests;
     if (parsed.children_ages) p.childrenAges = parsed.children_ages;
