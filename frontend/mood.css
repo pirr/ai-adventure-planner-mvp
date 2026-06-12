@@ -193,3 +193,19 @@ body.planning .filterbar, body.planning .facet-panel { display: none; }
 /* expanded sheet: stack result cards full-width so they fit the screen */
 .sheet.open .carousel { flex-direction: column; overflow: visible; }
 .sheet.open .recommendation { flex: 0 0 auto; width: 100%; max-width: none; }
+
+/* ---- "Describe your trip" (free-text + voice) --------------------------- */
+.describe-box { display: flex; gap: 8px; align-items: center; margin: 4px 0 14px; }
+.describe-box input { flex: 1; min-width: 0; border: 1.5px solid var(--line, #e2d8c1); border-radius: 14px;
+  padding: 12px 14px; font: inherit; background: var(--paper, #fff); }
+.describe-box input:focus { outline: none; border-color: var(--clay-500, #c4633a); }
+.describe-mic, .describe-go { flex: 0 0 auto; width: 44px; height: 44px; border: none; border-radius: 13px;
+  display: grid; place-items: center; cursor: pointer; background: var(--sand-200, #efe7d3); }
+.describe-go { background: var(--clay-500, #c4633a); color: #fff; }
+.describe-mic.listening { background: var(--clay-500, #c4633a); color: #fff; animation: mic-pulse 1.2s infinite; }
+.describe-box.busy .describe-go { opacity: 0.5; pointer-events: none; }
+.describe-err { margin: -8px 0 10px; font-size: 13px; color: #a4441f; }
+.describe-err.hidden { display: none; }
+@keyframes mic-pulse { 50% { transform: scale(1.08); } }
+.fchip.ai-set { animation: ai-pulse 1.3s ease 2; }
+@keyframes ai-pulse { 50% { box-shadow: 0 0 0 4px rgba(196, 99, 58, 0.35); } }

@@ -22,6 +22,9 @@
       picked: "Map point", mine: "My location",
       use_loc: "Use my location", loc_title: "Where are you starting from?", map_hint: "Tap the map to set your start",
       enter_coords: "Enter coordinates", lat: "Latitude", lon: "Longitude", set_btn: "Set",
+      describe_ph: "Describe it: time, company, mood…",
+      describe_fail: "Couldn’t understand that — try different words or pick a vibe",
+      describe_mic: "Dictate",
     },
     ru: {
       vibe_q: "\u0413\u043e\u0442\u043e\u0432\u044b", vibe_word: "\u043f\u043e\u0435\u0445\u0430\u0442\u044c?", or_pick: "\u0418\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
@@ -38,6 +41,9 @@
       picked: "\u0422\u043e\u0447\u043a\u0430 \u043d\u0430 \u043a\u0430\u0440\u0442\u0435", mine: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e",
       use_loc: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e", loc_title: "\u041e\u0442\u043a\u0443\u0434\u0430 \u043d\u0430\u0447\u043d\u0451\u043c?", map_hint: "\u041a\u043e\u0441\u043d\u0438\u0442\u0435\u0441\u044c \u043a\u0430\u0440\u0442\u044b, \u0447\u0442\u043e\u0431\u044b \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u0441\u0442\u0430\u0440\u0442",
       enter_coords: "\u0412\u0432\u0435\u0441\u0442\u0438 \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u044b", lat: "\u0428\u0438\u0440\u043e\u0442\u0430", lon: "\u0414\u043e\u043b\u0433\u043e\u0442\u0430", set_btn: "\u0413\u043e\u0442\u043e\u0432\u043e",
+      describe_ph: "\u041e\u043f\u0438\u0448\u0438\u0442\u0435: \u0432\u0440\u0435\u043c\u044f, \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f, \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435\u2026",
+      describe_fail: "\u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u043f\u043e\u043d\u044f\u0442\u044c \u2014 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u0438\u043c\u0438 \u0441\u043b\u043e\u0432\u0430\u043c\u0438 \u0438\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
+      describe_mic: "\u041d\u0430\u0434\u0438\u043a\u0442\u043e\u0432\u0430\u0442\u044c",
     },
   };
   function lx(k) { var d = LX[currentLang] || LX.en; return d[k] != null ? d[k] : LX.en[k]; }
@@ -85,6 +91,13 @@
   var currentMood = null;
   var placeLabel = null;
   var sheetAutoOpened = false;
+  // "Describe your trip" is available only when the backend has a real LLM
+  // provider configured (GET /api/features). Hidden until confirmed.
+  var featureParse = false;
+  fetch("/api/features")
+    .then(function (r) { return r.json(); })
+    .then(function (f) { featureParse = !!(f && f.parse); if (featureParse) buildLauncher(); })
+    .catch(function () {});
   function smartNowPreset() {
     var interests = {
       morning: ["viewpoints", "food", "nature"],
@@ -205,6 +218,83 @@
     choosePreset(smartNowPreset());
   }
 
+  // ---- "Describe your trip": parse free text into a preset-shaped search ---
+  var PARSED_FACET = {
+    available_minutes: "time", transport_mode: "transport", group_type: "crew",
+    children_ages: "crew", with_dog: "crew", with_elderly: "crew",
+    reduced_mobility: "crew", intensity: "effort", interests: "interest",
+  };
+  var aiSetFacets = [];
+
+  // The wizard's time input is chip-based; snap parsed minutes to the largest
+  // chip that still fits the stated budget (rounding up could recommend trips
+  // the user has no time for).
+  function snapMinutes(m) {
+    var vals = Array.prototype.map.call(
+      document.querySelectorAll("#timeChips .tile"),
+      function (t) { return parseInt(t.dataset.minutes, 10); }
+    ).sort(function (a, b) { return a - b; });
+    var best = vals[0] || 120;
+    vals.forEach(function (v) { if (v <= m) best = v; });
+    return best;
+  }
+
+  function parsedToPreset(parsed) {
+    var p = smartNowPreset();   // missing fields keep time-of-day defaults
+    if (parsed.available_minutes != null) p.time = snapMinutes(parsed.available_minutes);
+    if (parsed.transport_mode) p.transport = parsed.transport_mode;
+    if (parsed.group_type) p.crew = parsed.group_type;
+    if (parsed.intensity) p.intensity = parsed.intensity;
+    if (parsed.interests) p.interests = parsed.interests;
+    if (parsed.children_ages) p.childrenAges = parsed.children_ages;
+    if (parsed.max_walking_km != null) p.maxWalkingKm = parsed.max_walking_km;
+    if (parsed.with_dog != null) p.withDog = parsed.with_dog;
+    if (parsed.with_elderly != null) p.withElderly = parsed.with_elderly;
+    if (parsed.reduced_mobility != null) p.reducedMobility = parsed.reduced_mobility;
+    return p;
+  }
+
+  function describeFail() {
+    var err = $("describeErr"); if (err) err.classList.remove("hidden");
+    var box = $("describeBox"); if (box) box.classList.remove("busy");
+  }
+
+  function submitDescribe() {
+    var input = $("describeInput"); if (!input) return;
+    var text = input.value.trim();
+    if (text.length < 3) return;
+    var err = $("describeErr"); if (err) err.classList.add("hidden");
+    var box = $("describeBox"); if (box) box.classList.add("busy");
+    fetch("/api/parse-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: text,
+        lang: currentLang,
+        anonymous_id: typeof anonymousId === "function" ? anonymousId() : null,
+      }),
+    })
+      .then(function (r) { if (!r.ok) throw new Error("parse http " + r.status); return r.json(); })
+      .then(function (data) {
+        var parsed = data && data.parsed;
+        if (!parsed) { describeFail(); return; }
+        if (box) box.classList.remove("busy");
+        aiSetFacets = [];
+        Object.keys(parsed).forEach(function (k) {
+          var facet = PARSED_FACET[k];
+          if (parsed[k] != null && facet && aiSetFacets.indexOf(facet) === -1) aiSetFacets.push(facet);
+        });
+        if (window.setRequestText) window.setRequestText(text);
+        currentMood = null;                  // custom situation, not a vibe
+        applyPreset(parsedToPreset(parsed));
+        commitSearch();
+        buildFilterBar();
+      })
+      .catch(function () { describeFail(); });
+  }
+
+  function wireMic() {}
+
   // ---- launcher UI -------------------------------------------------------
   function buildLauncher() {
     var host = $("launchBody"); if (!host) return;
@@ -224,6 +314,17 @@
     });
     html += '  </div>';
     html += '</div>';
+
+    if (featureParse) {
+      html += '<div class="describe-box" id="describeBox">';
+      html += '  <input id="describeInput" maxlength="500" autocomplete="off" placeholder="' + lx("describe_ph") + '">';
+      if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+        html += '<button type="button" class="describe-mic" id="describeMic" title="' + lx("describe_mic") + '">' + icon("mic") + "</button>";
+      }
+      html += '  <button type="button" class="describe-go" id="describeGo">' + icon("arrow-right") + "</button>";
+      html += "</div>";
+      html += '<p class="describe-err hidden" id="describeErr">' + lx("describe_fail") + "</p>";
+    }
 
     html += '<button type="button" class="foryou best-now" id="bestNowBtn">';
     html += '  <span class="foryou-ic">' + icon("sparkles") + '</span>';
@@ -253,6 +354,10 @@
 
     host.innerHTML = html;
     var now = $("bestNowBtn"); if (now) now.addEventListener("click", chooseNow);
+    var dGo = $("describeGo"); if (dGo) dGo.addEventListener("click", submitDescribe);
+    var dIn = $("describeInput");
+    if (dIn) dIn.addEventListener("keydown", function (e) { if (e.key === "Enter") submitDescribe(); });
+    wireMic();
     host.querySelectorAll("[data-preset]").forEach(function (el) {
       el.addEventListener("click", function () {
         var p = PRESETS.filter(function (x) { return x.key === el.dataset.preset; })[0];
@@ -425,7 +530,9 @@
     var html = '<button type="button" class="mood-pill" id="moodPill">' + icon(currentMood ? currentMood.icon : "dices") + " " +
       (currentMood ? pt(currentMood).t : lx("your_vibe")) + " " + icon("chevron-down") + "</button>";
     FACETS.forEach(function (f) {
-      html += '<button type="button" class="fchip' + (facetChanged(f) ? " changed" : "") + '" data-facet="' + f.key + '"><span class="fk">' + lx(f.label) + "</span><b>" + facetValue(f) + "</b>" + icon("chevron-down") + "</button>";
+      html += '<button type="button" class="fchip' + (facetChanged(f) ? " changed" : "") +
+        (aiSetFacets.indexOf(f.key) !== -1 ? " ai-set" : "") +
+        '" data-facet="' + f.key + '"><span class="fk">' + lx(f.label) + "</span><b>" + facetValue(f) + "</b>" + icon("chevron-down") + "</button>";
     });
     bar.innerHTML = html;
     $("moodPill").addEventListener("click", function () { resetStaged(); if (window.enterPlanning) window.enterPlanning(); setTimeout(syncPlanningSheet, 0); });
@@ -436,6 +543,12 @@
     renderRecents();
     renderApplyBar();
     refreshIcons();
+    if (aiSetFacets.length) {
+      aiSetFacets = [];   // one-shot: highlight only right after a parse
+      bar.querySelectorAll(".fchip.ai-set").forEach(function (el) {
+        el.addEventListener("animationend", function () { el.classList.remove("ai-set"); }, { once: true });
+      });
+    }
   }
   function toggleFacet(key) { openFacetKey = (openFacetKey === key ? null : key); if (window.openSheet) window.openSheet(); renderFacetPanel(); renderRecents(); syncChipActive(); }
   function syncChipActive() {
