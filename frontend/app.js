@@ -32,6 +32,10 @@ let canLoadMore = true;
 let spyPaused = false;
 let spyResumeTimer = null;
 let spyResumeOnScrollEnd = true;
+// Free-text description that produced the current search; rides along as
+// request_text so the explanation LLM sees the user's own words.
+let pendingRequestText = null;
+window.setRequestText = (text) => { pendingRequestText = text || null; };
 
 function scoreIcon(score, { active = false, top = false } = {}) {
   const cls = 'map-pin' + (active ? ' is-active' : '') + (top ? ' is-top' : '');
@@ -364,6 +368,7 @@ const I18N = {
     data_notes: 'Data notes',
     badge_total: '{v} total',
     badge_travel: '{v} travel',
+    badge_onsite: '{v} on-site',
     badge_walk: '{km} km walk',
     difficulty_easy: 'easy',
     difficulty_medium: 'medium',
@@ -532,6 +537,7 @@ const I18N = {
     data_notes: 'Заметки о данных',
     badge_total: 'всего {v}',
     badge_travel: 'в пути {v}',
+    badge_onsite: 'на месте {v}',
     badge_walk: '{km} км пешком',
     difficulty_easy: 'лёгкий',
     difficulty_medium: 'средний',
@@ -781,7 +787,7 @@ function requestPayload(excludeSeen = false) {
     intensity: activeData('intensityChips', 'intensity', 'easy'),
     interests: selectedInterests(),
     max_walking_km: maxWalkingValue === '' ? null : parseFloat(maxWalkingValue),
-    request_text: null,
+    request_text: pendingRequestText,
     use_live_data: $('useLiveData').checked,
     limit: 5,
     lang: currentLang,
@@ -1183,6 +1189,7 @@ function buildCard(item, isTop) {
   fragment.querySelector('.badges').innerHTML = `
     <span class="badge">${t('badge_total', { v: minutes(item.total_minutes) })}</span>
     <span class="badge">${t('badge_travel', { v: minutes(item.travel_minutes) })}</span>
+    <span class="badge">${t('badge_onsite', { v: minutes(item.activity_minutes) })}</span>
     <span class="badge">${t('badge_walk', { km: item.walking_km.toFixed(1) })}</span>
     <span class="badge">${t('difficulty_' + item.difficulty)}</span>
     <span class="badge ${item.data_confidence === 'fallback' ? 'warn' : ''}">${t('confidence_' + item.data_confidence)} ${t('data_word')}</span>

@@ -44,6 +44,52 @@ class AdventureRequest(BaseModel):
         return [str(item).strip().lower() for item in value if str(item).strip()]
 
 
+# Canonical interest ids — must match the data-interest values in
+# frontend/index.html. Used by the UI, the parse whitelist and the LLM prompt.
+INTEREST_IDS = {"history", "fortresses", "viewpoints", "nature", "water", "food", "surprise me"}
+
+
+class ParseTextRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=500)
+    lang: Lang = "en"
+    anonymous_id: str | None = Field(default=None, max_length=64)
+
+
+class ParsedSituation(BaseModel):
+    """Subset of AdventureRequest a parser may set. Every field optional:
+    None means 'not mentioned' and the frontend keeps its default."""
+
+    available_minutes: int | None = Field(default=None, ge=30, le=720)
+    transport_mode: TransportMode | None = None
+    group_type: GroupType | None = None
+    children_ages: list[int] | None = None
+    with_dog: bool | None = None
+    with_elderly: bool | None = None
+    reduced_mobility: bool | None = None
+    intensity: Intensity | None = None
+    interests: list[str] | None = None
+    max_walking_km: float | None = Field(default=None, ge=0, le=30)
+
+    @validator("children_ages")
+    def keep_plausible_ages(cls, value: Any) -> list[int] | None:
+        if value is None:
+            return None
+        ages = [int(v) for v in value if isinstance(v, (int, float)) and 0 <= int(v) <= 18]
+        return ages or None
+
+    @validator("interests", pre=True)
+    def whitelist_interests(cls, value: Any) -> list[str] | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = [value]
+        kept = [str(v).strip().lower() for v in value if str(v).strip().lower() in INTEREST_IDS]
+        return kept or None
+
+    def is_empty(self) -> bool:
+        return all(v is None for v in self.dict().values())
+
+
 class WeatherSummary(BaseModel):
     source: str
     temperature_c: float | None = None

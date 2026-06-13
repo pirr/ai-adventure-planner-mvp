@@ -4,13 +4,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest, VisitedRequest
+from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest, ParseTextRequest, VisitedRequest
+from app.services.llm.factory import get_llm_provider
+from app.services.llm.template import TemplateProvider
 from app.services.recommendations import build_recommendations
 from app.services.storage import storage
 
@@ -45,6 +47,41 @@ async def index() -> FileResponse:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": settings.version}
+
+
+def _parse_feature_enabled() -> bool:
+    if not settings.llm_parse_enabled:
+        return False
+    if settings.llm_parse_daily_limit <= 0 or settings.llm_parse_user_daily_limit <= 0:
+        return False
+    return not isinstance(get_llm_provider(), TemplateProvider)
+
+
+@app.get("/api/features")
+async def features() -> dict[str, bool]:
+    return {"parse": _parse_feature_enabled()}
+
+
+@app.post("/api/parse-request")
+async def parse_request(payload: ParseTextRequest) -> dict[str, Any]:
+    if not _parse_feature_enabled():
+        raise HTTPException(status_code=404, detail="parse_disabled")
+    granted = storage.reserve_api_calls(
+        "parse",
+        payload.anonymous_id,
+        1,
+        daily_limit=settings.llm_parse_daily_limit,
+        user_daily_limit=settings.llm_parse_user_daily_limit,
+    )
+    if granted < 1:
+        raise HTTPException(status_code=429, detail="parse_budget_exhausted")
+    try:
+        parsed = await get_llm_provider().parse_situation(payload.text, payload.lang)
+    except Exception:  # noqa: BLE001 - provider bugs must not 500 with a stack trace
+        raise HTTPException(status_code=502, detail="parse_failed")
+    if parsed is not None and parsed.is_empty():
+        parsed = None
+    return {"parsed": parsed.dict() if parsed is not None else None}
 
 
 @app.get("/api/sample-request")
