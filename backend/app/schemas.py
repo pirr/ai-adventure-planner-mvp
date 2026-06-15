@@ -46,7 +46,7 @@ class AdventureRequest(BaseModel):
 
 # Canonical interest ids — must match the data-interest values in
 # frontend/index.html. Used by the UI, the parse whitelist and the LLM prompt.
-INTEREST_IDS = {"history", "fortresses", "viewpoints", "nature", "water", "food", "surprise me"}
+INTEREST_IDS = {"history", "fortresses", "viewpoints", "nature", "water", "food", "drinks", "surprise me"}
 
 
 class ParseTextRequest(BaseModel):

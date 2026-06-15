@@ -40,7 +40,7 @@ def test_unknown_enum_values_rejected():
 
 
 def test_interest_ids_match_the_ui():
-    assert INTEREST_IDS == {"history", "fortresses", "viewpoints", "nature", "water", "food", "surprise me"}
+    assert INTEREST_IDS == {"history", "fortresses", "viewpoints", "nature", "water", "food", "drinks", "surprise me"}
 
 
 # --- ParseTextRequest --------------------------------------------------------
@@ -190,3 +190,9 @@ def test_parse_request_budget_exhausted_is_429_and_skips_provider(monkeypatch):
     res = client.post("/api/parse-request", json={"text": "two hours", "anonymous_id": "u"})
     assert res.status_code == 429
     assert provider.calls == 0
+
+
+def test_parsed_situation_accepts_drinks_interest():
+    assert ParsedSituation(interests=["drinks"]).interests == ["drinks"]
+    # Unknown interests are still dropped by the whitelist.
+    assert ParsedSituation(interests=["nightclub"]).interests is None
