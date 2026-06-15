@@ -194,3 +194,11 @@ def test_all_models_fail_uses_rule_based_or_none(monkeypatch):
 
     without = OpenAICompatibleProvider(base_url="https://api.openai.com/v1", model="m", rule_based_fallback=False)
     assert asyncio.run(without.explain(_payload([_rec("r1")]))) is None
+
+
+def test_parse_prompt_includes_drinks_and_example():
+    from app.services.llm.openai_compat import _PARSE_SYSTEM_PROMPT, build_parse_messages
+
+    assert "drinks" in _PARSE_SYSTEM_PROMPT
+    messages = build_parse_messages("I want to drink a beer nearby", "en")
+    assert any("drinks" in m["content"] for m in messages if m["role"] == "assistant")

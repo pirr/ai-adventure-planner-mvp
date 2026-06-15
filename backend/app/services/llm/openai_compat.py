@@ -37,7 +37,8 @@ _PARSE_SYSTEM_PROMPT = (
     "- children_ages: list of integers 0-18\n"
     "- with_dog, with_elderly, reduced_mobility: booleans\n"
     '- intensity: "easy" | "medium" | "active"\n'
-    '- interests: any of ["history", "fortresses", "viewpoints", "nature", "water", "food", "surprise me"]\n'
+    '- interests: any of ["history", "fortresses", "viewpoints", "nature", "water", "food", "drinks", "surprise me"]'
+    " (drinks = bar/pub for going out for a drink; food = a meal or cafe)\n"
     "- max_walking_km: number 0-30 (set a small value like 2 when the user dislikes walking)\n"
     "The text may be in any language. Output a single JSON object only."
 )
@@ -49,6 +50,8 @@ _PARSE_FEW_SHOTS = [
      '{"group_type": "kids", "children_ages": [5, 8], "transport_mode": "car", "interests": ["history", "fortresses"]}'),
     ("quick easy walk with my dog, don't want to walk far",
      '{"with_dog": true, "group_type": "dog", "intensity": "easy", "transport_mode": "walk", "max_walking_km": 2}'),
+    ("I want to drink a beer nearby",
+     '{"interests": ["drinks"], "max_walking_km": 2}'),
 ]
 
 
