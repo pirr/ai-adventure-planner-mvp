@@ -7,7 +7,7 @@
 #
 # NOTE: `app` must be globally unique across Fly — change it before `fly deploy`.
 
-app = "ai-adventure-planner"
+app = "adventure-planner-mvp"
 primary_region = "fra"  # Frankfurt: closest region to the target users.
 
 [build]
