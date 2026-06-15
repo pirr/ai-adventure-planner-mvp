@@ -10,7 +10,7 @@ from app.schemas import AdventureRequest, AdventureResponse
 from app.services import google_places
 from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
-from app.services.routing import get_route
+from app.services.routing import get_routes
 from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations, get_llm_provider
 from app.services.scoring import ScoredCandidate, rejected_from_scored, score_candidate, to_recommendation
 from app.services.storage import storage
@@ -70,11 +70,10 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         # never changes the displayed adventure_score.
         return candidate.score - (1000 if rotate and candidate.place.source_id in seen else 0)
 
-    routes = await asyncio.gather(
-        *[get_route(request.lat, request.lon, place, request.transport_mode, request.use_live_data) for place in places[:40]]
-    )
+    candidate_places = places[:40]
+    routes = await get_routes(request.lat, request.lon, candidate_places, request.transport_mode, request.use_live_data)
     # First pass ranks every candidate using the weather at the user's origin.
-    scored = [score_candidate(place, route, weather, request, profile) for place, route in zip(places[:40], routes)]
+    scored = [score_candidate(place, route, weather, request, profile) for place, route in zip(candidate_places, routes)]
     scored.sort(key=order_key, reverse=True)
 
     # Second pass re-scores only the strongest candidates with the weather at
