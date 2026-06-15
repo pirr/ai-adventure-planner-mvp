@@ -201,6 +201,7 @@ body.planning .filterbar, body.planning .facet-panel { display: none; }
 .describe-box input:focus { outline: none; border-color: var(--clay-500, #c4633a); }
 .describe-mic, .describe-go { flex: 0 0 auto; width: 44px; height: 44px; border: none; border-radius: 13px;
   display: grid; place-items: center; cursor: pointer; background: var(--sand-200, #efe7d3); }
+.describe-mic .lucide, .describe-go .lucide { width: 20px; height: 20px; }
 .describe-go { background: var(--clay-500, #c4633a); color: #fff; }
 .describe-mic.listening { background: var(--clay-500, #c4633a); color: #fff; animation: mic-pulse 1.2s infinite; }
 .describe-box.busy .describe-go { opacity: 0.5; pointer-events: none; }

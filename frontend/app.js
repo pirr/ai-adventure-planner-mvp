@@ -5,6 +5,7 @@ const sheetEl = $('sheet');
 let lastRequestId = null;
 let lastResponse = null;
 let lastPayload = null;
+let loadMoreErrorMessage = '';
 
 function anonymousId() {
   let id = localStorage.getItem('anon_id');
@@ -231,7 +232,6 @@ function setMode(mode) {
   document.body.classList.toggle('exploring', mode === 'exploring');
   $('editBtn').classList.toggle('hidden', mode !== 'exploring');
   $('locateBtn').classList.toggle('hidden', mode !== 'exploring');
-  $('showOthersBtn').classList.toggle('hidden', mode !== 'exploring');
 }
 
 function enterExploring() {
@@ -431,6 +431,7 @@ const I18N = {
     reason_inaccurate: 'Inaccurate',
     reason_other: 'Other',
     search_failed: 'Search failed: {error}',
+    search_network_failed: 'Connection dropped while loading recommendations. Please check the connection and try again.',
     demo_status: 'Demo location set: Tivat, Montenegro.',
     geo_unavailable: 'Geolocation is not available in this browser.',
     geo_insecure_status: 'Geolocation is blocked because this page is not a secure context. Using demo coordinates.',
@@ -600,6 +601,7 @@ const I18N = {
     reason_inaccurate: 'Неточно',
     reason_other: 'Другое',
     search_failed: 'Поиск не удался: {error}',
+    search_network_failed: 'Соединение оборвалось во время загрузки рекомендаций. Проверьте связь и попробуйте ещё раз.',
     demo_status: 'Демо-локация задана: Тиват, Черногория.',
     geo_unavailable: 'Геолокация недоступна в этом браузере.',
     geo_insecure_status: 'Геолокация заблокирована: страница не в защищённом контексте. Используются демо-координаты.',
@@ -761,7 +763,6 @@ function selectedInterests() {
 }
 
 $('searchBtn').addEventListener('click', () => runSearch());
-$('showOthersBtn').addEventListener('click', () => loadMoreResults({ scrollToNew: true }));
 $('clearHistoryBtn').addEventListener('click', clearHistory);
 $('clearVisitedBtn').addEventListener('click', clearVisited);
 
@@ -814,6 +815,54 @@ function track(event, extra = {}) {
   }).catch(() => {});
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientRecommendationError(error) {
+  const name = String((error && error.name) || '').toLowerCase();
+  const message = String((error && error.message) || error || '').toLowerCase();
+  return (
+    name === 'typeerror' &&
+    (
+      message.includes('load failed') ||
+      message.includes('failed to fetch') ||
+      message.includes('networkerror') ||
+      message.includes('network request failed') ||
+      message.includes('cancelled')
+    )
+  );
+}
+
+function recommendationErrorText(error) {
+  if (isTransientRecommendationError(error)) return t('search_network_failed');
+  return t('search_failed', { error: error && error.message ? error.message : String(error) });
+}
+
+async function postRecommendations(payload, { retries = 1 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Request failed: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientRecommendationError(error) || attempt >= retries) break;
+      await wait(650 * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
 // In-card loading: a centered compass spinner + text inside #carousel, shown while
 // the search runs and replaced by renderResults() (which rebuilds the carousel).
 function renderLoading() {
@@ -843,6 +892,7 @@ let searchGeneration = 0;
 async function runSearch({ excludeSeen = false } = {}) {
   const generation = ++searchGeneration;
   clearError();
+  loadMoreErrorMessage = '';
   loadingMore = false;
   canLoadMore = true;
   track('search_started', { meta: { exclude_seen: excludeSeen } });
@@ -855,16 +905,7 @@ async function runSearch({ excludeSeen = false } = {}) {
   lastPayload = payload;
 
   try {
-    const response = await fetch('/api/recommendations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `Request failed: ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await postRecommendations(payload);
     if (generation !== searchGeneration) return; // superseded by a newer search
     annotateRequestId(data);
     renderResults(data);
@@ -874,7 +915,7 @@ async function runSearch({ excludeSeen = false } = {}) {
   } catch (error) {
     carouselEl.innerHTML = ''; // clear the loading indicator
     openSheet();
-    setError(t('search_failed', { error: error.message }));
+    setError(recommendationErrorText(error));
   }
 }
 
@@ -890,6 +931,7 @@ async function loadMoreResults({ scrollToNew = false } = {}) {
     return;
   }
   clearError();
+  loadMoreErrorMessage = '';
   loadingMore = true;
   renderLoadMoreCard();
   track('search_started', { meta: { exclude_seen: true, load_more: true } });
@@ -899,16 +941,7 @@ async function loadMoreResults({ scrollToNew = false } = {}) {
   const previousScrollLeft = carouselEl.scrollLeft;
 
   try {
-    const response = await fetch('/api/recommendations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `Request failed: ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await postRecommendations(payload);
     if (generation !== searchGeneration) return; // a fresh search replaced these results
     annotateRequestId(data);
     const current = lastResponse.recommendations || [];
@@ -940,7 +973,8 @@ async function loadMoreResults({ scrollToNew = false } = {}) {
     track('search_completed', { request_id: data.request_id, meta: { count: fresh.length, load_more: true } });
     loadHistory();
   } catch (error) {
-    setError(t('search_failed', { error: error.message }));
+    loadMoreErrorMessage = recommendationErrorText(error);
+    setError(loadMoreErrorMessage);
   } finally {
     loadingMore = false;
     renderLoadMoreCard();
@@ -1112,11 +1146,16 @@ function renderLoadMoreCard() {
   button.className = 'load-more-card';
   if (loadingMore) button.classList.add('is-loading');
   if (!canLoadMore) button.classList.add('is-done');
+  if (loadMoreErrorMessage) button.classList.add('is-error');
   button.disabled = loadingMore || !canLoadMore;
+  button.setAttribute('aria-live', 'polite');
+  button.setAttribute('aria-busy', loadingMore ? 'true' : 'false');
+  const iconName = loadingMore ? 'loader-circle' : loadMoreErrorMessage ? 'triangle-alert' : 'shuffle';
+  const note = loadMoreErrorMessage || (canLoadMore ? t('other_good_options') : t('no_more_others'));
   button.innerHTML = `
-    <span class="load-more-icon" aria-hidden="true"><i data-lucide="${loadingMore ? 'loader-circle' : 'shuffle'}"></i></span>
+    <span class="load-more-icon" aria-hidden="true"><i data-lucide="${iconName}"></i></span>
     <span class="load-more-title">${loadingMore ? t('loading_others') : t('show_others')}</span>
-    <span class="load-more-note">${canLoadMore ? t('other_good_options') : t('no_more_others')}</span>
+    <span class="load-more-note">${escapeHtml(note)}</span>
   `;
   button.addEventListener('click', () => loadMoreResults({ scrollToNew: true }));
   carouselEl.appendChild(button);
