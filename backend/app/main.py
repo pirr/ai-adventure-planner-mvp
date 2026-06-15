@@ -4,10 +4,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest, ParseTextRequest, VisitedRequest
@@ -25,9 +29,34 @@ logging.basicConfig(
 )
 
 
+def _client_ip(request: Request) -> str:
+    """Rate-limit bucket key. Behind Fly's proxy the real browser address is in
+    Fly-Client-IP; fall back to the first X-Forwarded-For hop, then the socket
+    peer for local dev. Keying on the proxy's own IP would lump every visitor
+    into one bucket and rate-limit the whole site at once."""
+    fly_ip = request.headers.get("fly-client-ip")
+    if fly_ip:
+        return fly_ip
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(
+    key_func=_client_ip,
+    default_limits=[settings.rate_limit_default],
+    enabled=settings.rate_limit_enabled,
+    headers_enabled=True,
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Same-origin by default (empty allow-list). Widen only via ALLOWED_ORIGINS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(settings.allowed_origins),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,7 +92,8 @@ async def features() -> dict[str, bool]:
 
 
 @app.post("/api/parse-request")
-async def parse_request(payload: ParseTextRequest) -> dict[str, Any]:
+@limiter.limit(settings.rate_limit_parse)
+async def parse_request(request: Request, response: Response, payload: ParseTextRequest) -> dict[str, Any]:
     if not _parse_feature_enabled():
         raise HTTPException(status_code=404, detail="parse_disabled")
     granted = storage.reserve_api_calls(
@@ -103,9 +133,10 @@ async def sample_request() -> dict[str, Any]:
 
 
 @app.post("/api/recommendations")
-async def recommendations(request: AdventureRequest):
-    response = await build_recommendations(request)
-    storage.save_response(response.request_id, request, response)
+@limiter.limit(settings.rate_limit_recommendations)
+async def recommendations(request: Request, response: Response, payload: AdventureRequest):
+    response = await build_recommendations(payload)
+    storage.save_response(response.request_id, payload, response)
     return response
 
 

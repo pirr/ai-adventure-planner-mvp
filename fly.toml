@@ -1,0 +1,69 @@
+# Fly.io deployment for the AI Adventure Planner.
+#
+# Cost model (verified pricing, 2026): one shared-cpu-1x / 512MB Machine that
+# scales to zero when idle, plus a 1GB volume ($0.15/mo). Compute is billed only
+# while a request is being served, so a low-traffic MVP stays well under €5/mo.
+# See docs/DEPLOY_FLY.md for first-time setup, secrets and the cost breakdown.
+#
+# NOTE: `app` must be globally unique across Fly — change it before `fly deploy`.
+
+app = "ai-adventure-planner"
+primary_region = "fra"  # Frankfurt: closest region to the target users.
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Non-secret runtime config. API keys are NOT here — set them with `fly secrets`
+# (see docs/DEPLOY_FLY.md) so they never land in git or the image.
+[env]
+  # SQLite lives on the mounted volume below (WORKDIR is /app/backend).
+  SQLITE_PATH = "./data/adventures.db"
+  DATA_DIR = "./data"
+  USE_OPEN_METEO_FALLBACK = "true"
+  LOG_LEVEL = "INFO"
+
+  # Google Places spend caps — the app-side backstop. ALSO cap quota + a billing
+  # budget in Google Cloud Console; app limits alone can't stop a leaked key.
+  GOOGLE_PLACES_DAILY_LIMIT = "800"
+  GOOGLE_PLACES_USER_DAILY_LIMIT = "60"
+  GOOGLE_PLACES_MAX_ENRICHED = "15"
+  GOOGLE_PLACES_CACHE_TTL_SECONDS = "86400"
+
+  # Per-client-IP HTTP rate limits (slowapi). Tighten/loosen without a rebuild.
+  RATE_LIMIT_ENABLED = "true"
+  RATE_LIMIT_DEFAULT = "120/minute"
+  RATE_LIMIT_RECOMMENDATIONS = "10/minute;100/day"
+  RATE_LIMIT_PARSE = "5/minute;30/day"
+
+[http_service]
+  internal_port = 8000          # Dockerfile EXPOSEs 8000 (uvicorn).
+  force_https = true            # Also required for browser geolocation on phones.
+  auto_stop_machines = "stop"   # Scale to zero when idle.
+  auto_start_machines = true    # Wake on the next request (~1-3s cold start).
+  min_machines_running = 0      # Allow stopping the last Machine -> ~no idle cost.
+  processes = ["app"]
+
+  # Fly-proxy backstop in front of the per-IP limiter: caps simultaneous load on
+  # the single small Machine so heavy requests can't pile up and OOM it.
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 15
+    hard_limit = 25
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+# Persistent SQLite. Create once: `fly volumes create adventure_data -r fra -s 1`.
+# A volume pins the app to one Machine in one region — fine for this MVP.
+[mounts]
+  source = "adventure_data"
+  destination = "/app/backend/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpus = 1

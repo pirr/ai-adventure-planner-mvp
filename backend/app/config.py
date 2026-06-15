@@ -35,6 +35,25 @@ class Settings:
     http_timeout_seconds: float = float(os.getenv("HTTP_TIMEOUT_SECONDS", "8"))
     # App log level (INFO by default). Set DEBUG for verbose LLM/HTTP logs.
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
+    # Cross-origin policy. The frontend is served same-origin by this backend,
+    # so the safe default is an empty allow-list (no cross-origin access). Set
+    # ALLOWED_ORIGINS to a comma-separated list of full origins only if a
+    # separate frontend host needs to call the API.
+    allowed_origins: tuple[str, ...] = tuple(
+        o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+    )
+    # --- HTTP rate limiting (per client IP, slowapi) ---
+    # Abuse backstop in front of the per-feature daily budgets. Disable in tests
+    # via RATE_LIMIT_ENABLED=false. Limit strings use slowapi syntax; combine
+    # windows with ';' (e.g. "10/minute;100/day").
+    rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    # Global default applied to every route; loose enough for static assets and
+    # the health check, tight enough to stop a flood from one IP.
+    rate_limit_default: str = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
+    # Heaviest endpoint: external APIs + Google Places + LLM per call.
+    rate_limit_recommendations: str = os.getenv("RATE_LIMIT_RECOMMENDATIONS", "10/minute;100/day")
+    # LLM free-text parse: bound paid model calls per IP.
+    rate_limit_parse: str = os.getenv("RATE_LIMIT_PARSE", "5/minute;30/day")
     # LLM explanation layer. Provider-agnostic over the OpenAI /v1 chat API.
     # Default "template" keeps the rule-based explanations and makes no network
     # call. Set LLM_PROVIDER to a preset (openai/llamacpp/ollama/deepseek/groq/
