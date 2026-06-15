@@ -91,7 +91,8 @@ def _distance_fit(route: RouteInfo, request: AdventureRequest) -> int:
 
 
 def _interest_fit(place: PlaceCandidate, interests: Iterable[str]) -> int:
-    normalized = {normalize_interest(item) for item in interests}
+    normalized_list = [normalize_interest(item) for item in interests]
+    normalized = set(normalized_list)
     if not normalized or "surprise me" in normalized:
         return 78
     tag_interests = set(map(normalize_interest, place.tags.get("interests", [])))
@@ -99,7 +100,8 @@ def _interest_fit(place: PlaceCandidate, interests: Iterable[str]) -> int:
     available = tag_interests | inferred | {normalize_interest(place.type)}
     matches = normalized & available
     if matches:
-        return min(100, 70 + 15 * len(matches))
+        primary_bonus = 10 if normalized_list and normalized_list[0] in matches else 0
+        return min(100, 70 + 15 * len(matches) + primary_bonus)
     if {"nature", "viewpoints"} & normalized and place.type in {"park", "water", "viewpoint"}:
         return 82
     if {"history", "fortresses"} & normalized and place.type in {"historic_site", "fortress", "museum"}:
@@ -264,7 +266,11 @@ def _description(place: PlaceCandidate, lang: str) -> str:
 
 
 def _confidence(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary) -> str:
-    live_count = sum([place.source == "openstreetmap", route.confidence == "live", weather.confidence == "live"])
+    live_count = sum([
+        place.source in {"google_places", "openstreetmap"},
+        route.confidence == "live",
+        weather.confidence == "live",
+    ])
     if live_count == 3:
         return "live"
     if live_count == 0:

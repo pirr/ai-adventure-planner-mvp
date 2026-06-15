@@ -53,6 +53,7 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         request.interests,
         request.use_live_data,
         request.lang,
+        request.anonymous_id,
     )
 
     # Per-user place state: hard-drop visited places before we spend routing

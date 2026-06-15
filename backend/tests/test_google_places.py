@@ -6,7 +6,7 @@ import pytest
 from app.config import settings as real_settings
 from app.schemas import AdventureRequest, PlaceCandidate, PlacePhoto, RouteInfo, WeatherSummary
 from app.services import google_places
-from app.services.google_places import blended_quality, enrich_places
+from app.services.google_places import blended_quality, enrich_places, search_candidate_places
 from app.services.llm import TemplateProvider
 from app.services.place_photos import get_place_photo
 from app.services.recommendations import build_recommendations
@@ -30,6 +30,23 @@ def _payload(lat=42.0, lon=18.0, rating=4.6, count=1200, photo=True):
     if photo:
         place["photos"] = [{"name": "places/abc/photos/xyz", "authorAttributions": [{"displayName": "A. Author"}]}]
     return {"places": [place]}
+
+
+def _candidate_payload(lat=42.0, lon=18.0):
+    return {
+        "places": [
+            {
+                "id": "g1",
+                "displayName": {"text": "Live Cafe"},
+                "primaryType": "restaurant",
+                "types": ["restaurant", "food"],
+                "location": {"latitude": lat, "longitude": lon},
+                "rating": 4.7,
+                "userRatingCount": 340,
+                "photos": [{"name": "places/g1/photos/p1", "authorAttributions": [{"displayName": "Guide"}]}],
+            }
+        ]
+    }
 
 
 def _patch_search(monkeypatch, payload_by_id):
@@ -150,6 +167,68 @@ def test_enrich_disabled_without_key(monkeypatch):
     monkeypatch.setattr("app.services.google_places.settings", _settings(google_places_api_key=None))
     results, warnings = asyncio.run(enrich_places([_place()], "u"))
     assert results == {} and warnings == []
+
+
+# --- candidate search -------------------------------------------------------
+
+def test_google_candidate_search_builds_live_place_candidates(google_env, monkeypatch):
+    calls = []
+
+    async def fake(client, lat, lon, radius_km, interests, lang):
+        calls.append((lat, lon, radius_km, interests, lang))
+        return _candidate_payload(lat, lon)
+
+    monkeypatch.setattr(google_places, "_search_candidate_text", fake)
+    candidates, warnings = asyncio.run(search_candidate_places(42.0, 18.0, 10, ["food"], "u", "en"))
+
+    assert warnings == []
+    assert len(candidates) == 1
+    place = candidates[0]
+    assert place.source == "google_places"
+    assert place.source_id == "google:g1"
+    assert place.name == "Live Cafe"
+    assert place.type == "food"
+    assert place.rating == 4.7
+    assert place.rating_count == 340
+    assert place.google_photo_name == "places/g1/photos/p1"
+    assert calls == [(42.0, 18.0, 10, ["food"], "en")]
+
+
+def test_google_candidate_search_consumes_one_google_budget(google_env, monkeypatch):
+    async def fake(*args):
+        return _candidate_payload()
+
+    monkeypatch.setattr(google_places, "_search_candidate_text", fake)
+    asyncio.run(search_candidate_places(42.0, 18.0, 10, ["food"], "u", "en"))
+
+    with google_env._connect() as conn:
+        row = conn.execute("SELECT count FROM api_usage WHERE scope='google_candidates:global'").fetchone()
+    assert row["count"] == 1
+
+
+def test_enrich_skips_google_candidates_without_extra_search(google_env, monkeypatch):
+    async def fail(*args):
+        raise AssertionError("Google candidates already have their Places metadata")
+
+    monkeypatch.setattr(google_places, "_search_text", fail)
+    place = PlaceCandidate(
+        source="google_places",
+        source_id="google:g1",
+        name="Live Cafe",
+        type="food",
+        lat=42.0,
+        lon=18.0,
+        rating=4.7,
+        rating_count=340,
+        google_photo_name="places/g1/photos/p1",
+        google_photo_attribution="Guide",
+    )
+
+    results, warnings = asyncio.run(enrich_places([place], "u"))
+
+    assert warnings == []
+    assert results["google:g1"].rating == 4.7
+    assert results["google:g1"].photo_name == "places/g1/photos/p1"
 
 
 # --- storage.reserve_api_calls ----------------------------------------------

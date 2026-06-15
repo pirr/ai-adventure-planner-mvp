@@ -79,6 +79,43 @@ def test_good_short_match_scores_high():
     assert scored.breakdown.time_fit >= 90
 
 
+def test_primary_interest_breaks_food_history_tie():
+    request = AdventureRequest(
+        lat=42.43,
+        lon=18.69,
+        available_minutes=240,
+        transport_mode="car",
+        interests=["food", "history"],
+    )
+    weather = WeatherSummary(source="test", summary="clear", score=90, confidence="estimated")
+    route = RouteInfo(source="test", one_way_minutes=15, round_trip_minutes=30, distance_km=8, map_url="x", confidence="estimated")
+    food = PlaceCandidate(
+        source="test",
+        source_id="test:food",
+        name="Waterfront Cafes",
+        type="food",
+        lat=42.43,
+        lon=18.69,
+        tags={"interests": ["food"]},
+        quality_score=80,
+    )
+    fortress = PlaceCandidate(
+        source="test",
+        source_id="test:fort",
+        name="Fortress",
+        type="fortress",
+        lat=42.43,
+        lon=18.69,
+        tags={"interests": ["history", "fortresses"]},
+        quality_score=80,
+    )
+
+    food_score = score_candidate(food, route, weather, request)
+    fortress_score = score_candidate(fortress, route, weather, request)
+
+    assert food_score.breakdown.interest_fit > fortress_score.breakdown.interest_fit
+
+
 def test_reduced_mobility_penalizes_hard_long_route():
     base = dict(lat=42.43, lon=18.69, available_minutes=300, transport_mode="car", interests=["history"])
     weather = WeatherSummary(source="test", summary="clear", score=90, confidence="estimated")
