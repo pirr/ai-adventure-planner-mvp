@@ -71,6 +71,19 @@ def place_matches_interest(place: PlaceCandidate, interest: str) -> bool:
     return normalize_interest(interest) in _place_interests(place)
 
 
+def apply_primary_rerank(candidates: list["ScoredCandidate"], request: AdventureRequest) -> list["ScoredCandidate"]:
+    """Lead with places that match a *focused* request (exactly one interest,
+    not 'surprise me'). Stable partition — order only, scores untouched. No-op
+    for multi-interest or 'surprise me' searches."""
+    interests = [normalize_interest(i) for i in request.interests]
+    if len(interests) != 1 or interests[0] == "surprise me":
+        return list(candidates)
+    primary = interests[0]
+    matched = [c for c in candidates if place_matches_interest(c.place, primary)]
+    rest = [c for c in candidates if not place_matches_interest(c.place, primary)]
+    return matched + rest
+
+
 def _clamp(value: int | float) -> int:
     return max(0, min(100, int(round(value))))
 

@@ -12,7 +12,7 @@ from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import get_routes
 from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations, get_llm_provider
-from app.services.scoring import ScoredCandidate, rejected_from_scored, score_candidate, to_recommendation
+from app.services.scoring import ScoredCandidate, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
 from app.services.storage import storage
 from app.services.weather import get_destination_forecasts, get_weather
 
@@ -123,7 +123,10 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         rescored.append(refreshed)
 
     final = sorted(rescored + rest, key=order_key, reverse=True)
-    top = [item for item in final if _is_recommendable(item, request)][: request.limit]
+    recommendable = [item for item in final if _is_recommendable(item, request)]
+    # Focused single-interest searches lead with matching places (e.g. "drinks"
+    # -> pubs first); multi-interest browse keeps the score order.
+    top = apply_primary_rerank(recommendable, request)[: request.limit]
     photos = await asyncio.gather(
         *[get_place_photo(item.place, request.use_live_data, request.anonymous_id) for item in top]
     )

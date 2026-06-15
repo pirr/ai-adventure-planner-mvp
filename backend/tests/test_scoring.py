@@ -179,3 +179,36 @@ def test_place_matches_interest_for_drinks():
     pub = PlaceCandidate(source="t", source_id="t:1", name="Pub", type="drinks", lat=42.4, lon=18.7)
     assert place_matches_interest(pub, "drinks") is True
     assert place_matches_interest(pub, "history") is False
+
+
+def _scored(place_type: str, score: int):
+    from app.schemas import ScoreBreakdown
+    from app.services.scoring import ScoredCandidate
+
+    place = PlaceCandidate(source="t", source_id=f"t:{place_type}:{score}", name=place_type, type=place_type, lat=42.4, lon=18.7)
+    route = RouteInfo(source="t", one_way_minutes=10, round_trip_minutes=20, distance_km=5, map_url="x")
+    breakdown = ScoreBreakdown(time_fit=80, weather_fit=80, distance_fit=80, safety_fit=80, group_fit=80, interest_fit=80, place_quality=80)
+    return ScoredCandidate(place=place, route=route, total_minutes=40, score=score, breakdown=breakdown, why=[], warnings=[], description="", data_confidence="estimated")
+
+
+def test_primary_rerank_puts_single_interest_match_first():
+    from app.services.scoring import apply_primary_rerank
+
+    # Viewpoint scores higher than the pub, but a focused "drinks" search leads with the pub.
+    viewpoint = _scored("viewpoint", 90)
+    pub = _scored("drinks", 70)
+    request = AdventureRequest(lat=42.4, lon=18.7, interests=["drinks"])
+
+    ordered = apply_primary_rerank([viewpoint, pub], request)
+    assert [c.place.type for c in ordered] == ["drinks", "viewpoint"]
+
+
+def test_primary_rerank_noop_for_multi_interest():
+    from app.services.scoring import apply_primary_rerank
+
+    viewpoint = _scored("viewpoint", 90)
+    pub = _scored("drinks", 70)
+    request = AdventureRequest(lat=42.4, lon=18.7, interests=["drinks", "history"])
+
+    ordered = apply_primary_rerank([viewpoint, pub], request)
+    assert [c.place.type for c in ordered] == ["viewpoint", "drinks"]
