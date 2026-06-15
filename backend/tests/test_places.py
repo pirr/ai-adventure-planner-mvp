@@ -5,16 +5,25 @@ from app.services import places
 from app.services.places import _build_overpass_query, _place_type_from_tags
 
 
-def test_food_interest_adds_restaurants_and_cafes_to_overpass_query():
+_AMENITY_REGEX = '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"'
+
+
+def test_food_interest_adds_amenities_to_overpass_query():
     query = _build_overpass_query(42.43, 18.69, 25000, ["food", "history"])
 
-    assert '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"' in query
+    assert _AMENITY_REGEX in query
 
 
-def test_non_food_interest_keeps_food_amenities_out_of_overpass_query():
+def test_drinks_interest_adds_amenities_to_overpass_query():
+    query = _build_overpass_query(42.43, 18.69, 25000, ["drinks"])
+
+    assert _AMENITY_REGEX in query
+
+
+def test_non_food_interest_keeps_amenities_out_of_overpass_query():
     query = _build_overpass_query(42.43, 18.69, 25000, ["history", "fortresses"])
 
-    assert '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"' not in query
+    assert _AMENITY_REGEX not in query
 
 
 def test_eat_amenities_become_food_places():

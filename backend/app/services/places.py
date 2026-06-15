@@ -58,11 +58,11 @@ def _build_overpass_query(lat: float, lon: float, radius_m: int, interests: list
     # Broad query first; ranking happens later.
     normalized = {str(interest).strip().lower() for interest in interests}
     food_block = ""
-    if "food" in normalized:
+    if normalized & {"food", "drinks"}:
         food_block = f"""
-  node(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
-  way(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
-  relation(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
+  node(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  way(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  relation(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
 """
     return f"""
 [out:json][timeout:10];
