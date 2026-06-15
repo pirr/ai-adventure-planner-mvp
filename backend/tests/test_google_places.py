@@ -297,16 +297,52 @@ def test_commons_photo_wins_over_google(monkeypatch):
     assert photo is not None and "commons.wikimedia.org" in photo.url
 
 
-def test_google_photo_backfills_when_free_sources_are_empty(monkeypatch):
+def test_google_photo_backfills_when_free_sources_are_empty(google_env, monkeypatch):
+    monkeypatch.setattr("app.services.place_photos.storage", google_env)
+
     async def fake(photo_name, attribution):
         return PlacePhoto(url="https://lh3.googleusercontent.com/abc", source="Google Maps", attribution=attribution)
 
     monkeypatch.setattr(google_places, "resolve_photo", fake)
     place = _place(google_photo_name="places/abc/photos/xyz", google_photo_attribution="A. Author")
-    photo = asyncio.run(get_place_photo(place, use_live_data=True))
+    photo = asyncio.run(get_place_photo(place, use_live_data=True, anonymous_id="u"))
     assert photo is not None
     assert photo.source == "Google Maps"
     assert photo.attribution == "A. Author"
+    # The photo media call is a billed Google request, so it draws the budget.
+    with google_env._connect() as conn:
+        row = conn.execute("SELECT count FROM api_usage WHERE scope='google:global'").fetchone()
+    assert row["count"] == 1
+
+
+def test_google_photo_skipped_when_budget_exhausted(google_env, monkeypatch):
+    # Daily Google budget gone -> the photo media endpoint must not be billed;
+    # fall back to free sources (none here -> no photo) instead of hitting Google.
+    cfg = _settings(google_places_api_key="test-key", google_places_daily_limit=0)
+    monkeypatch.setattr("app.services.storage.settings", cfg)
+    monkeypatch.setattr("app.services.place_photos.settings", cfg)
+    monkeypatch.setattr("app.services.place_photos.storage", google_env)
+
+    async def fail(*args):
+        raise AssertionError("Google photo must not be resolved once the budget is exhausted")
+
+    monkeypatch.setattr(google_places, "resolve_photo", fail)
+    place = _place(google_photo_name="places/abc/photos/xyz")
+    photo = asyncio.run(get_place_photo(place, use_live_data=True, anonymous_id="u"))
+    assert photo is None
+
+
+def test_google_photo_skipped_without_anonymous_id(google_env, monkeypatch):
+    # No anonymous_id -> not budgetable, so it must not spend on a Google photo.
+    monkeypatch.setattr("app.services.place_photos.storage", google_env)
+
+    async def fail(*args):
+        raise AssertionError("Google photo must not be resolved without a budgetable anonymous_id")
+
+    monkeypatch.setattr(google_places, "resolve_photo", fail)
+    place = _place(google_photo_name="places/abc/photos/xyz")
+    photo = asyncio.run(get_place_photo(place, use_live_data=True, anonymous_id=None))
+    assert photo is None
 
 
 # --- pipeline ----------------------------------------------------------------
