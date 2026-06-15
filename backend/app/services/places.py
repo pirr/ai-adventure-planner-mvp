@@ -242,8 +242,10 @@ def _needs_google_candidates(candidates: list[PlaceCandidate], interests: list[s
     normalized = {str(interest).strip().lower() for interest in interests}
     if len(candidates) < 8:
         return True
-    if "food" in normalized:
-        return sum(candidate.type == "food" for candidate in candidates) < 5
+    if "food" in normalized and sum(candidate.type == "food" for candidate in candidates) < 5:
+        return True
+    if "drinks" in normalized and sum(candidate.type == "drinks" for candidate in candidates) < 5:
+        return True
     return False
 
 
