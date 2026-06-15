@@ -171,3 +171,11 @@ def test_personal_preference_fit_shifts_with_history():
     liked = score_candidate(place, route, weather, request, {"place_types": {"fortress": 2}})
     assert disliked.breakdown.personal_preference_fit < 70 < liked.breakdown.personal_preference_fit
     assert disliked.score < cold.score < liked.score
+
+
+def test_place_matches_interest_for_drinks():
+    from app.services.scoring import place_matches_interest
+
+    pub = PlaceCandidate(source="t", source_id="t:1", name="Pub", type="drinks", lat=42.4, lon=18.7)
+    assert place_matches_interest(pub, "drinks") is True
+    assert place_matches_interest(pub, "history") is False
