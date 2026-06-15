@@ -26,6 +26,22 @@ def test_non_food_interest_keeps_amenities_out_of_overpass_query():
     assert _AMENITY_REGEX not in query
 
 
+def test_amenity_block_radius_is_capped_for_large_radius():
+    # The dense amenity scan blows past Overpass's per-query timeout at city
+    # scale, so it is capped to a local radius while base blocks keep the full one.
+    from app.services.places import AMENITY_MAX_RADIUS_M
+
+    query = _build_overpass_query(42.43, 18.69, 25000, ["drinks"])
+    assert 'around:25000,42.43,18.69)["tourism"' in query  # base block, full radius
+    assert f'around:{AMENITY_MAX_RADIUS_M},42.43,18.69)["amenity"' in query
+    assert 'around:25000,42.43,18.69)["amenity"' not in query
+
+
+def test_amenity_block_uses_full_radius_when_within_cap():
+    query = _build_overpass_query(42.43, 18.69, 5000, ["drinks"])
+    assert 'around:5000,42.43,18.69)["amenity"' in query
+
+
 def test_eat_amenities_become_food_places():
     assert _place_type_from_tags({"amenity": "restaurant"}) == "food"
     assert _place_type_from_tags({"amenity": "cafe"}) == "food"

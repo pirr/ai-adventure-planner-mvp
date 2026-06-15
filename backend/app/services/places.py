@@ -19,6 +19,10 @@ _RETRY_OVERPASS_STATUS = {502, 503, 504}
 # refill over seconds), so fail over to the next endpoint / sample places now.
 _FAILOVER_OVERPASS_STATUS = {406, 429}
 
+# Cap (metres) for the dense food/drink amenity scan. Larger radii overrun
+# Overpass's per-query timeout and the whole query returns nothing.
+AMENITY_MAX_RADIUS_M = 8000
+
 
 INTEREST_OSM_FILTERS = {
     "nature": ["tourism=viewpoint", "leisure=park", "natural=beach", "natural=water", "waterway=waterfall"],
@@ -59,10 +63,15 @@ def _build_overpass_query(lat: float, lon: float, radius_m: int, interests: list
     normalized = {str(interest).strip().lower() for interest in interests}
     food_block = ""
     if normalized & {"food", "drinks"}:
+        # Food/drink amenities are dense; scanning them over a city-scale radius
+        # blows past Overpass's per-query [timeout:10] and the whole query
+        # returns zero elements. Cap the amenity search to a local radius — a
+        # bar/cafe 50km away is never a good "near me" result anyway.
+        amenity_radius = min(radius_m, AMENITY_MAX_RADIUS_M)
         food_block = f"""
-  node(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
-  way(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
-  relation(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  node(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  way(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  relation(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
 """
     return f"""
 [out:json][timeout:10];
