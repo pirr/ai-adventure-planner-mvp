@@ -17,10 +17,16 @@ def test_non_food_interest_keeps_food_amenities_out_of_overpass_query():
     assert '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"' not in query
 
 
-def test_food_amenities_become_food_places():
+def test_eat_amenities_become_food_places():
     assert _place_type_from_tags({"amenity": "restaurant"}) == "food"
     assert _place_type_from_tags({"amenity": "cafe"}) == "food"
-    assert _place_type_from_tags({"amenity": "pub"}) == "food"
+    assert _place_type_from_tags({"amenity": "fast_food"}) == "food"
+
+
+def test_drink_amenities_become_drinks_places():
+    assert _place_type_from_tags({"amenity": "pub"}) == "drinks"
+    assert _place_type_from_tags({"amenity": "bar"}) == "drinks"
+    assert _place_type_from_tags({"amenity": "biergarten"}) == "drinks"
 
 
 def test_live_place_search_does_not_add_fallback_when_results_are_limited(monkeypatch):

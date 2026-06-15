@@ -26,7 +26,8 @@ INTEREST_OSM_FILTERS = {
     "history": ["historic", "tourism=museum", "tourism=attraction"],
     "fortresses": ["historic=fort", "historic=castle", "castle_type"],
     "water": ["natural=beach", "natural=water", "waterway=waterfall"],
-    "food": ["amenity=cafe", "amenity=restaurant", "amenity=bar", "amenity=pub"],
+    "food": ["amenity=cafe", "amenity=restaurant", "amenity=fast_food"],
+    "drinks": ["amenity=bar", "amenity=pub", "amenity=biergarten"],
     "surprise me": ["tourism=viewpoint", "historic", "leisure=park", "tourism=attraction"],
 }
 
@@ -105,7 +106,9 @@ def _place_type_from_tags(tags: dict[str, Any]) -> str:
         return "viewpoint"
     if leisure == "park":
         return "park"
-    if amenity in {"bar", "cafe", "fast_food", "ice_cream", "pub", "restaurant"}:
+    if amenity in {"bar", "pub", "biergarten"}:
+        return "drinks"
+    if amenity in {"cafe", "fast_food", "ice_cream", "restaurant"}:
         return "food"
     return "place"
 
@@ -135,6 +138,7 @@ def _estimate_activity(place_type: str) -> int:
         "fortress": 80,
         "attraction": 60,
         "food": 45,
+        "drinks": 50,
     }.get(place_type, 45)
 
 
@@ -148,6 +152,7 @@ def _estimate_walking(place_type: str) -> float:
         "fortress": 2.0,
         "attraction": 1.3,
         "food": 0.4,
+        "drinks": 0.3,
     }.get(place_type, 1.0)
 
 
