@@ -25,6 +25,15 @@
       describe_ph: "Describe it: time, company, mood…",
       describe_fail: "Couldn’t understand that — try different words or pick a vibe",
       describe_mic: "Dictate",
+      describe_mic_unavailable: "Voice input is not available in this browser.",
+      describe_mic_insecure: "Voice input needs HTTPS or http://localhost.",
+      describe_mic_denied: "Microphone permission was blocked.",
+      describe_mic_no_microphone: "No microphone was found for this browser.",
+      describe_mic_no_speech: "I didn’t hear speech. Try again and speak after the mic turns orange.",
+      describe_mic_network: "The browser speech service is unavailable. Try Chrome or Edge with an internet connection, or type your request.",
+      describe_mic_language: "Voice input does not support this language in your browser.",
+      describe_mic_aborted: "Voice input was cancelled.",
+      describe_mic_error: "Voice input stopped. Try again or type your request.",
     },
     ru: {
       vibe_q: "\u0413\u043e\u0442\u043e\u0432\u044b", vibe_word: "\u043f\u043e\u0435\u0445\u0430\u0442\u044c?", or_pick: "\u0418\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
@@ -44,6 +53,15 @@
       describe_ph: "\u041e\u043f\u0438\u0448\u0438\u0442\u0435: \u0432\u0440\u0435\u043c\u044f, \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f, \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435\u2026",
       describe_fail: "\u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u043f\u043e\u043d\u044f\u0442\u044c \u2014 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u0438\u043c\u0438 \u0441\u043b\u043e\u0432\u0430\u043c\u0438 \u0438\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
       describe_mic: "\u041d\u0430\u0434\u0438\u043a\u0442\u043e\u0432\u0430\u0442\u044c",
+      describe_mic_unavailable: "\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0439 \u0432\u0432\u043e\u0434 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d \u0432 \u044d\u0442\u043e\u043c \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435.",
+      describe_mic_insecure: "\u0414\u043b\u044f \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0433\u043e \u0432\u0432\u043e\u0434\u0430 \u043d\u0443\u0436\u0435\u043d HTTPS \u0438\u043b\u0438 http://localhost.",
+      describe_mic_denied: "\u0414\u043e\u0441\u0442\u0443\u043f \u043a \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d\u0443 \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d.",
+      describe_mic_no_microphone: "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043d\u0435 \u043d\u0430\u0448\u0451\u043b \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d.",
+      describe_mic_no_speech: "\u042f \u043d\u0435 \u0443\u0441\u043b\u044b\u0448\u0430\u043b \u0440\u0435\u0447\u044c. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437 \u0438 \u0433\u043e\u0432\u043e\u0440\u0438\u0442\u0435, \u043a\u043e\u0433\u0434\u0430 \u043c\u0438\u043a\u0440\u043e\u0444\u043e\u043d \u0441\u0442\u0430\u043d\u0435\u0442 \u043e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u043c.",
+      describe_mic_network: "\u0411\u0440\u0430\u0443\u0437\u0435\u0440\u043d\u044b\u0439 \u0441\u0435\u0440\u0432\u0438\u0441 \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0432\u0430\u043d\u0438\u044f \u0440\u0435\u0447\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 Chrome \u0438\u043b\u0438 Edge \u0441 \u0438\u043d\u0442\u0435\u0440\u043d\u0435\u0442\u043e\u043c \u0438\u043b\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u0435\u043a\u0441\u0442.",
+      describe_mic_language: "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043d\u0435 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u044d\u0442\u043e\u0442 \u044f\u0437\u044b\u043a \u0434\u043b\u044f \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0433\u043e \u0432\u0432\u043e\u0434\u0430.",
+      describe_mic_aborted: "\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0439 \u0432\u0432\u043e\u0434 \u043e\u0442\u043c\u0435\u043d\u0451\u043d.",
+      describe_mic_error: "\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0439 \u0432\u0432\u043e\u0434 \u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437 \u0438\u043b\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u0435\u043a\u0441\u0442.",
     },
   };
   function lx(k) { var d = LX[currentLang] || LX.en; return d[k] != null ? d[k] : LX.en[k]; }
@@ -262,8 +280,13 @@
     return p;
   }
 
-  function describeFail() {
-    var err = $("describeErr"); if (err) err.classList.remove("hidden");
+  function showDescribeError(message) {
+    var err = $("describeErr"); if (!err) return;
+    err.textContent = message || lx("describe_fail");
+    err.classList.remove("hidden");
+  }
+  function describeFail(message) {
+    showDescribeError(message);
     var box = $("describeBox"); if (box) box.classList.remove("busy");
   }
 
@@ -271,7 +294,7 @@
     var input = $("describeInput"); if (!input) return;
     var text = input.value.trim();
     if (text.length < 3) return;
-    var err = $("describeErr"); if (err) err.classList.add("hidden");
+    var err = $("describeErr"); if (err) { err.textContent = lx("describe_fail"); err.classList.add("hidden"); }
     var box = $("describeBox"); if (box) box.classList.add("busy");
     fetch("/api/parse-request", {
       method: "POST",
@@ -305,9 +328,21 @@
     var btn = $("describeMic"); if (!btn) return;
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     var rec = null;
+    function micErrorMessage(e) {
+      var code = e && e.error;
+      if (code === "not-allowed" || code === "service-not-allowed") return lx("describe_mic_denied");
+      if (code === "audio-capture") return lx("describe_mic_no_microphone");
+      if (code === "no-speech") return lx("describe_mic_no_speech");
+      if (code === "network") return lx("describe_mic_network");
+      if (code === "language-not-supported" || code === "bad-grammar") return lx("describe_mic_language");
+      if (code === "aborted") return lx("describe_mic_aborted");
+      return lx("describe_mic_error");
+    }
     btn.addEventListener("click", function () {
+      if (!SR) { describeFail(lx("describe_mic_unavailable")); return; }
+      if (!window.isSecureContext) { describeFail(lx("describe_mic_insecure")); return; }
       if (rec) { rec.stop(); return; }   // tap again = stop listening
-      rec = new SR();
+      try { rec = new SR(); } catch (e) { describeFail(lx("describe_mic_error")); return; }
       rec.lang = currentLang === "ru" ? "ru-RU" : "en-US";
       rec.interimResults = true;
       rec.onresult = function (e) {
@@ -316,9 +351,19 @@
         if (e.results[e.results.length - 1].isFinal) submitDescribe();
       };
       rec.onend = function () { rec = null; btn.classList.remove("listening"); };
-      rec.onerror = function () { rec = null; btn.classList.remove("listening"); };
+      rec.onerror = function (e) {
+        if (window.console && console.warn) console.warn("Speech recognition error:", e && e.error);
+        rec = null;
+        btn.classList.remove("listening");
+        describeFail(micErrorMessage(e));
+      };
       btn.classList.add("listening");
-      rec.start();
+      var err = $("describeErr"); if (err) err.classList.add("hidden");
+      try { rec.start(); } catch (e) {
+        rec = null;
+        btn.classList.remove("listening");
+        describeFail(lx("describe_mic_error"));
+      }
     });
   }
 
@@ -345,9 +390,7 @@
     if (featureParse) {
       html += '<div class="describe-box" id="describeBox">';
       html += '  <input id="describeInput" maxlength="500" autocomplete="off" placeholder="' + lx("describe_ph") + '">';
-      if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-        html += '<button type="button" class="describe-mic" id="describeMic" title="' + lx("describe_mic") + '">' + icon("mic") + "</button>";
-      }
+      html += '<button type="button" class="describe-mic" id="describeMic" title="' + lx("describe_mic") + '" aria-label="' + lx("describe_mic") + '">' + icon("mic") + "</button>";
       html += '  <button type="button" class="describe-go" id="describeGo">' + icon("arrow-right") + "</button>";
       html += "</div>";
       html += '<p class="describe-err hidden" id="describeErr">' + lx("describe_fail") + "</p>";
