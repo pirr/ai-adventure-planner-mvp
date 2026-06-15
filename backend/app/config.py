@@ -7,7 +7,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Settings:
-    app_name: str = "AI Adventure Planner MVP"
+    app_name: str = "Adventure Planner MVP"
     version: str = "0.2"
     # Sent as the User-Agent on every outbound API call. Public providers such as
     # overpass-api.de reject default library agents ("python-httpx/*") with HTTP

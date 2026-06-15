@@ -276,7 +276,7 @@ $('editBtn').addEventListener('click', enterPlanning);
 // ---------------------------------------------------------------------------
 const I18N = {
   en: {
-    app_title: 'AI Adventure Planner',
+    app_title: 'Adventure Planner',
     brand: 'Adventure Planner',
     edit_trip: 'Edit trip',
     s1_kicker: "Let's start",
