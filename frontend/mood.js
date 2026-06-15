@@ -125,7 +125,6 @@
     return {
       key: "now", icon: "sparkles", time: 120, crew: "solo", transport: "car",
       intensity: "easy", interests: interests, childrenAges: [], maxWalkingKm: 3,
-      useLiveData: true,
       en: { t: "Best trip now", s: "Ready-to-go plan" },
       ru: { t: "\u041b\u0443\u0447\u0448\u0435\u0435 \u0441\u0435\u0439\u0447\u0430\u0441", s: "\u0413\u043e\u0442\u043e\u0432\u044b\u0439 \u043f\u043b\u0430\u043d" },
     };
@@ -221,7 +220,6 @@
     setChecked("withDog", p.withDog);
     setChecked("withElderly", p.withElderly);
     setChecked("reducedMobility", p.reducedMobility);
-    if (p.useLiveData !== undefined) setChecked("useLiveData", p.useLiveData);
     normalizeCrewState(p.crew);
   }
 
@@ -493,7 +491,6 @@
     f.withDog = !!(($("withDog") || {}).checked);
     f.withElderly = !!(($("withElderly") || {}).checked);
     f.reducedMobility = !!(($("reducedMobility") || {}).checked);
-    f.useLiveData = !!(($("useLiveData") || {}).checked);
     return f;
   }
   function presetByKey(k) { return k === "now" ? smartNowPreset() : PRESETS.filter(function (p) { return p.key === k; })[0] || null; }
@@ -509,7 +506,6 @@
     setChecked("withDog", s.withDog);
     setChecked("withElderly", s.withElderly);
     setChecked("reducedMobility", s.reducedMobility);
-    if (s.useLiveData !== undefined) setChecked("useLiveData", s.useLiveData);
     normalizeCrewState(s.group);
   }
   function interestsEqual(a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); }

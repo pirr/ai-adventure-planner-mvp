@@ -5,7 +5,6 @@ const sheetEl = $('sheet');
 let lastRequestId = null;
 let lastResponse = null;
 let lastPayload = null;
-let loadMoreErrorMessage = '';
 
 function anonymousId() {
   let id = localStorage.getItem('anon_id');
@@ -26,8 +25,6 @@ let markersById = {};
 let activeId = null;
 let lastViewedCardId = null;
 let scrollRaf = null;
-let loadingMore = false;
-let canLoadMore = true;
 // While we programmatically scroll a card into view, pause the scroll-spy so it
 // doesn't re-select whatever card is momentarily centered during the animation.
 let spyPaused = false;
@@ -199,15 +196,7 @@ function pauseSpy(duration = 700, { resumeOnScrollEnd = true } = {}) {
   }, duration);
 }
 
-function maybeLoadMoreOnScroll() {
-  if (!lastResponse || loadingMore || !canLoadMore) return;
-  const remaining = carouselEl.scrollWidth - carouselEl.scrollLeft - carouselEl.clientWidth;
-  const threshold = Math.max(180, carouselEl.clientWidth * 0.45);
-  if (remaining <= threshold) loadMoreResults();
-}
-
 function onCarouselScroll() {
-  maybeLoadMoreOnScroll();
   if (spyPaused || scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = null;
@@ -342,8 +331,7 @@ const I18N = {
     visited_confirm: 'Clear all places you marked as visited?',
     visited_cleared: 'Visited places cleared.',
     mark_visited: "I've been here",
-    show_others: 'Show others',
-    no_more_others: 'No new places left.',
+    no_live_results: 'No live places found. Try a larger time window, another area, or search again.',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
     history_confirm: 'Delete your local history (recent searches, feedback and events)?',
@@ -380,7 +368,6 @@ const I18N = {
     data_word: 'data',
     best_trip_now: 'Best trip right now',
     other_good_options: 'Other good options',
-    loading_others: 'Finding more places...',
     excellent_fit: 'Excellent fit',
     good_fit: 'Good fit',
     possible_fit: 'Possible fit',
@@ -512,8 +499,7 @@ const I18N = {
     visited_confirm: 'Очистить все отмеченные посещённые места?',
     visited_cleared: 'Посещённые места очищены.',
     mark_visited: 'Я здесь был',
-    show_others: 'Другие места',
-    no_more_others: 'Новых мест не осталось.',
+    no_live_results: 'Онлайн-места не найдены. Увеличьте время, выберите другой район или попробуйте снова.',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
     history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
@@ -550,7 +536,6 @@ const I18N = {
     data_word: 'данные',
     best_trip_now: 'Лучшая поездка сейчас',
     other_good_options: 'Другие хорошие варианты',
-    loading_others: 'Ищем ещё места...',
     excellent_fit: 'Отлично подходит',
     good_fit: 'Хорошо подходит',
     possible_fit: 'Можно рассмотреть',
@@ -773,7 +758,7 @@ function parseChildrenAges(value) {
     .filter((v) => Number.isFinite(v) && v >= 0 && v <= 18);
 }
 
-function requestPayload(excludeSeen = false) {
+function requestPayload() {
   const maxWalkingValue = $('maxWalkingKm').value;
   return {
     lat: parseFloat($('lat').value),
@@ -789,11 +774,10 @@ function requestPayload(excludeSeen = false) {
     interests: selectedInterests(),
     max_walking_km: maxWalkingValue === '' ? null : parseFloat(maxWalkingValue),
     request_text: pendingRequestText,
-    use_live_data: $('useLiveData').checked,
+    use_live_data: true,
     limit: 5,
     lang: currentLang,
     anonymous_id: anonymousId(),
-    exclude_seen: excludeSeen,
   };
 }
 
@@ -880,28 +864,20 @@ function annotateRequestId(data) {
   });
 }
 
-function recommendationKey(item) {
-  return item.source_id || item.id;
-}
-
-// Bumped on every fresh search; in-flight responses from an older search or
-// load-more compare against it and drop their result instead of rendering
-// stale places (with refit:false) over the new result set.
+// Bumped on every fresh search; in-flight responses from older searches drop
+// their result instead of rendering stale places over the new result set.
 let searchGeneration = 0;
 
-async function runSearch({ excludeSeen = false } = {}) {
+async function runSearch() {
   const generation = ++searchGeneration;
   clearError();
-  loadMoreErrorMessage = '';
-  loadingMore = false;
-  canLoadMore = true;
-  track('search_started', { meta: { exclude_seen: excludeSeen } });
-  // Collapse to peek only on the FIRST entry from planning; on re-searches (filter
-  // Apply / Show others) keep the sheet where it is so the open list isn't yanked shut.
+  track('search_started');
+  // Collapse to peek only on the first entry from planning; on re-searches from
+  // filters, keep the sheet where it is so the open list isn't yanked shut.
   if (!document.body.classList.contains('exploring')) sheetEl.classList.remove('open');
   enterExploring();                 // show the results sheet now (launcher hides)
   renderLoading();                  // spinner + text where the cards will be
-  const payload = requestPayload(excludeSeen);
+  const payload = requestPayload();
   lastPayload = payload;
 
   try {
@@ -909,75 +885,12 @@ async function runSearch({ excludeSeen = false } = {}) {
     if (generation !== searchGeneration) return; // superseded by a newer search
     annotateRequestId(data);
     renderResults(data);
-    if (excludeSeen && !(data.recommendations || []).length) setError(t('no_more_others'));
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
     loadHistory();
   } catch (error) {
     carouselEl.innerHTML = ''; // clear the loading indicator
     openSheet();
     setError(recommendationErrorText(error));
-  }
-}
-
-async function loadMoreResults({ scrollToNew = false } = {}) {
-  if (loadingMore) return;
-  if (!canLoadMore) {
-    setError(t('no_more_others'));
-    renderLoadMoreCard();
-    return;
-  }
-  if (!lastResponse) {
-    runSearch({ excludeSeen: true });
-    return;
-  }
-  clearError();
-  loadMoreErrorMessage = '';
-  loadingMore = true;
-  renderLoadMoreCard();
-  track('search_started', { meta: { exclude_seen: true, load_more: true } });
-  const generation = searchGeneration;
-  const payload = requestPayload(true);
-  lastPayload = payload;
-  const previousScrollLeft = carouselEl.scrollLeft;
-
-  try {
-    const data = await postRecommendations(payload);
-    if (generation !== searchGeneration) return; // a fresh search replaced these results
-    annotateRequestId(data);
-    const current = lastResponse.recommendations || [];
-    const seen = new Set(current.map(recommendationKey));
-    const fresh = (data.recommendations || []).filter((item) => !seen.has(recommendationKey(item)));
-
-    if (!fresh.length) {
-      canLoadMore = false;
-      setError(t('no_more_others'));
-      track('search_completed', { request_id: data.request_id, meta: { count: 0, load_more: true } });
-      renderLoadMoreCard();
-      return;
-    }
-
-    const combined = {
-      ...lastResponse,
-      request_id: data.request_id,
-      generated_at: data.generated_at,
-      recommendations: [...current, ...fresh],
-      rejected_alternatives: data.rejected_alternatives || lastResponse.rejected_alternatives || [],
-      data_warnings: data.data_warnings || lastResponse.data_warnings || [],
-    };
-    renderResults(combined, { refit: false });
-    if (scrollToNew) {
-      requestAnimationFrame(() => setActive(fresh[0].id, { pan: false, scroll: true }));
-    } else {
-      carouselEl.scrollLeft = previousScrollLeft;
-    }
-    track('search_completed', { request_id: data.request_id, meta: { count: fresh.length, load_more: true } });
-    loadHistory();
-  } catch (error) {
-    loadMoreErrorMessage = recommendationErrorText(error);
-    setError(loadMoreErrorMessage);
-  } finally {
-    loadingMore = false;
-    renderLoadMoreCard();
   }
 }
 
@@ -1136,34 +1049,18 @@ function renderDecisionSummary(item) {
   `;
 }
 
-function renderLoadMoreCard() {
-  const existing = carouselEl.querySelector('.load-more-card');
-  if (existing) existing.remove();
-  if (!lastResponse || !(lastResponse.recommendations || []).length) return;
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'load-more-card';
-  if (loadingMore) button.classList.add('is-loading');
-  if (!canLoadMore) button.classList.add('is-done');
-  if (loadMoreErrorMessage) button.classList.add('is-error');
-  button.disabled = loadingMore || !canLoadMore;
-  button.setAttribute('aria-live', 'polite');
-  button.setAttribute('aria-busy', loadingMore ? 'true' : 'false');
-  const iconName = loadingMore ? 'loader-circle' : loadMoreErrorMessage ? 'triangle-alert' : 'shuffle';
-  const note = loadMoreErrorMessage || (canLoadMore ? t('other_good_options') : t('no_more_others'));
-  button.innerHTML = `
-    <span class="load-more-icon" aria-hidden="true"><i data-lucide="${iconName}"></i></span>
-    <span class="load-more-title">${loadingMore ? t('loading_others') : t('show_others')}</span>
-    <span class="load-more-note">${escapeHtml(note)}</span>
-  `;
-  button.addEventListener('click', () => loadMoreResults({ scrollToNew: true }));
-  carouselEl.appendChild(button);
-  if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-}
-
 function renderCards(items) {
   carouselEl.innerHTML = '';
+  if (!items.length) {
+    carouselEl.innerHTML = `
+      <div class="card-empty">
+        <div class="compass" aria-hidden="true"><i data-lucide="map-pin"></i></div>
+        <p>${t('no_live_results')}</p>
+      </div>
+    `;
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    return;
+  }
   items.forEach((item, index) => {
     if (index === 1) {
       const label = document.createElement('h3');
@@ -1173,7 +1070,6 @@ function renderCards(items) {
     }
     carouselEl.appendChild(buildCard(item, index === 0));
   });
-  renderLoadMoreCard();
   if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 }
 

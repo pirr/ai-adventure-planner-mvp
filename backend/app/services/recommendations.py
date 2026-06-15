@@ -53,6 +53,7 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
         request.interests,
         request.use_live_data,
         request.lang,
+        request.anonymous_id,
     )
 
     # Per-user place state: hard-drop visited places before we spend routing
@@ -123,7 +124,9 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
 
     final = sorted(rescored + rest, key=order_key, reverse=True)
     top = [item for item in final if _is_recommendable(item, request)][: request.limit]
-    photos = await asyncio.gather(*[get_place_photo(item.place, request.use_live_data) for item in top])
+    photos = await asyncio.gather(
+        *[get_place_photo(item.place, request.use_live_data, request.anonymous_id) for item in top]
+    )
     recommendations = [to_recommendation(item, photo) for item, photo in zip(top, photos)]
     explainer = provider if provider is not None else _explainer_provider(request)
     recommendations = await explain_recommendations(recommendations, request, explainer)

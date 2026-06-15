@@ -90,6 +90,14 @@ class Settings:
     google_places_cache_ttl_seconds: int = int(os.getenv("GOOGLE_PLACES_CACHE_TTL_SECONDS", "86400"))
     # Max places enriched per request (cost cap; the re-scoring pool is <= limit+5 <= 15).
     google_places_max_enriched: int = int(os.getenv("GOOGLE_PLACES_MAX_ENRICHED", "15"))
+    # Max candidates returned by one Google Text Search when OSM has no usable
+    # live candidates. Text Search caps this at 20.
+    google_places_candidate_limit: int = int(os.getenv("GOOGLE_PLACES_CANDIDATE_LIMIT", "12"))
+    # Candidate search is the critical "find real places" path and costs at
+    # most one Text Search per recommendation request. Keep it separate from
+    # per-card enrichment so old enrichment usage cannot starve live results.
+    google_places_candidate_daily_limit: int = int(os.getenv("GOOGLE_PLACES_CANDIDATE_DAILY_LIMIT", "120"))
+    google_places_candidate_user_daily_limit: int = int(os.getenv("GOOGLE_PLACES_CANDIDATE_USER_DAILY_LIMIT", "30"))
     # App-side daily budgets for Google calls. Keep the global limit *below*
     # the Cloud Console quota cap so the app cuts off first. 0 disables
     # enrichment entirely.

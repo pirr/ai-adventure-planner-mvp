@@ -8,6 +8,7 @@ from app.config import settings
 from app.schemas import PlaceCandidate, PlacePhoto
 from app.services import google_places
 from app.services.net import http_client
+from app.services.storage import storage
 
 
 COMMONS_SOURCE = "Wikimedia Commons"
@@ -111,7 +112,27 @@ async def _photo_from_wikidata(wikidata_id: str) -> PlacePhoto | None:
     return None
 
 
-async def get_place_photo(place: PlaceCandidate, use_live_data: bool) -> PlacePhoto | None:
+def _reserve_google_photo(anonymous_id: str | None) -> bool:
+    """Reserve one Google Places Photo media call from the shared daily budget.
+
+    Photo resolution is a billed Google request, so it draws the same daily cap
+    as enrichment (``GOOGLE_PLACES_DAILY_LIMIT``). Returns False when that budget
+    is exhausted — or the request isn't budgetable (no ``anonymous_id``) — so the
+    caller stops hitting Google and keeps the free photo sources tried above.
+    """
+    granted = storage.reserve_api_calls(
+        "google",
+        anonymous_id,
+        1,
+        daily_limit=settings.google_places_daily_limit,
+        user_daily_limit=settings.google_places_user_daily_limit,
+    )
+    return granted >= 1
+
+
+async def get_place_photo(
+    place: PlaceCandidate, use_live_data: bool, anonymous_id: str | None = None
+) -> PlacePhoto | None:
     tagged_photo = photo_from_tags(place.tags)
     if tagged_photo or not use_live_data:
         return tagged_photo
@@ -126,8 +147,10 @@ async def get_place_photo(place: PlaceCandidate, use_live_data: bool) -> PlacePh
             pass
 
     # Free sources exhausted; fall back to Google when enrichment found one
-    # (each media resolution is a billed call, so it stays last in line).
-    if place.google_photo_name:
+    # (each media resolution is a billed call, so it stays last in line). The
+    # budget gate means an exhausted daily quota falls back to free sources
+    # rather than continuing to bill Google.
+    if place.google_photo_name and _reserve_google_photo(anonymous_id):
         try:
             return await google_places.resolve_photo(place.google_photo_name, place.google_photo_attribution)
         except Exception:

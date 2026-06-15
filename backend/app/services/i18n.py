@@ -62,9 +62,9 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "warn_openweather_unavailable": "OpenWeather unavailable, trying fallback provider: {exc}",
         "warn_openmeteo_unavailable": "Open-Meteo unavailable, using fallback weather: {exc}",
         # Place search warnings
-        "warn_osm_unavailable": "OpenStreetMap/Overpass unavailable, using fallback places: {exc}",
+        "warn_osm_unavailable": "OpenStreetMap/Overpass unavailable, live places could not be loaded: {exc}",
         "warn_places_disabled": "Live place search disabled, using fallback/sample places.",
-        "warn_places_limited": "Live place search returned limited results, supplemented with fallback/sample places.",
+        "warn_places_limited": "Live place search returned limited results; showing live results only.",
         "warn_google_unavailable": "Google Places unavailable, ratings and extra photos skipped: {exc}",
         # Safety / risk warnings
         "warn_rain_paths": "Rain in the last 24 hours may make natural paths muddy or slippery.",
@@ -110,9 +110,9 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "warn_openweather_unavailable": "OpenWeather недоступен, пробуем резервный источник: {exc}",
         "warn_openmeteo_unavailable": "Open-Meteo недоступен, используется резервная погода: {exc}",
         # Place search warnings
-        "warn_osm_unavailable": "OpenStreetMap/Overpass недоступен, используются резервные места: {exc}",
+        "warn_osm_unavailable": "OpenStreetMap/Overpass недоступен, онлайн-места не удалось загрузить: {exc}",
         "warn_places_disabled": "Онлайн-поиск мест отключён, используются резервные/демо-места.",
-        "warn_places_limited": "Онлайн-поиск мест дал мало результатов, дополнено резервными/демо-местами.",
+        "warn_places_limited": "Онлайн-поиск мест дал мало результатов; показаны только онлайн-результаты.",
         "warn_google_unavailable": "Google Places недоступен, рейтинги и дополнительные фото пропущены: {exc}",
         # Safety / risk warnings
         "warn_rain_paths": "Дождь за последние 24 часа мог сделать тропы грязными или скользкими.",

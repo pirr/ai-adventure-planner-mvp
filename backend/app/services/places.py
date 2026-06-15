@@ -7,6 +7,7 @@ import httpx
 
 from app.config import settings
 from app.schemas import PlaceCandidate
+from app.services import google_places
 from app.services.i18n import t
 from app.services.net import http_client
 from app.services.sample_data import fallback_places
@@ -25,7 +26,7 @@ INTEREST_OSM_FILTERS = {
     "history": ["historic", "tourism=museum", "tourism=attraction"],
     "fortresses": ["historic=fort", "historic=castle", "castle_type"],
     "water": ["natural=beach", "natural=water", "waterway=waterfall"],
-    "food": ["amenity=cafe", "amenity=restaurant"],
+    "food": ["amenity=cafe", "amenity=restaurant", "amenity=bar", "amenity=pub"],
     "surprise me": ["tourism=viewpoint", "historic", "leisure=park", "tourism=attraction"],
 }
 
@@ -54,6 +55,14 @@ def radius_for_request(available_minutes: int, transport_mode: str) -> float:
 
 def _build_overpass_query(lat: float, lon: float, radius_m: int, interests: list[str]) -> str:
     # Broad query first; ranking happens later.
+    normalized = {str(interest).strip().lower() for interest in interests}
+    food_block = ""
+    if "food" in normalized:
+        food_block = f"""
+  node(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
+  way(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
+  relation(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
+"""
     return f"""
 [out:json][timeout:10];
 (
@@ -68,6 +77,7 @@ def _build_overpass_query(lat: float, lon: float, radius_m: int, interests: list
   node(around:{radius_m},{lat},{lon})["natural"~"beach|water|peak|cave_entrance"];
   way(around:{radius_m},{lat},{lon})["natural"~"beach|water|peak|cave_entrance"];
   node(around:{radius_m},{lat},{lon})["waterway"="waterfall"];
+{food_block}
 );
 out center tags 80;
 """
@@ -95,7 +105,7 @@ def _place_type_from_tags(tags: dict[str, Any]) -> str:
         return "viewpoint"
     if leisure == "park":
         return "park"
-    if amenity in {"cafe", "restaurant"}:
+    if amenity in {"bar", "cafe", "fast_food", "ice_cream", "pub", "restaurant"}:
         return "food"
     return "place"
 
@@ -223,7 +233,36 @@ async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: 
     return candidates
 
 
-async def get_candidate_places(lat: float, lon: float, available_minutes: int, transport_mode: str, interests: list[str], use_live_data: bool, lang: str = "en") -> tuple[list[PlaceCandidate], list[str]]:
+def _needs_google_candidates(candidates: list[PlaceCandidate], interests: list[str]) -> bool:
+    normalized = {str(interest).strip().lower() for interest in interests}
+    if len(candidates) < 8:
+        return True
+    if "food" in normalized:
+        return sum(candidate.type == "food" for candidate in candidates) < 5
+    return False
+
+
+def _merge_live_candidates(primary: list[PlaceCandidate], secondary: list[PlaceCandidate]) -> list[PlaceCandidate]:
+    merged = list(primary)
+    seen = {candidate.source_id for candidate in merged}
+    for candidate in secondary:
+        if candidate.source_id in seen:
+            continue
+        merged.append(candidate)
+        seen.add(candidate.source_id)
+    return merged
+
+
+async def get_candidate_places(
+    lat: float,
+    lon: float,
+    available_minutes: int,
+    transport_mode: str,
+    interests: list[str],
+    use_live_data: bool,
+    lang: str = "en",
+    anonymous_id: str | None = None,
+) -> tuple[list[PlaceCandidate], list[str]]:
     radius_km = radius_for_request(available_minutes, transport_mode)
     warnings: list[str] = []
     candidates: list[PlaceCandidate] = []
@@ -236,13 +275,17 @@ async def get_candidate_places(lat: float, lon: float, available_minutes: int, t
         except Exception as exc:  # noqa: BLE001 - MVP should degrade gracefully
             warnings.append(t(lang, "warn_osm_unavailable", exc=exc.__class__.__name__))
 
-    fallback = fallback_places(lat, lon, radius_km)
-    if len(candidates) < 8:
-        existing = {item.source_id for item in candidates}
-        candidates.extend([item for item in fallback if item.source_id not in existing])
-        if not use_live_data:
-            warnings.append(t(lang, "warn_places_disabled"))
-        elif candidates:
-            warnings.append(t(lang, "warn_places_limited"))
+        if _needs_google_candidates(candidates, interests):
+            google_candidates, google_warnings = await google_places.search_candidate_places(
+                lat, lon, radius_km, interests, anonymous_id, lang
+            )
+            candidates = _merge_live_candidates(candidates, google_candidates)
+            warnings.extend(google_warnings)
+
+    if not use_live_data:
+        candidates = fallback_places(lat, lon, radius_km)
+        warnings.append(t(lang, "warn_places_disabled"))
+    elif len(candidates) < 8:
+        warnings.append(t(lang, "warn_places_limited"))
 
     return candidates, warnings
