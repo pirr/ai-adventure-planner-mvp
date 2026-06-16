@@ -1,0 +1,54 @@
+# CI/CD for the AI Adventure Planner.
+#
+# - Pull requests to main: run the backend test suite (gates the PR).
+# - Pushes to main:        run tests, then deploy to Fly.io only if they pass.
+#
+# Tests run inside the same Docker image the app ships with (docker compose),
+# so CI matches local dev and production exactly. The deploy builds on Fly's
+# remote builders (--remote-only), so the runner never builds the image itself.
+#
+# Required repo secret: FLY_API_TOKEN
+#   fly tokens create deploy -x 999999h
+#   then add it under: Settings -> Secrets and variables -> Actions
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No source mount in docker-compose.yml, so the image must be (re)built to
+      # pick up the current commit before the tests run against it.
+      - name: Build image
+        run: docker compose build app
+
+      # WORKDIR in the image is /app/backend; PYTHONPATH=. lets pytest import the
+      # `app` package. The suite mocks all external services and conftest.py
+      # disables the rate limiter, so no API keys are needed.
+      - name: Run tests
+        run: docker compose run --rm -e PYTHONPATH=. app pytest tests
+
+  deploy:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    needs: test                       # hard gate: red tests => no deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Never run two deploys at once; cancel an in-flight one if a newer push lands.
+    concurrency:
+      group: deploy-fly
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
