@@ -42,6 +42,40 @@ def test_amenity_block_uses_full_radius_when_within_cap():
     assert 'around:5000,42.43,18.69)["amenity"' in query
 
 
+def test_overpass_remark_timeout_is_treated_as_failure():
+    # Overpass reports a server-side timeout as HTTP 200 with a "remark" and no
+    # elements; that must surface as an error so failover/fallback can engage.
+    import httpx
+    import pytest
+    from app.services.places import _overpass_request
+
+    def handler(request):
+        return httpx.Response(200, json={"elements": [], "remark": 'runtime error: Query timed out in "query" after 11 seconds.'})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await _overpass_request(client, "q")
+
+    with pytest.raises(Exception):
+        asyncio.run(run())
+
+
+def test_overpass_remark_with_partial_results_is_returned():
+    # A remark alongside actual elements (partial results) is still usable.
+    import httpx
+    from app.services.places import _overpass_request
+
+    def handler(request):
+        return httpx.Response(200, json={"elements": [{"type": "node", "id": 1}], "remark": "timed out"})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await _overpass_request(client, "q")
+
+    payload = asyncio.run(run())
+    assert len(payload["elements"]) == 1
+
+
 def test_eat_amenities_become_food_places():
     assert _place_type_from_tags({"amenity": "restaurant"}) == "food"
     assert _place_type_from_tags({"amenity": "cafe"}) == "food"

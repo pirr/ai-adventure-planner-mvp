@@ -24,6 +24,18 @@ _FAILOVER_OVERPASS_STATUS = {406, 429}
 AMENITY_MAX_RADIUS_M = 8000
 
 
+class OverpassRuntimeError(RuntimeError):
+    """Overpass returned HTTP 200 but aborted server-side (a timeout/runtime
+    error reported in the JSON `remark`), so the payload is empty and unusable.
+    Raised so the caller fails over to mirrors/sample places instead of
+    silently treating it as 'no places nearby'."""
+
+
+def _is_overpass_timeout_remark(payload: dict[str, Any]) -> bool:
+    remark = str(payload.get("remark") or "")
+    return "timed out" in remark or "runtime error" in remark
+
+
 INTEREST_OSM_FILTERS = {
     "nature": ["tourism=viewpoint", "leisure=park", "natural=beach", "natural=water", "waterway=waterfall"],
     "viewpoints": ["tourism=viewpoint"],
@@ -189,7 +201,16 @@ async def _overpass_request(client: httpx.AsyncClient, query: str) -> dict[str, 
             try:
                 response = await client.post(url, data={"data": query})
                 response.raise_for_status()
-                return response.json()
+                payload = response.json()
+                if not payload.get("elements") and _is_overpass_timeout_remark(payload):
+                    # Server-side abort (HTTP 200 + remark, no data). Treat like
+                    # a busy endpoint: retry, then fail over to the next one.
+                    last_exc = OverpassRuntimeError(str(payload.get("remark")))
+                    if attempt + 1 < attempts:
+                        await asyncio.sleep(settings.overpass_retry_backoff_seconds * (attempt + 1))
+                        continue
+                    break
+                return payload
             except httpx.HTTPStatusError as exc:
                 last_exc = exc
                 if status_exc is None:
