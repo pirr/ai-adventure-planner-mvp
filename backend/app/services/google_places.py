@@ -28,10 +28,11 @@ _CANDIDATE_FIELD_MASK = (
     "places.rating,places.userRatingCount,places.photos"
 )
 
-_FOOD_TYPES = {"bar", "cafe", "coffee_shop", "ice_cream_shop", "pub", "restaurant", "meal_takeaway"}
+_DRINK_TYPES = {"bar", "pub"}
+_EAT_TYPES = {"cafe", "coffee_shop", "ice_cream_shop", "restaurant", "meal_takeaway"}
 _TYPE_TO_PLACE_TYPE = {
     "art_gallery": "museum",
-    "bar": "food",
+    "bar": "drinks",
     "cafe": "food",
     "coffee_shop": "food",
     "historical_landmark": "historic_site",
@@ -39,7 +40,7 @@ _TYPE_TO_PLACE_TYPE = {
     "meal_takeaway": "food",
     "museum": "museum",
     "park": "park",
-    "pub": "food",
+    "pub": "drinks",
     "restaurant": "food",
     "tourist_attraction": "attraction",
 }
@@ -72,8 +73,10 @@ def blended_quality(osm_quality: int, rating: float, rating_count: int) -> int:
 
 def _candidate_text_query(interests: list[str]) -> str:
     normalized = {str(interest).strip().lower() for interest in interests}
+    if "drinks" in normalized:
+        return "bars pubs"
     if "food" in normalized:
-        return "restaurants cafes bars"
+        return "restaurants cafes"
     if {"history", "fortresses"} & normalized:
         return "historic sites museums castles fortresses tourist attractions"
     if {"nature", "viewpoints", "water"} & normalized:
@@ -114,7 +117,9 @@ async def _search_candidate_text(
 def _candidate_place_type(result: dict[str, Any]) -> str:
     types = {str(item) for item in result.get("types") or []}
     primary_type = str(result.get("primaryType") or "")
-    if types & _FOOD_TYPES or primary_type in _FOOD_TYPES:
+    if types & _DRINK_TYPES or primary_type in _DRINK_TYPES:
+        return "drinks"
+    if types & _EAT_TYPES or primary_type in _EAT_TYPES:
         return "food"
     return _TYPE_TO_PLACE_TYPE.get(primary_type, "attraction")
 
@@ -123,6 +128,7 @@ def _candidate_interests(place_type: str) -> list[str]:
     return {
         "attraction": ["surprise me"],
         "food": ["food"],
+        "drinks": ["drinks"],
         "historic_site": ["history"],
         "museum": ["history"],
         "park": ["nature"],
@@ -134,6 +140,7 @@ def _candidate_activity(place_type: str) -> int:
     return {
         "attraction": 60,
         "food": 45,
+        "drinks": 50,
         "historic_site": 70,
         "museum": 75,
         "park": 60,
@@ -145,6 +152,7 @@ def _candidate_walking(place_type: str) -> float:
     return {
         "attraction": 1.0,
         "food": 0.4,
+        "drinks": 0.3,
         "historic_site": 1.4,
         "museum": 0.8,
         "park": 1.6,

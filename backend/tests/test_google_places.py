@@ -367,3 +367,21 @@ def test_pipeline_without_key_has_no_google_traces(tmp_path, monkeypatch):
     assert response.recommendations
     assert all(r.rating is None and r.rating_count is None for r in response.recommendations)
     assert not any("Google" in w for w in response.data_warnings)
+
+
+# --- drinks intent ----------------------------------------------------------
+
+def test_drinks_candidate_query_and_typing():
+    from app.services.google_places import _candidate_text_query, _candidate_place_type, _candidate_interests
+
+    assert _candidate_text_query(["drinks"]) == "bars pubs"
+    assert _candidate_place_type({"primaryType": "pub", "types": ["pub"]}) == "drinks"
+    assert _candidate_place_type({"primaryType": "restaurant", "types": ["restaurant"]}) == "food"
+    assert _candidate_interests("drinks") == ["drinks"]
+
+
+def test_needs_google_candidates_triggers_for_sparse_drinks():
+    from app.services.places import _needs_google_candidates
+
+    eats = [PlaceCandidate(source="o", source_id=f"o:{i}", name="x", type="food", lat=42.4, lon=18.7) for i in range(10)]
+    assert _needs_google_candidates(eats, ["drinks"]) is True

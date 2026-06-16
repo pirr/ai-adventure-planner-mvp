@@ -19,6 +19,8 @@ INTEREST_ALIASES = {
     "nature": "nature",
     "water": "water",
     "food": "food",
+    "drink": "drinks",
+    "drinks": "drinks",
     "surprise": "surprise me",
     "surprise me": "surprise me",
 }
@@ -33,6 +35,7 @@ PLACE_INTERESTS = {
     "attraction": {"history", "viewpoints", "family"},
     "trail": {"nature", "active"},
     "food": {"food"},
+    "drinks": {"drinks"},
 }
 
 
@@ -53,6 +56,32 @@ class ScoredCandidate:
 
 def normalize_interest(value: str) -> str:
     return INTEREST_ALIASES.get(value.strip().lower(), value.strip().lower())
+
+
+def _place_interests(place: PlaceCandidate) -> set[str]:
+    """The set of interests a place can satisfy: its OSM-tagged interests, the
+    interests inferred from its type, and the (normalized) type itself."""
+    tag_interests = set(map(normalize_interest, place.tags.get("interests", [])))
+    return tag_interests | PLACE_INTERESTS.get(place.type, set()) | {normalize_interest(place.type)}
+
+
+def place_matches_interest(place: PlaceCandidate, interest: str) -> bool:
+    """True when `place` satisfies `interest`, using the same availability set
+    `_interest_fit` scores on. Shared so ranking and scoring agree."""
+    return normalize_interest(interest) in _place_interests(place)
+
+
+def apply_primary_rerank(candidates: list["ScoredCandidate"], request: AdventureRequest) -> list["ScoredCandidate"]:
+    """Lead with places that match a *focused* request (exactly one interest,
+    not 'surprise me'). Stable partition — order only, scores untouched. No-op
+    for multi-interest or 'surprise me' searches."""
+    interests = [normalize_interest(i) for i in request.interests]
+    if len(interests) != 1 or interests[0] == "surprise me":
+        return list(candidates)
+    primary = interests[0]
+    matched = [c for c in candidates if place_matches_interest(c.place, primary)]
+    rest = [c for c in candidates if not place_matches_interest(c.place, primary)]
+    return matched + rest
 
 
 def _clamp(value: int | float) -> int:
@@ -95,9 +124,7 @@ def _interest_fit(place: PlaceCandidate, interests: Iterable[str]) -> int:
     normalized = set(normalized_list)
     if not normalized or "surprise me" in normalized:
         return 78
-    tag_interests = set(map(normalize_interest, place.tags.get("interests", [])))
-    inferred = PLACE_INTERESTS.get(place.type, set())
-    available = tag_interests | inferred | {normalize_interest(place.type)}
+    available = _place_interests(place)
     matches = normalized & available
     if matches:
         primary_bonus = 10 if normalized_list and normalized_list[0] in matches else 0

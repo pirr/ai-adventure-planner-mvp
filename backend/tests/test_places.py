@@ -5,22 +5,87 @@ from app.services import places
 from app.services.places import _build_overpass_query, _place_type_from_tags
 
 
-def test_food_interest_adds_restaurants_and_cafes_to_overpass_query():
+_AMENITY_REGEX = '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"'
+
+
+def test_food_interest_adds_amenities_to_overpass_query():
     query = _build_overpass_query(42.43, 18.69, 25000, ["food", "history"])
 
-    assert '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"' in query
+    assert _AMENITY_REGEX in query
 
 
-def test_non_food_interest_keeps_food_amenities_out_of_overpass_query():
+def test_drinks_interest_adds_amenities_to_overpass_query():
+    query = _build_overpass_query(42.43, 18.69, 25000, ["drinks"])
+
+    assert _AMENITY_REGEX in query
+
+
+def test_non_food_interest_keeps_amenities_out_of_overpass_query():
     query = _build_overpass_query(42.43, 18.69, 25000, ["history", "fortresses"])
 
-    assert '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"' not in query
+    assert _AMENITY_REGEX not in query
 
 
-def test_food_amenities_become_food_places():
+def test_amenity_block_radius_is_capped_for_large_radius():
+    # The dense amenity scan blows past Overpass's per-query timeout at city
+    # scale, so it is capped to a local radius while base blocks keep the full one.
+    from app.services.places import AMENITY_MAX_RADIUS_M
+
+    query = _build_overpass_query(42.43, 18.69, 25000, ["drinks"])
+    assert 'around:25000,42.43,18.69)["tourism"' in query  # base block, full radius
+    assert f'around:{AMENITY_MAX_RADIUS_M},42.43,18.69)["amenity"' in query
+    assert 'around:25000,42.43,18.69)["amenity"' not in query
+
+
+def test_amenity_block_uses_full_radius_when_within_cap():
+    query = _build_overpass_query(42.43, 18.69, 5000, ["drinks"])
+    assert 'around:5000,42.43,18.69)["amenity"' in query
+
+
+def test_overpass_remark_timeout_is_treated_as_failure():
+    # Overpass reports a server-side timeout as HTTP 200 with a "remark" and no
+    # elements; that must surface as an error so failover/fallback can engage.
+    import httpx
+    import pytest
+    from app.services.places import _overpass_request
+
+    def handler(request):
+        return httpx.Response(200, json={"elements": [], "remark": 'runtime error: Query timed out in "query" after 11 seconds.'})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await _overpass_request(client, "q")
+
+    with pytest.raises(Exception):
+        asyncio.run(run())
+
+
+def test_overpass_remark_with_partial_results_is_returned():
+    # A remark alongside actual elements (partial results) is still usable.
+    import httpx
+    from app.services.places import _overpass_request
+
+    def handler(request):
+        return httpx.Response(200, json={"elements": [{"type": "node", "id": 1}], "remark": "timed out"})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await _overpass_request(client, "q")
+
+    payload = asyncio.run(run())
+    assert len(payload["elements"]) == 1
+
+
+def test_eat_amenities_become_food_places():
     assert _place_type_from_tags({"amenity": "restaurant"}) == "food"
     assert _place_type_from_tags({"amenity": "cafe"}) == "food"
-    assert _place_type_from_tags({"amenity": "pub"}) == "food"
+    assert _place_type_from_tags({"amenity": "fast_food"}) == "food"
+
+
+def test_drink_amenities_become_drinks_places():
+    assert _place_type_from_tags({"amenity": "pub"}) == "drinks"
+    assert _place_type_from_tags({"amenity": "bar"}) == "drinks"
+    assert _place_type_from_tags({"amenity": "biergarten"}) == "drinks"
 
 
 def test_live_place_search_does_not_add_fallback_when_results_are_limited(monkeypatch):

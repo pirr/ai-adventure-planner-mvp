@@ -19,6 +19,22 @@ _RETRY_OVERPASS_STATUS = {502, 503, 504}
 # refill over seconds), so fail over to the next endpoint / sample places now.
 _FAILOVER_OVERPASS_STATUS = {406, 429}
 
+# Cap (metres) for the dense food/drink amenity scan. Larger radii overrun
+# Overpass's per-query timeout and the whole query returns nothing.
+AMENITY_MAX_RADIUS_M = 8000
+
+
+class OverpassRuntimeError(RuntimeError):
+    """Overpass returned HTTP 200 but aborted server-side (a timeout/runtime
+    error reported in the JSON `remark`), so the payload is empty and unusable.
+    Raised so the caller fails over to mirrors/sample places instead of
+    silently treating it as 'no places nearby'."""
+
+
+def _is_overpass_timeout_remark(payload: dict[str, Any]) -> bool:
+    remark = str(payload.get("remark") or "")
+    return "timed out" in remark or "runtime error" in remark
+
 
 INTEREST_OSM_FILTERS = {
     "nature": ["tourism=viewpoint", "leisure=park", "natural=beach", "natural=water", "waterway=waterfall"],
@@ -26,7 +42,8 @@ INTEREST_OSM_FILTERS = {
     "history": ["historic", "tourism=museum", "tourism=attraction"],
     "fortresses": ["historic=fort", "historic=castle", "castle_type"],
     "water": ["natural=beach", "natural=water", "waterway=waterfall"],
-    "food": ["amenity=cafe", "amenity=restaurant", "amenity=bar", "amenity=pub"],
+    "food": ["amenity=cafe", "amenity=restaurant", "amenity=fast_food"],
+    "drinks": ["amenity=bar", "amenity=pub", "amenity=biergarten"],
     "surprise me": ["tourism=viewpoint", "historic", "leisure=park", "tourism=attraction"],
 }
 
@@ -57,11 +74,16 @@ def _build_overpass_query(lat: float, lon: float, radius_m: int, interests: list
     # Broad query first; ranking happens later.
     normalized = {str(interest).strip().lower() for interest in interests}
     food_block = ""
-    if "food" in normalized:
+    if normalized & {"food", "drinks"}:
+        # Food/drink amenities are dense; scanning them over a city-scale radius
+        # blows past Overpass's per-query [timeout:10] and the whole query
+        # returns zero elements. Cap the amenity search to a local radius — a
+        # bar/cafe 50km away is never a good "near me" result anyway.
+        amenity_radius = min(radius_m, AMENITY_MAX_RADIUS_M)
         food_block = f"""
-  node(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
-  way(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
-  relation(around:{radius_m},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream"];
+  node(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  way(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
+  relation(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
 """
     return f"""
 [out:json][timeout:10];
@@ -105,7 +127,9 @@ def _place_type_from_tags(tags: dict[str, Any]) -> str:
         return "viewpoint"
     if leisure == "park":
         return "park"
-    if amenity in {"bar", "cafe", "fast_food", "ice_cream", "pub", "restaurant"}:
+    if amenity in {"bar", "pub", "biergarten"}:
+        return "drinks"
+    if amenity in {"cafe", "fast_food", "ice_cream", "restaurant"}:
         return "food"
     return "place"
 
@@ -135,6 +159,7 @@ def _estimate_activity(place_type: str) -> int:
         "fortress": 80,
         "attraction": 60,
         "food": 45,
+        "drinks": 50,
     }.get(place_type, 45)
 
 
@@ -148,6 +173,7 @@ def _estimate_walking(place_type: str) -> float:
         "fortress": 2.0,
         "attraction": 1.3,
         "food": 0.4,
+        "drinks": 0.3,
     }.get(place_type, 1.0)
 
 
@@ -175,7 +201,16 @@ async def _overpass_request(client: httpx.AsyncClient, query: str) -> dict[str, 
             try:
                 response = await client.post(url, data={"data": query})
                 response.raise_for_status()
-                return response.json()
+                payload = response.json()
+                if not payload.get("elements") and _is_overpass_timeout_remark(payload):
+                    # Server-side abort (HTTP 200 + remark, no data). Treat like
+                    # a busy endpoint: retry, then fail over to the next one.
+                    last_exc = OverpassRuntimeError(str(payload.get("remark")))
+                    if attempt + 1 < attempts:
+                        await asyncio.sleep(settings.overpass_retry_backoff_seconds * (attempt + 1))
+                        continue
+                    break
+                return payload
             except httpx.HTTPStatusError as exc:
                 last_exc = exc
                 if status_exc is None:
@@ -237,8 +272,10 @@ def _needs_google_candidates(candidates: list[PlaceCandidate], interests: list[s
     normalized = {str(interest).strip().lower() for interest in interests}
     if len(candidates) < 8:
         return True
-    if "food" in normalized:
-        return sum(candidate.type == "food" for candidate in candidates) < 5
+    if "food" in normalized and sum(candidate.type == "food" for candidate in candidates) < 5:
+        return True
+    if "drinks" in normalized and sum(candidate.type == "drinks" for candidate in candidates) < 5:
+        return True
     return False
 
 
