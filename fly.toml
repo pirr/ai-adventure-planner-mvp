@@ -22,6 +22,16 @@ primary_region = "fra"  # Frankfurt: closest region to the target users.
   USE_OPEN_METEO_FALLBACK = "true"
   LOG_LEVEL = "INFO"
 
+  # Overpass/OSM is the primary (free, unlimited) place source. From Fly's
+  # network overpass-api.de answers in ~8s, whose variance crossed the old 12s
+  # client timeout and ReadTimeout'd — collapsing all traffic onto the small
+  # paid Google fallback, which then exhausts and returns nothing. Give the
+  # primary headroom and add the one mirror verified reachable+fast from Fly
+  # (~4s) as failover. Do NOT add kumi.systems / private.coffee: both are
+  # unreachable from Fly and an unreachable mirror costs a full timeout.
+  OVERPASS_TIMEOUT_SECONDS = "20"
+  OVERPASS_MIRRORS = "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+
   # Google Places spend caps — the app-side backstop. ALSO cap quota + a billing
   # budget in Google Cloud Console; app limits alone can't stop a leaked key.
   GOOGLE_PLACES_DAILY_LIMIT = "800"
