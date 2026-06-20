@@ -1,7 +1,9 @@
 import asyncio
+import dataclasses
 
 import httpx
 
+from app.config import settings as real_settings
 from app.schemas import AdventureRequest, PlaceCandidate, WeatherSummary
 from app.services import recommendations, routing
 from app.services.llm import TemplateProvider
@@ -13,12 +15,13 @@ def _place(
     lon: float = 18.6982,
     source_id: str = "osm:node:1",
     name: str = "Perast",
+    place_type: str = "historic_site",
 ) -> PlaceCandidate:
     return PlaceCandidate(
         source="openstreetmap",
         source_id=source_id,
         name=name,
-        type="historic_site",
+        type=place_type,
         lat=lat,
         lon=lon,
     )
@@ -32,6 +35,10 @@ def _mock_osrm(monkeypatch, payload: dict, seen: list[httpx.Request] | None = No
 
     transport = httpx.MockTransport(handler)
     monkeypatch.setattr(routing, "http_client", lambda timeout: httpx.AsyncClient(transport=transport))
+
+
+def _settings(**overrides):
+    return dataclasses.replace(real_settings, **overrides)
 
 
 # Tivat -> Perast is only ~5.5 km in a straight line, but the drive around the
@@ -143,6 +150,49 @@ def test_get_routes_live_disabled_makes_no_osrm_call(monkeypatch):
     monkeypatch.setattr(routing, "http_client", fail)
     routes = asyncio.run(routing.get_routes(42.4380, 18.6936, [_place()], "car", use_live_data=False))
     assert routes[0].source == "haversine-estimate"
+
+
+def test_recommendations_prefilter_keeps_best_candidates_not_first_candidates(monkeypatch):
+    monkeypatch.setattr(recommendations, "settings", _settings(search_route_candidate_limit=2))
+    request = AdventureRequest(
+        lat=42.4380,
+        lon=18.6936,
+        available_minutes=300,
+        transport_mode="car",
+        interests=["history"],
+        use_live_data=True,
+        limit=1,
+    )
+    weather = WeatherSummary(source="test", summary="clear", score=90)
+    bad_first = _place(
+        lat=43.8,
+        lon=20.5,
+        source_id="osm:node:bad",
+        name="Distant Cafe",
+        place_type="food",
+    )
+    good_places = [
+        _place(
+            lat=42.44 + index * 0.001,
+            lon=18.69,
+            source_id=f"osm:node:good-{index}",
+            name=f"Good Fort {index}",
+            place_type="fortress",
+        )
+        for index in range(11)
+    ]
+
+    selected = recommendations._select_candidates_for_routing(
+        [bad_first] + good_places,
+        request,
+        weather,
+        profile=None,
+        rotate=False,
+        seen=set(),
+    )
+
+    assert len(selected) == 9  # request.limit + 8 is the safety floor
+    assert "osm:node:bad" not in {place.source_id for place in selected}
 
 
 def test_recommendations_use_one_osrm_table_request(monkeypatch, tmp_path):
