@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -14,7 +14,17 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from app.config import settings
-from app.schemas import AdventureRequest, AnalyticsEvent, FeedbackRequest, ParseTextRequest, VisitedRequest
+from app.schemas import (
+    AdventureRequest,
+    AnalyticsEvent,
+    AuthLoginRequest,
+    AuthRegisterRequest,
+    AuthStatusResponse,
+    FeedbackRequest,
+    ParseTextRequest,
+    VisitedRequest,
+)
+from app.services import auth
 from app.services.llm.factory import get_llm_provider
 from app.services.llm.template import TemplateProvider
 from app.services.recommendations import build_recommendations
@@ -57,7 +67,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.allowed_origins),
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -86,9 +96,110 @@ def _parse_feature_enabled() -> bool:
     return not isinstance(get_llm_provider(), TemplateProvider)
 
 
+def _auth_status(session: auth.SessionContext | None) -> AuthStatusResponse:
+    if session is None:
+        return AuthStatusResponse(user=None, csrf_token=None)
+    return AuthStatusResponse(user=session.user, csrf_token=session.csrf_token)
+
+
+def _session(request: Request) -> auth.SessionContext | None:
+    return auth.session_context_from_request(request)
+
+
+def _required_session(request: Request) -> auth.SessionContext:
+    session = _session(request)
+    if session is None:
+        raise HTTPException(status_code=401, detail="auth_required")
+    return session
+
+
+def _raise_auth_error(exc: auth.AuthError) -> None:
+    raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
 @app.get("/api/features")
 async def features() -> dict[str, bool]:
     return {"parse": _parse_feature_enabled()}
+
+
+@app.get("/api/auth/config")
+async def auth_config() -> dict[str, bool]:
+    return {"email_enabled": True, "google_enabled": auth.google_oauth_enabled()}
+
+
+@app.get("/api/auth/me", response_model=AuthStatusResponse)
+async def auth_me(request: Request) -> AuthStatusResponse:
+    return _auth_status(_session(request))
+
+
+@app.post("/api/auth/register", response_model=AuthStatusResponse)
+@limiter.limit(settings.rate_limit_auth)
+async def auth_register(
+    request: Request,
+    response: Response,
+    payload: AuthRegisterRequest,
+) -> AuthStatusResponse:
+    try:
+        account = auth.register_email(payload.email, payload.password, payload.anonymous_id, payload.lang)
+        session = auth.start_session(response, account, user_agent=request.headers.get("user-agent"))
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    return _auth_status(session)
+
+
+@app.post("/api/auth/login", response_model=AuthStatusResponse)
+@limiter.limit(settings.rate_limit_auth)
+async def auth_login(
+    request: Request,
+    response: Response,
+    payload: AuthLoginRequest,
+) -> AuthStatusResponse:
+    try:
+        account = auth.login_email(payload.email, payload.password, payload.anonymous_id)
+        session = auth.start_session(response, account, user_agent=request.headers.get("user-agent"))
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    return _auth_status(session)
+
+
+@app.post("/api/auth/logout", response_model=AuthStatusResponse)
+async def auth_logout(request: Request, response: Response) -> AuthStatusResponse:
+    session = _required_session(request)
+    try:
+        auth.require_csrf(request, session)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    storage.revoke_session(session.token_hash)
+    auth.clear_session_cookie(response)
+    return AuthStatusResponse(user=None, csrf_token=None)
+
+
+@app.get("/api/auth/google/start")
+@limiter.limit(settings.rate_limit_auth)
+async def auth_google_start(request: Request, anonymous_id: str | None = None) -> RedirectResponse:  # noqa: ARG001
+    try:
+        url, state = auth.create_google_authorization_url(anonymous_id)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    redirect = RedirectResponse(url)
+    auth.set_oauth_state_cookie(redirect, state)
+    return redirect
+
+
+@app.get("/api/auth/google/callback")
+@limiter.limit(settings.rate_limit_auth)
+async def auth_google_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    if error or not code or not state:
+        raise HTTPException(status_code=400, detail="google_oauth_failed")
+    try:
+        auth.require_oauth_state_cookie(request, state)
+        account, _ = await auth.finish_google_login(code, state)
+        redirect = RedirectResponse("/", status_code=303)
+        auth.start_session(redirect, account, user_agent=request.headers.get("user-agent"))
+        auth.clear_oauth_state_cookie(redirect)
+        return redirect
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
 
 
 @app.post("/api/parse-request")
@@ -135,14 +246,26 @@ async def sample_request() -> dict[str, Any]:
 @app.post("/api/recommendations")
 @limiter.limit(settings.rate_limit_recommendations)
 async def recommendations(request: Request, response: Response, payload: AdventureRequest):
-    response = await build_recommendations(payload)
-    storage.save_response(response.request_id, payload, response)
-    return response
+    session = _session(request)
+    if session is not None:
+        try:
+            auth.require_csrf(request, session)
+        except auth.AuthError as exc:
+            _raise_auth_error(exc)
+    result = await build_recommendations(payload, account_id=session.account_id if session else None)
+    storage.save_response(result.request_id, payload, result, account_id=session.account_id if session else None)
+    return result
 
 
 @app.post("/api/feedback")
-async def feedback(payload: FeedbackRequest) -> dict[str, str]:
-    storage.save_feedback(payload)
+async def feedback(request: Request, payload: FeedbackRequest) -> dict[str, str]:
+    session = _session(request)
+    if session is not None:
+        try:
+            auth.require_csrf(request, session)
+        except auth.AuthError as exc:
+            _raise_auth_error(exc)
+    storage.save_feedback(payload, account_id=session.account_id if session else None)
     return {"status": "ok"}
 
 
@@ -152,8 +275,14 @@ async def feedback_list() -> dict[str, Any]:
 
 
 @app.post("/api/events")
-async def events(payload: AnalyticsEvent) -> dict[str, str]:
-    storage.save_event(payload)
+async def events(request: Request, payload: AnalyticsEvent) -> dict[str, str]:
+    session = _session(request)
+    if session is not None:
+        try:
+            auth.require_csrf(request, session)
+        except auth.AuthError as exc:
+            _raise_auth_error(exc)
+    storage.save_event(payload, account_id=session.account_id if session else None)
     return {"status": "ok"}
 
 
@@ -168,21 +297,37 @@ async def ab() -> dict[str, Any]:
 
 
 @app.post("/api/visited")
-async def visited(payload: VisitedRequest) -> dict[str, str]:
-    storage.mark_visited(payload.anonymous_id, payload.source_id)
+async def visited(request: Request, payload: VisitedRequest) -> dict[str, str]:
+    session = _required_session(request)
+    try:
+        auth.require_csrf(request, session)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    storage.mark_visited_account(session.account_id, payload.source_id)
     return {"status": "ok"}
 
 
 @app.delete("/api/visited")
-async def visited_clear(anonymous_id: str | None = None) -> dict[str, Any]:
-    return {"status": "ok", "cleared": storage.clear_visited(anonymous_id)}
+async def visited_clear(request: Request, anonymous_id: str | None = None) -> dict[str, Any]:  # noqa: ARG001
+    session = _required_session(request)
+    try:
+        auth.require_csrf(request, session)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    return {"status": "ok", "cleared": storage.clear_visited_account(session.account_id)}
 
 
 @app.get("/api/history")
-async def history(anonymous_id: str | None = None) -> dict[str, Any]:
-    return {"items": storage.history_for(anonymous_id)}
+async def history(request: Request, anonymous_id: str | None = None) -> dict[str, Any]:  # noqa: ARG001
+    session = _required_session(request)
+    return {"items": storage.history_for_account(session.account_id)}
 
 
 @app.delete("/api/history")
-async def history_delete(anonymous_id: str | None = None) -> dict[str, Any]:
-    return {"status": "ok", "deleted_sessions": storage.delete_user_data(anonymous_id)}
+async def history_delete(request: Request, anonymous_id: str | None = None) -> dict[str, Any]:  # noqa: ARG001
+    session = _required_session(request)
+    try:
+        auth.require_csrf(request, session)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    return {"status": "ok", "deleted_sessions": storage.delete_account_history(session.account_id)}

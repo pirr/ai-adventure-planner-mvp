@@ -5,6 +5,9 @@ const sheetEl = $('sheet');
 let lastRequestId = null;
 let lastResponse = null;
 let lastPayload = null;
+let currentUser = null;
+let csrfToken = null;
+let authConfig = { email_enabled: true, google_enabled: false };
 
 function anonymousId() {
   let id = localStorage.getItem('anon_id');
@@ -329,13 +332,29 @@ const I18N = {
     history_title: 'Recently seen',
     clear_history: 'Clear my history',
     clear_visited: 'Clear visited',
+    sign_in: 'Sign in',
+    account_title: 'Account',
+    log_in: 'Log in',
+    create_account: 'Create account',
+    log_out: 'Log out',
+    email: 'Email',
+    password: 'Password',
+    or: 'or',
+    continue_google: 'Continue with Google',
+    signed_in_as: 'Signed in as {email}',
+    auth_required_history: 'Sign in to keep history and visited places across devices.',
+    auth_required_action: 'Sign in to use account history and visited places.',
+    auth_failed: 'Could not sign in: {error}',
+    account_update_failed: 'Could not update account data: {error}',
+    account_created: 'Account ready.',
+    logged_out: 'Signed out.',
     visited_confirm: 'Clear all places you marked as visited?',
     visited_cleared: 'Visited places cleared.',
     mark_visited: "I've been here",
     no_live_results: 'No live places found. Try a larger time window, another area, or search again.',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
-    history_confirm: 'Delete your local history (recent searches, feedback and events)?',
+    history_confirm: 'Delete your account search history, feedback and events?',
     score_breakdown: 'Score breakdown',
     open_maps: 'Maps',
     start_route: 'Start route',
@@ -498,13 +517,29 @@ const I18N = {
     history_title: 'Недавно просмотренное',
     clear_history: 'Очистить историю',
     clear_visited: 'Очистить посещённые',
+    sign_in: 'Войти',
+    account_title: 'Аккаунт',
+    log_in: 'Войти',
+    create_account: 'Создать аккаунт',
+    log_out: 'Выйти',
+    email: 'Email',
+    password: 'Пароль',
+    or: 'или',
+    continue_google: 'Продолжить с Google',
+    signed_in_as: 'Вы вошли как {email}',
+    auth_required_history: 'Войдите, чтобы сохранять историю и посещённые места на разных устройствах.',
+    auth_required_action: 'Войдите, чтобы использовать историю аккаунта и посещённые места.',
+    auth_failed: 'Не удалось войти: {error}',
+    account_update_failed: 'Не удалось обновить данные аккаунта: {error}',
+    account_created: 'Аккаунт готов.',
+    logged_out: 'Вы вышли.',
     visited_confirm: 'Очистить все отмеченные посещённые места?',
     visited_cleared: 'Посещённые места очищены.',
     mark_visited: 'Я здесь был',
     no_live_results: 'Онлайн-места не найдены. Увеличьте время, выберите другой район или попробуйте снова.',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
-    history_confirm: 'Удалить вашу историю (недавние поиски, отзывы и события)?',
+    history_confirm: 'Удалить историю поиска аккаунта, отзывы и события?',
     score_breakdown: 'Разбор оценки',
     open_maps: 'Карты',
     start_route: 'Начать маршрут',
@@ -641,6 +676,7 @@ function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('lang', lang);
   applyStaticI18n();
+  updateAuthUi();
   updateProgress();
   if (lastResponse) renderResults(lastResponse, { refit: false });
   loadHistory();
@@ -793,8 +829,152 @@ function clearError() {
   errorBox.textContent = '';
 }
 
+function needsCsrf(method) {
+  return !['GET', 'HEAD', 'OPTIONS'].includes(String(method || 'GET').toUpperCase());
+}
+
+function apiFetch(url, options = {}) {
+  const method = options.method || 'GET';
+  const headers = { ...(options.headers || {}) };
+  if (csrfToken && needsCsrf(method)) headers['X-CSRF-Token'] = csrfToken;
+  return fetch(url, { ...options, method, headers, credentials: 'same-origin' });
+}
+window.apiFetch = apiFetch;
+
+async function readError(response) {
+  try {
+    const data = await response.json();
+    return data.detail || response.statusText || `HTTP ${response.status}`;
+  } catch (error) {
+    return response.statusText || `HTTP ${response.status}`;
+  }
+}
+
+function showAuthMessage(message, ok = false) {
+  const el = $('authMessage');
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.toggle('ok', ok);
+}
+
+function setAuthState(data) {
+  currentUser = data && data.user ? data.user : null;
+  csrfToken = data && data.csrf_token ? data.csrf_token : null;
+  updateAuthUi();
+}
+
+function updateAuthUi() {
+  const label = $('accountLabel');
+  if (label) label.textContent = currentUser ? currentUser.email : t('sign_in');
+  const signedOut = $('authSignedOut');
+  const signedIn = $('authSignedIn');
+  if (signedOut) signedOut.classList.toggle('hidden', !!currentUser);
+  if (signedIn) signedIn.classList.toggle('hidden', !currentUser);
+  if ($('authEmail') && currentUser) $('authEmail').textContent = t('signed_in_as', { email: currentUser.email });
+  if ($('googleAuthBtn')) $('googleAuthBtn').classList.toggle('hidden', !authConfig.google_enabled);
+  if ($('authDivider')) $('authDivider').classList.toggle('hidden', !authConfig.google_enabled);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function setAuthTab(tab) {
+  const isRegister = tab === 'register';
+  $('authLoginTab').classList.toggle('is-active', !isRegister);
+  $('authRegisterTab').classList.toggle('is-active', isRegister);
+  $('loginForm').classList.toggle('hidden', isRegister);
+  $('registerForm').classList.toggle('hidden', !isRegister);
+  showAuthMessage('');
+}
+
+function openAuthModal(tab = 'login') {
+  setAuthTab(tab);
+  updateAuthUi();
+  $('authModal').classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  $('authModal').classList.add('hidden');
+  showAuthMessage('');
+}
+
+async function loadAuthConfig() {
+  try {
+    const response = await apiFetch('/api/auth/config');
+    if (response.ok) authConfig = await response.json();
+  } catch (error) {}
+  updateAuthUi();
+}
+
+async function loadAuthStatus() {
+  try {
+    const response = await apiFetch('/api/auth/me', { cache: 'no-store' });
+    if (response.ok) setAuthState(await response.json());
+    else setAuthState({ user: null, csrf_token: null });
+  } catch (error) {
+    setAuthState({ user: null, csrf_token: null });
+  }
+}
+
+async function submitAuth(path, payload, successMessage) {
+  const response = await apiFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  setAuthState(await response.json());
+  showAuthMessage(successMessage, true);
+  closeAuthModal();
+  loadHistory();
+}
+
+function authPayload(emailId, passwordId) {
+  return {
+    email: $(emailId).value,
+    password: $(passwordId).value,
+    anonymous_id: anonymousId(),
+    lang: currentLang,
+  };
+}
+
+function wireAuthUi() {
+  $('accountBtn').addEventListener('click', () => openAuthModal(currentUser ? 'login' : 'login'));
+  $('authCloseBtn').addEventListener('click', closeAuthModal);
+  $('authModal').addEventListener('click', (event) => {
+    if (event.target === $('authModal')) closeAuthModal();
+  });
+  $('authLoginTab').addEventListener('click', () => setAuthTab('login'));
+  $('authRegisterTab').addEventListener('click', () => setAuthTab('register'));
+  $('loginForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      await submitAuth('/api/auth/login', authPayload('loginEmail', 'loginPassword'), '');
+    } catch (error) {
+      showAuthMessage(t('auth_failed', { error: error.message }));
+    }
+  });
+  $('registerForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      await submitAuth('/api/auth/register', authPayload('registerEmail', 'registerPassword'), t('account_created'));
+    } catch (error) {
+      showAuthMessage(t('auth_failed', { error: error.message }));
+    }
+  });
+  $('googleAuthBtn').addEventListener('click', () => {
+    window.location.href = `/api/auth/google/start?anonymous_id=${encodeURIComponent(anonymousId())}`;
+  });
+  $('logoutBtn').addEventListener('click', async () => {
+    try {
+      const response = await apiFetch('/api/auth/logout', { method: 'POST' });
+      if (response.ok) setAuthState(await response.json());
+    } catch (error) {}
+    closeAuthModal();
+    loadHistory();
+  });
+}
+
 function track(event, extra = {}) {
-  fetch('/api/events', {
+  apiFetch('/api/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ event, anonymous_id: anonymousId(), ...extra }),
@@ -829,7 +1009,7 @@ async function postRecommendations(payload, { retries = 1 } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const response = await fetch('/api/recommendations', {
+      const response = await apiFetch('/api/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1290,7 +1470,7 @@ function toggleReasonPicker(box, recommendationId, requestId = lastRequestId) {
 async function submitFeedback(recommendationId, rating, reason, requestId = lastRequestId) {
   if (!requestId) return;
   try {
-    await fetch('/api/feedback', {
+    await apiFetch('/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1313,15 +1493,24 @@ async function submitFeedback(recommendationId, rating, reason, requestId = last
 }
 
 async function markVisited(item) {
+  if (!currentUser) {
+    openAuthModal('login');
+    showAuthMessage(t('auth_required_action'));
+    return;
+  }
   // Tell the server (so it's excluded from every future search), then drop the
   // card and its pin from the current results immediately.
   try {
-    await fetch('/api/visited', {
+    const response = await apiFetch('/api/visited', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ anonymous_id: anonymousId(), source_id: item.source_id }),
     });
-  } catch (error) {}
+    if (!response.ok) throw new Error(await readError(response));
+  } catch (error) {
+    alert(t('account_update_failed', { error: error.message }));
+    return;
+  }
   if (lastResponse) {
     lastResponse.recommendations = (lastResponse.recommendations || []).filter((rec) => rec.id !== item.id);
     renderResults(lastResponse, { refit: false });
@@ -1329,16 +1518,30 @@ async function markVisited(item) {
 }
 
 async function clearVisited() {
+  if (!currentUser) {
+    openAuthModal('login');
+    showAuthMessage(t('auth_required_action'));
+    return;
+  }
   if (!confirm(t('visited_confirm'))) return;
   try {
-    await fetch(`/api/visited?anonymous_id=${encodeURIComponent(anonymousId())}`, { method: 'DELETE' });
-  } catch (error) {}
+    const response = await apiFetch('/api/visited', { method: 'DELETE' });
+    if (!response.ok) throw new Error(await readError(response));
+  } catch (error) {
+    alert(t('account_update_failed', { error: error.message }));
+    return;
+  }
   alert(t('visited_cleared'));
 }
 
 async function loadHistory() {
+  if (!currentUser) {
+    renderHistoryPrompt();
+    return;
+  }
   try {
-    const res = await fetch(`/api/history?anonymous_id=${encodeURIComponent(anonymousId())}`);
+    const res = await apiFetch('/api/history');
+    if (!res.ok) throw new Error(await readError(res));
     const data = await res.json();
     renderHistory(data.items || []);
   } catch (error) {
@@ -1346,9 +1549,26 @@ async function loadHistory() {
   }
 }
 
+function renderHistoryPrompt() {
+  const section = $('historySection');
+  const list = $('historyList');
+  section.classList.remove('hidden');
+  list.innerHTML = `
+    <div class="auth-prompt">
+      <p>${t('auth_required_history')}</p>
+      <button type="button" class="link-btn" id="historySignIn">${t('sign_in')}</button>
+    </div>
+  `;
+  const actions = section.querySelector('.history-actions');
+  if (actions) actions.classList.add('hidden');
+  $('historySignIn').addEventListener('click', () => openAuthModal('login'));
+}
+
 function renderHistory(items) {
   const section = $('historySection');
   const list = $('historyList');
+  const actions = section.querySelector('.history-actions');
+  if (actions) actions.classList.remove('hidden');
   if (!items.length) {
     section.classList.add('hidden');
     list.innerHTML = '';
@@ -1369,10 +1589,19 @@ function renderHistory(items) {
 }
 
 async function clearHistory() {
+  if (!currentUser) {
+    openAuthModal('login');
+    showAuthMessage(t('auth_required_action'));
+    return;
+  }
   if (!confirm(t('history_confirm'))) return;
   try {
-    await fetch(`/api/history?anonymous_id=${encodeURIComponent(anonymousId())}`, { method: 'DELETE' });
-  } catch (error) {}
+    const response = await apiFetch('/api/history', { method: 'DELETE' });
+    if (!response.ok) throw new Error(await readError(response));
+  } catch (error) {
+    alert(t('account_update_failed', { error: error.message }));
+    return;
+  }
   renderHistory([]);
   alert(t('history_cleared'));
 }
@@ -1398,4 +1627,6 @@ function escapeHtml(value) {
 // Initial load.
 applyStaticI18n();
 updateProgress();
-loadHistory();
+wireAuthUi();
+loadAuthConfig();
+loadAuthStatus().then(loadHistory);

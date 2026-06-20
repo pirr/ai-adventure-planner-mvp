@@ -27,6 +27,7 @@
     <div class="topbar-right">
       <button id="editBtn" type="button" class="pill-btn hidden"><i data-lucide="chevron-left" aria-hidden="true"></i> <span data-i18n="edit_trip">Edit trip</span></button>
       <button id="locateBtn" type="button" class="icon-btn hidden" title="Use my location" aria-label="Use my location"><i data-lucide="locate-fixed"></i></button>
+      <button id="accountBtn" type="button" class="pill-btn account-btn"><i data-lucide="user-circle" aria-hidden="true"></i> <span id="accountLabel" data-i18n="sign_in">Sign in</span></button>
       <div class="lang-toggle" id="langToggle" aria-label="Language">
         <button type="button" class="lang-btn" data-lang="en">EN</button>
         <button type="button" class="lang-btn" data-lang="ru">RU</button>
@@ -218,9 +219,44 @@
     </article>
   </template>
 
+  <div id="authModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-panel">
+      <button id="authCloseBtn" type="button" class="icon-btn auth-close" aria-label="Close"><i data-lucide="x"></i></button>
+      <h2 id="authTitle" data-i18n="account_title">Account</h2>
+      <p id="authMessage" class="auth-message"></p>
+
+      <div id="authSignedOut">
+        <div class="auth-tabs" role="tablist">
+          <button id="authLoginTab" type="button" class="auth-tab is-active" data-auth-tab="login" data-i18n="log_in">Log in</button>
+          <button id="authRegisterTab" type="button" class="auth-tab" data-auth-tab="register" data-i18n="create_account">Create account</button>
+        </div>
+
+        <form id="loginForm" class="auth-form" autocomplete="on">
+          <label class="input-field"><span data-i18n="email">Email</span><input id="loginEmail" type="email" autocomplete="email" required /></label>
+          <label class="input-field"><span data-i18n="password">Password</span><input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+          <button type="submit" class="btn btn-solid" data-i18n="log_in">Log in</button>
+        </form>
+
+        <form id="registerForm" class="auth-form hidden" autocomplete="on">
+          <label class="input-field"><span data-i18n="email">Email</span><input id="registerEmail" type="email" autocomplete="email" required /></label>
+          <label class="input-field"><span data-i18n="password">Password</span><input id="registerPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+          <button type="submit" class="btn btn-solid" data-i18n="create_account">Create account</button>
+        </form>
+
+        <div id="authDivider" class="auth-divider"><span data-i18n="or">or</span></div>
+        <button id="googleAuthBtn" type="button" class="btn btn-line auth-google"><i data-lucide="mail" aria-hidden="true"></i><span data-i18n="continue_google">Continue with Google</span></button>
+      </div>
+
+      <div id="authSignedIn" class="hidden">
+        <p class="auth-email" id="authEmail"></p>
+        <button id="logoutBtn" type="button" class="btn btn-line" data-i18n="log_out">Log out</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/vendor/lucide-icons.js?v=6"></script>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
-  <script src="/static/app.js?v=30"></script>
+  <script src="/static/app.js?v=31"></script>
   <script src="/static/mood.js?v=21"></script>
 </body>
 </html>
