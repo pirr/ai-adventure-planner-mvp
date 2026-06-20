@@ -77,11 +77,19 @@ def _select_candidates_for_routing(
     return [candidate.place for candidate in preliminary[:limit]]
 
 
-async def build_recommendations(request: AdventureRequest, provider: LLMProvider | None = None) -> AdventureResponse:
+async def build_recommendations(
+    request: AdventureRequest,
+    provider: LLMProvider | None = None,
+    account_id: int | None = None,
+) -> AdventureResponse:
     overall_started = time.perf_counter()
     request_id = str(uuid.uuid4())
     # Personal Preference Fit signal from this user's past feedback (cold-start safe).
-    profile = storage.preference_profile(request.anonymous_id)
+    profile = (
+        storage.preference_profile_for_account(account_id)
+        if account_id is not None
+        else storage.preference_profile(request.anonymous_id)
+    )
     stage_started = time.perf_counter()
     weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data, request.lang)
     logger.info("recommendations_timing request_id=%s stage=weather duration_ms=%d", request_id, _elapsed_ms(stage_started))
@@ -105,7 +113,11 @@ async def build_recommendations(request: AdventureRequest, provider: LLMProvider
 
     # Per-user place state: hard-drop visited places before we spend routing
     # calls on them; keep `seen` to optionally rotate past them below.
-    marks = storage.place_marks(request.anonymous_id)
+    marks = (
+        storage.account_place_marks(account_id)
+        if account_id is not None
+        else storage.place_marks(request.anonymous_id)
+    )
     visited, seen = marks["visited"], marks["seen"]
     if visited:
         places = [place for place in places if place.source_id not in visited]

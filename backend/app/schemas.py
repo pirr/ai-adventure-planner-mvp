@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, EmailStr, Field, validator
 
 TransportMode = Literal["walk", "car", "bike"]
 GroupType = Literal["solo", "couple", "family", "kids", "dog"]
@@ -53,6 +53,31 @@ class ParseTextRequest(BaseModel):
     text: str = Field(..., min_length=3, max_length=500)
     lang: Lang = "en"
     anonymous_id: str | None = Field(default=None, max_length=64)
+
+
+class AuthRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=256)
+    anonymous_id: str | None = Field(default=None, max_length=64)
+    lang: Lang = "en"
+
+
+class AuthLoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=256)
+    anonymous_id: str | None = Field(default=None, max_length=64)
+
+
+class AuthUser(BaseModel):
+    id: int
+    email: EmailStr
+    email_verified: bool = False
+    provider: Literal["email", "google"] = "email"
+
+
+class AuthStatusResponse(BaseModel):
+    user: AuthUser | None = None
+    csrf_token: str | None = None
 
 
 class ParsedSituation(BaseModel):

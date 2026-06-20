@@ -80,6 +80,22 @@ class Settings:
     rate_limit_recommendations: str = os.getenv("RATE_LIMIT_RECOMMENDATIONS", "10/minute;100/day")
     # LLM free-text parse: bound paid model calls per IP.
     rate_limit_parse: str = os.getenv("RATE_LIMIT_PARSE", "5/minute;30/day")
+    # Account registration/login/OAuth entrypoints.
+    rate_limit_auth: str = os.getenv("RATE_LIMIT_AUTH", "5/minute;50/day")
+    # --- Authentication ---
+    auth_session_cookie_name: str = os.getenv("AUTH_SESSION_COOKIE_NAME", "ap_session")
+    auth_session_days: int = int(os.getenv("AUTH_SESSION_DAYS", "30"))
+    auth_cookie_secure: bool = _env_bool("AUTH_COOKIE_SECURE", False)
+    auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax")
+    auth_password_min_length: int = int(os.getenv("AUTH_PASSWORD_MIN_LENGTH", "8"))
+    google_oauth_client_id: str | None = os.getenv("GOOGLE_OAUTH_CLIENT_ID") or None
+    google_oauth_client_secret: str | None = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET") or None
+    google_oauth_redirect_uri: str | None = os.getenv("GOOGLE_OAUTH_REDIRECT_URI") or None
+    google_oauth_authorization_url: str = os.getenv(
+        "GOOGLE_OAUTH_AUTHORIZATION_URL",
+        "https://accounts.google.com/o/oauth2/v2/auth",
+    )
+    google_oauth_token_url: str = os.getenv("GOOGLE_OAUTH_TOKEN_URL", "https://oauth2.googleapis.com/token")
     # LLM explanation layer. Provider-agnostic over the OpenAI /v1 chat API.
     # Default "template" keeps the rule-based explanations and makes no network
     # call. Set LLM_PROVIDER to a preset (openai/llamacpp/ollama/deepseek/groq/

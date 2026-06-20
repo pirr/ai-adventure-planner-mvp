@@ -4,3 +4,7 @@ pydantic>=1.10,<3
 httpx>=0.26
 slowapi>=0.1.9
 pytest>=8.0
+argon2-cffi>=23.1
+email-validator>=2.0
+google-auth>=2.0
+requests>=2.31

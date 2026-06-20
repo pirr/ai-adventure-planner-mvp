@@ -21,6 +21,7 @@ primary_region = "fra"  # Frankfurt: closest region to the target users.
   DATA_DIR = "./data"
   USE_OPEN_METEO_FALLBACK = "true"
   LOG_LEVEL = "INFO"
+  AUTH_COOKIE_SECURE = "true"
 
   # Overpass/OSM is the primary (free, unlimited) place source. From Fly's
   # network overpass-api.de answers in ~8s, whose variance crossed the old 12s
