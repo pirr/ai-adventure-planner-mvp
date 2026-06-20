@@ -5,6 +5,20 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    return os.getenv(name, str(default)).lower() == "true"
+
+
+def _env_float_tuple(name: str, default: str) -> tuple[float, ...]:
+    values: list[float] = []
+    for raw in os.getenv(name, default).split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        values.append(float(raw))
+    return tuple(values)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "Adventure Planner MVP"
@@ -29,6 +43,18 @@ class Settings:
     overpass_timeout_seconds: float = float(os.getenv("OVERPASS_TIMEOUT_SECONDS", "12"))
     overpass_max_attempts: int = int(os.getenv("OVERPASS_MAX_ATTEMPTS", "2"))
     overpass_retry_backoff_seconds: float = float(os.getenv("OVERPASS_RETRY_BACKOFF_SECONDS", "0.5"))
+    # Search latency controls. Progressive radius keeps dense-area Overpass
+    # calls small first, then expands only when the early rings are weak.
+    search_progressive_enabled: bool = _env_bool("SEARCH_PROGRESSIVE_ENABLED", True)
+    search_radius_tiers_km: tuple[float, ...] = _env_float_tuple("SEARCH_RADIUS_TIERS_KM", "8,25,55")
+    search_osm_target_candidates: int = int(os.getenv("SEARCH_OSM_TARGET_CANDIDATES", "32"))
+    # Raw OSM candidates are safe to cache briefly; final recommendations still
+    # use fresh weather, routing, personalization, seen/visited state and LLM.
+    search_candidate_cache_ttl_seconds: int = int(os.getenv("SEARCH_CANDIDATE_CACHE_TTL_SECONDS", "21600"))
+    search_candidate_cache_max_entries: int = int(os.getenv("SEARCH_CANDIDATE_CACHE_MAX_ENTRIES", "256"))
+    # Number of cheap-pre-ranked candidates sent to live routing. Keep this
+    # comfortably above the max result limit so quality/diversity survive.
+    search_route_candidate_limit: int = int(os.getenv("SEARCH_ROUTE_CANDIDATE_LIMIT", "32"))
     osrm_url: str = os.getenv("OSRM_URL", "https://router.project-osrm.org")
     openweather_api_key: str | None = os.getenv("OPENWEATHER_API_KEY")
     use_open_meteo_fallback: bool = os.getenv("USE_OPEN_METEO_FALLBACK", "true").lower() == "true"

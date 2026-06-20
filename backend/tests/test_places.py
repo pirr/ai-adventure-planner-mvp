@@ -1,11 +1,28 @@
 import asyncio
+import dataclasses
 
+from app.config import settings as real_settings
 from app.schemas import PlaceCandidate
 from app.services import places
 from app.services.places import _build_overpass_query, _place_type_from_tags
 
 
 _AMENITY_REGEX = '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"'
+
+
+def _settings(**overrides):
+    return dataclasses.replace(real_settings, **overrides)
+
+
+def _candidate(index: int, place_type: str = "fortress") -> PlaceCandidate:
+    return PlaceCandidate(
+        source="openstreetmap",
+        source_id=f"osm:node:{index}",
+        name=f"Place {index}",
+        type=place_type,
+        lat=42.43 + index * 0.001,
+        lon=18.69,
+    )
 
 
 def test_food_interest_adds_amenities_to_overpass_query():
@@ -40,6 +57,71 @@ def test_amenity_block_radius_is_capped_for_large_radius():
 def test_amenity_block_uses_full_radius_when_within_cap():
     query = _build_overpass_query(42.43, 18.69, 5000, ["drinks"])
     assert 'around:5000,42.43,18.69)["amenity"' in query
+
+
+def test_progressive_radius_steps_include_full_radius(monkeypatch):
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(search_progressive_enabled=True, search_radius_tiers_km=(8, 25, 55)),
+    )
+
+    assert places._search_radius_steps(5) == [5]
+    assert places._search_radius_steps(55) == [8, 25, 55]
+    assert places._search_radius_steps(90) == [8, 25, 55, 90]
+
+
+def test_progressive_osm_search_stops_when_first_ring_is_strong(monkeypatch):
+    calls = []
+
+    async def fake_fetch(lat, lon, radius_km, interests):
+        calls.append(radius_km)
+        return [_candidate(index) for index in range(35)]
+
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(search_progressive_enabled=True, search_radius_tiers_km=(8, 25, 55), search_osm_target_candidates=32),
+    )
+    monkeypatch.setattr(places, "fetch_osm_places", fake_fetch)
+
+    candidates = asyncio.run(places._fetch_osm_places_progressive(42.43, 18.69, 55, ["history"]))
+
+    assert len(candidates) == 35
+    assert calls == [8]
+
+
+def test_osm_candidate_cache_reuses_cloned_results(monkeypatch):
+    calls = []
+    places._candidate_cache.clear()
+
+    async def fake_overpass(client, query):
+        calls.append(query)
+        return {
+            "elements": [
+                {
+                    "type": "node",
+                    "id": 1,
+                    "lat": 42.43,
+                    "lon": 18.69,
+                    "tags": {"name": "Original Fort", "historic": "castle"},
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(search_candidate_cache_ttl_seconds=60, search_candidate_cache_max_entries=8),
+    )
+    monkeypatch.setattr(places, "_overpass_request", fake_overpass)
+
+    first = asyncio.run(places.fetch_osm_places(42.43, 18.69, 8, ["history"]))
+    first[0].name = "Mutated"
+    second = asyncio.run(places.fetch_osm_places(42.43, 18.69, 8, ["history"]))
+
+    assert len(calls) == 1
+    assert second[0].name == "Original Fort"
 
 
 def test_overpass_remark_timeout_is_treated_as_failure():

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from typing import Any
 
 import httpx
@@ -11,7 +13,10 @@ from app.services import google_places
 from app.services.i18n import t
 from app.services.net import http_client
 from app.services.sample_data import fallback_places
+from app.services.scoring import normalize_interest, place_matches_interest
 
+
+logger = logging.getLogger(__name__)
 
 # Server-busy statuses worth a quick same-endpoint retry (momentary hiccup).
 _RETRY_OVERPASS_STATUS = {502, 503, 504}
@@ -22,6 +27,10 @@ _FAILOVER_OVERPASS_STATUS = {406, 429}
 # Cap (metres) for the dense food/drink amenity scan. Larger radii overrun
 # Overpass's per-query timeout and the whole query returns nothing.
 AMENITY_MAX_RADIUS_M = 8000
+
+# {cache_key: (expires_at, candidates)}. Candidates are deep-copied on both
+# read and write so downstream enrichment does not mutate cached entries.
+_candidate_cache: dict[tuple[Any, ...], tuple[float, list[PlaceCandidate]]] = {}
 
 
 class OverpassRuntimeError(RuntimeError):
@@ -34,6 +43,104 @@ class OverpassRuntimeError(RuntimeError):
 def _is_overpass_timeout_remark(payload: dict[str, Any]) -> bool:
     remark = str(payload.get("remark") or "")
     return "timed out" in remark or "runtime error" in remark
+
+
+def _clone_candidates(candidates: list[PlaceCandidate]) -> list[PlaceCandidate]:
+    return [
+        candidate.model_copy(deep=True) if hasattr(candidate, "model_copy") else candidate.copy(deep=True)
+        for candidate in candidates
+    ]
+
+
+def _cache_key(lat: float, lon: float, radius_km: float, interests: list[str]) -> tuple[Any, ...]:
+    normalized = tuple(sorted(normalize_interest(str(interest)) for interest in interests))
+    return ("osm-v1", round(lat, 3), round(lon, 3), round(radius_km, 1), normalized)
+
+
+def _candidate_cache_get(key: tuple[Any, ...]) -> list[PlaceCandidate] | None:
+    if settings.search_candidate_cache_ttl_seconds <= 0:
+        return None
+    cached = _candidate_cache.get(key)
+    if cached is None:
+        return None
+    expires_at, candidates = cached
+    if expires_at <= time.time():
+        _candidate_cache.pop(key, None)
+        return None
+    return _clone_candidates(candidates)
+
+
+def _candidate_cache_set(key: tuple[Any, ...], candidates: list[PlaceCandidate]) -> None:
+    ttl = settings.search_candidate_cache_ttl_seconds
+    max_entries = settings.search_candidate_cache_max_entries
+    if ttl <= 0 or max_entries <= 0:
+        return
+    now = time.time()
+    for cache_key, (expires_at, _) in list(_candidate_cache.items()):
+        if expires_at <= now:
+            _candidate_cache.pop(cache_key, None)
+    while len(_candidate_cache) >= max_entries:
+        _candidate_cache.pop(next(iter(_candidate_cache)))
+    _candidate_cache[key] = (now + ttl, _clone_candidates(candidates))
+
+
+def _search_radius_steps(full_radius_km: float) -> list[float]:
+    if not settings.search_progressive_enabled:
+        return [full_radius_km]
+    radii = [radius for radius in sorted(settings.search_radius_tiers_km) if 0 < radius < full_radius_km]
+    radii.append(full_radius_km)
+    deduped: list[float] = []
+    seen: set[float] = set()
+    for radius in radii:
+        marker = round(radius, 2)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        deduped.append(radius)
+    return deduped
+
+
+def _merge_candidates(primary: list[PlaceCandidate], secondary: list[PlaceCandidate]) -> list[PlaceCandidate]:
+    merged = list(primary)
+    seen = {candidate.source_id for candidate in merged}
+    for candidate in secondary:
+        if candidate.source_id in seen:
+            continue
+        merged.append(candidate)
+        seen.add(candidate.source_id)
+    return merged
+
+
+def _matching_candidate_count(candidates: list[PlaceCandidate], interests: list[str]) -> int:
+    requested = [normalize_interest(str(interest)) for interest in interests]
+    requested = [interest for interest in requested if interest and interest != "surprise me"]
+    if not requested:
+        return len(candidates)
+    return sum(1 for candidate in candidates if any(place_matches_interest(candidate, interest) for interest in requested))
+
+
+def _has_enough_osm_candidates(candidates: list[PlaceCandidate], interests: list[str]) -> bool:
+    target = max(8, settings.search_osm_target_candidates)
+    if len(candidates) < target:
+        return False
+
+    requested = [normalize_interest(str(interest)) for interest in interests if str(interest).strip()]
+    focused = requested[0] if len(requested) == 1 else None
+    if focused in {"food", "drinks"}:
+        # Food/drink amenities are only scanned locally by design. If the local
+        # ring is sparse, Google candidate search is the better bounded backfill
+        # than a city-scale broad Overpass scan.
+        return _matching_candidate_count(candidates, interests) >= 5 or len(candidates) >= target
+    if focused and focused != "surprise me":
+        return _matching_candidate_count(candidates, interests) >= min(10, max(5, target // 3))
+
+    if not requested or "surprise me" in requested:
+        return len({candidate.type for candidate in candidates}) >= 3
+    covered = sum(
+        1 for interest in requested
+        if any(place_matches_interest(candidate, interest) for candidate in candidates)
+    )
+    return covered >= min(len(requested), 2)
 
 
 INTEREST_OSM_FILTERS = {
@@ -228,6 +335,12 @@ async def _overpass_request(client: httpx.AsyncClient, query: str) -> dict[str, 
 
 
 async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: list[str]) -> list[PlaceCandidate]:
+    key = _cache_key(lat, lon, radius_km, interests)
+    cached = _candidate_cache_get(key)
+    if cached is not None:
+        logger.info("place_search_osm_cache_hit radius_km=%.1f candidates=%d", radius_km, len(cached))
+        return cached
+
     radius_m = int(radius_km * 1000)
     query = _build_overpass_query(lat, lon, radius_m, interests)
     async with http_client(settings.overpass_timeout_seconds) as client:
@@ -265,6 +378,31 @@ async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: 
                 quality_score=_quality_from_tags(tags, True),
             )
         )
+    _candidate_cache_set(key, candidates)
+    return candidates
+
+
+async def _fetch_osm_places_progressive(
+    lat: float,
+    lon: float,
+    radius_km: float,
+    interests: list[str],
+) -> list[PlaceCandidate]:
+    candidates: list[PlaceCandidate] = []
+    for search_radius_km in _search_radius_steps(radius_km):
+        started = time.perf_counter()
+        stage = await fetch_osm_places(lat, lon, search_radius_km, interests)
+        candidates = _merge_candidates(candidates, stage)
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "place_search_osm_stage radius_km=%.1f fetched=%d merged=%d duration_ms=%d",
+            search_radius_km,
+            len(stage),
+            len(candidates),
+            elapsed_ms,
+        )
+        if _has_enough_osm_candidates(candidates, interests):
+            break
     return candidates
 
 
@@ -280,14 +418,7 @@ def _needs_google_candidates(candidates: list[PlaceCandidate], interests: list[s
 
 
 def _merge_live_candidates(primary: list[PlaceCandidate], secondary: list[PlaceCandidate]) -> list[PlaceCandidate]:
-    merged = list(primary)
-    seen = {candidate.source_id for candidate in merged}
-    for candidate in secondary:
-        if candidate.source_id in seen:
-            continue
-        merged.append(candidate)
-        seen.add(candidate.source_id)
-    return merged
+    return _merge_candidates(primary, secondary)
 
 
 async def get_candidate_places(
@@ -306,7 +437,7 @@ async def get_candidate_places(
 
     if use_live_data:
         try:
-            candidates = await fetch_osm_places(lat, lon, radius_km, interests)
+            candidates = await _fetch_osm_places_progressive(lat, lon, radius_km, interests)
         except httpx.HTTPStatusError as exc:
             warnings.append(t(lang, "warn_osm_unavailable", exc=f"HTTP {exc.response.status_code}"))
         except Exception as exc:  # noqa: BLE001 - MVP should degrade gracefully
