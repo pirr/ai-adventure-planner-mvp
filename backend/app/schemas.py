@@ -187,6 +187,20 @@ class ScoreBreakdown(BaseModel):
     interest_fit: int
     place_quality: int
     personal_preference_fit: int = 70  # neutral until the user has feedback history
+    community_confidence: int = 70  # neutral until other adventurers have rated this place
+
+
+class CommunitySignal(BaseModel):
+    """Aggregated first-party signal from other adventurers for one place.
+
+    Populated only when the sample clears a minimum threshold (see scoring), so a
+    single vote never identifies a user or shows a noisy badge. The dimension that
+    didn't clear its own threshold is reported as 0 so the client hides that chip.
+    """
+
+    liked_ratio: float = Field(default=0.0, ge=0, le=1)  # share of distinct raters who thumbed up
+    sample_size: int = Field(default=0, ge=0)  # distinct raters behind liked_ratio (0 -> hide chip)
+    recent_visits: int = Field(default=0, ge=0)  # distinct users who marked visited within the window (0 -> hide chip)
 
 
 class Recommendation(BaseModel):
@@ -227,6 +241,9 @@ class Recommendation(BaseModel):
     arrival_weather: WeatherSummary | None = None
     forecast: list[HourlyForecast] = Field(default_factory=list)
     tags: dict[str, Any] = Field(default_factory=dict)
+    # Aggregated "wisdom of our adventurers" for this place; None until enough
+    # first-party feedback/visits accrue to clear the badge threshold.
+    community: CommunitySignal | None = None
 
 
 class RejectedAlternative(BaseModel):

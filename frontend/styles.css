@@ -334,6 +334,8 @@ body.planning .sheet { display: none; }
 .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: var(--sand-200); color: var(--pine-700); padding: 5px 11px; font-size: 12px; font-weight: 700; }
 .badge .lucide { width: 12px; height: 12px; }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.community { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-line); }
+.community-strip { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 0; }
 
 .weather-strip { background: linear-gradient(155deg, var(--pine-700), var(--pine-900)); color: var(--sand-300); border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 16px; box-shadow: var(--float-sm); }
 .weather-strip h3 { font-family: var(--display); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--moss-300); margin-bottom: 7px; }

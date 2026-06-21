@@ -394,6 +394,8 @@ const I18N = {
     badge_travel: '{v} travel',
     badge_onsite: '{v} on-site',
     badge_walk: '{km} km walk',
+    badge_community_liked: '♥ {pct}% liked · {n} adventurers',
+    badge_community_visits: '{n} visited recently',
     difficulty_easy: 'easy',
     difficulty_medium: 'medium',
     difficulty_hard: 'hard',
@@ -434,6 +436,7 @@ const I18N = {
     bd_interest_fit: 'Interest Fit',
     bd_place_quality: 'Place Quality',
     bd_personal_preference_fit: 'Personal Fit',
+    bd_community_confidence: 'Community',
     why_title: 'Why here',
     why_now_title: 'Why now',
     risks_title: 'Worth knowing',
@@ -584,6 +587,8 @@ const I18N = {
     badge_travel: 'в пути {v}',
     badge_onsite: 'на месте {v}',
     badge_walk: '{km} км пешком',
+    badge_community_liked: '♥ {pct}% понравилось · {n} путешеств.',
+    badge_community_visits: '{n} побывали недавно',
     difficulty_easy: 'лёгкий',
     difficulty_medium: 'средний',
     difficulty_hard: 'сложный',
@@ -624,6 +629,7 @@ const I18N = {
     bd_interest_fit: 'Интересы',
     bd_place_quality: 'Качество места',
     bd_personal_preference_fit: 'Личные предпочтения',
+    bd_community_confidence: 'Сообщество',
     why_title: 'Почему сюда',
     why_now_title: 'Почему сейчас',
     risks_title: 'Стоит знать',
@@ -1409,9 +1415,21 @@ function practicalFacts(item) {
   return facts;
 }
 
+// Social-proof chips from aggregated first-party signal; empty string when the
+// place hasn't cleared the badge threshold (keeps badges meaningful + anonymous).
+function communityBadgesHtml(item) {
+  const c = item.community;
+  if (!c) return '';
+  const chips = [];
+  if (c.sample_size) chips.push(`<span class="badge community">${t('badge_community_liked', { pct: Math.round(c.liked_ratio * 100), n: c.sample_size })}</span>`);
+  if (c.recent_visits) chips.push(`<span class="badge community">${t('badge_community_visits', { n: c.recent_visits })}</span>`);
+  return chips.join('');
+}
+
 function renderDecisionSummary(item) {
   const routeLine = t('route_each_way', { mode: routeModeLabel(), v: minutes(oneWayTravelMinutes(item)) });
   const facts = practicalFacts(item);
+  const community = communityBadgesHtml(item);
   return `
     <div class="decision-plan">
       <span>${t('leave_now')}</span>
@@ -1419,6 +1437,7 @@ function renderDecisionSummary(item) {
       <span>${escapeHtml(routeLine)}</span>
       <span>${escapeHtml(item.walking_km.toFixed(1))} km · ${t('difficulty_' + item.difficulty)}</span>
     </div>
+    ${community ? `<div class="community-strip">${community}</div>` : ''}
     <div class="practical-panel">
       <h3>${t('practical_title')}</h3>
       <div class="practical-grid">
@@ -1508,6 +1527,7 @@ function buildCard(item, isTop) {
     <span class="badge">${t('badge_walk', { km: item.walking_km.toFixed(1) })}</span>
     <span class="badge">${t('difficulty_' + item.difficulty)}</span>
     <span class="badge ${item.data_confidence === 'fallback' ? 'warn' : ''}">${t('confidence_' + item.data_confidence)} ${t('data_word')}</span>
+    ${communityBadgesHtml(item)}
   `;
   renderPlaceWeather(fragment, item);
   fragment.querySelector('.breakdown').innerHTML = Object.entries(item.score_breakdown)

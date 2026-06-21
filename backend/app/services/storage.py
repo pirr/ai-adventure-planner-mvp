@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -594,6 +595,67 @@ class Storage:
                 continue
             place_types[place_type] = place_types.get(place_type, 0) + (1 if row["rating"] == "up" else -1)
         return {"place_types": place_types} if place_types else {}
+
+    def community_signals(self, source_ids: list[str | None]) -> dict[str, dict[str, int]]:
+        """Cross-user 'wisdom of our adventurers' for the given places, keyed by
+        canonical ``source_id``. Returns ``{source_id: {ups, downs, raters, recent_visits}}``
+        for places that have any signal; places with none are omitted (cold start).
+
+        Counts are by *distinct user* (account or anonymous), so one person can't
+        inflate a place. ``ups``/``downs``/``raters`` come from thumbs feedback;
+        ``recent_visits`` from "mark visited" within ``community_visit_window_days``.
+        """
+        ids = [s for s in dict.fromkeys(source_ids) if s]  # dedupe, drop None, keep order
+        if not ids:
+            return {}
+        placeholders = ",".join("?" * len(ids))
+        up_raters: dict[str, set] = defaultdict(set)
+        down_raters: dict[str, set] = defaultdict(set)
+        visitors: dict[str, set] = defaultdict(set)
+        cutoff = (datetime.utcnow() - timedelta(days=settings.community_visit_window_days)).isoformat()
+        with self._connect() as conn:
+            rating_rows = conn.execute(
+                f"""
+                SELECT json_extract(r.payload_json, '$.source_id') AS source_id,
+                       f.rating AS rating,
+                       COALESCE(CAST(f.account_id AS TEXT), f.anonymous_id) AS rater
+                FROM feedback f
+                JOIN recommendations r
+                  ON r.request_id = f.request_id AND r.id = f.recommendation_id
+                WHERE json_extract(r.payload_json, '$.source_id') IN ({placeholders})
+                """,
+                ids,
+            ).fetchall()
+            visit_rows = conn.execute(
+                f"""
+                SELECT source_id, anonymous_id AS rater FROM place_marks
+                WHERE visited = 1 AND updated_at >= ? AND source_id IN ({placeholders})
+                UNION
+                SELECT source_id, CAST(account_id AS TEXT) AS rater FROM account_place_marks
+                WHERE visited = 1 AND updated_at >= ? AND source_id IN ({placeholders})
+                """,
+                [cutoff, *ids, cutoff, *ids],
+            ).fetchall()
+        for row in rating_rows:
+            sid, rater = row["source_id"], row["rater"]
+            if not sid or not rater:
+                continue
+            if row["rating"] == "up":
+                up_raters[sid].add(rater)
+            elif row["rating"] == "down":
+                down_raters[sid].add(rater)
+        for row in visit_rows:
+            sid, rater = row["source_id"], row["rater"]
+            if sid and rater:
+                visitors[sid].add(rater)
+        signals: dict[str, dict[str, int]] = {}
+        for sid in ids:
+            ups, downs = len(up_raters.get(sid, ())), len(down_raters.get(sid, ()))
+            raters = len(up_raters.get(sid, set()) | down_raters.get(sid, set()))
+            recent_visits = len(visitors.get(sid, ()))
+            if raters or recent_visits:
+                signals[sid] = {"ups": ups, "downs": downs, "raters": raters, "recent_visits": recent_visits}
+        return signals
 
     @staticmethod
     def _record_seen(conn: sqlite3.Connection, anonymous_id: str | None, source_ids: list[str | None]) -> None:
