@@ -405,6 +405,8 @@ const I18N = {
     want_confirm: 'Clear all places in your "Want to visit" list?',
     want_cleared: 'Want-to-visit list cleared.',
     auth_required_want: 'Sign in to save places you want to visit.',
+    nav_want: 'Saved',
+    want_empty: 'No saved places yet. Tap "☆ Want to visit" on any place.',
     difficulty_easy: 'easy',
     difficulty_medium: 'medium',
     difficulty_hard: 'hard',
@@ -607,6 +609,8 @@ const I18N = {
     want_confirm: 'Очистить все места из списка «Хочу посетить»?',
     want_cleared: 'Список «Хочу посетить» очищен.',
     auth_required_want: 'Войдите, чтобы сохранять места, которые хотите посетить.',
+    nav_want: 'Сохранённые',
+    want_empty: 'Пока нет сохранённых мест. Нажмите «☆ Хочу посетить» на любом месте.',
     difficulty_easy: 'лёгкий',
     difficulty_medium: 'средний',
     difficulty_hard: 'сложный',
@@ -936,6 +940,7 @@ function updateAuthUi() {
   const signedIn = $('authSignedIn');
   if (signedOut) signedOut.classList.toggle('hidden', !!currentUser);
   if (signedIn) signedIn.classList.toggle('hidden', !currentUser);
+  if ($('wantBtn')) $('wantBtn').classList.toggle('hidden', !currentUser);
   if ($('authEmail') && currentUser) $('authEmail').textContent = t('signed_in_as', { email: currentUser.email });
   if ($('googleAuthBtn')) $('googleAuthBtn').classList.toggle('hidden', !authConfig.google_enabled);
   if ($('authDivider')) $('authDivider').classList.toggle('hidden', !authConfig.google_enabled);
@@ -1013,6 +1018,11 @@ function wireAuthUi() {
   $('authCloseBtn').addEventListener('click', closeAuthModal);
   $('authModal').addEventListener('click', (event) => {
     if (event.target === $('authModal')) closeAuthModal();
+  });
+  $('wantBtn').addEventListener('click', openWantModal);
+  $('wantCloseBtn').addEventListener('click', closeWantModal);
+  $('wantModal').addEventListener('click', (event) => {
+    if (event.target === $('wantModal')) closeWantModal();
   });
   $('authLoginTab').addEventListener('click', () => setAuthTab('login'));
   $('authRegisterTab').addEventListener('click', () => setAuthTab('register'));
@@ -1883,9 +1893,30 @@ async function clearHistory() {
   alert(t('history_cleared'));
 }
 
+function openWantModal() {
+  if (!currentUser) {
+    openAuthModal('login');
+    showAuthMessage(t('auth_required_want'));
+    return;
+  }
+  $('wantModal').classList.remove('hidden');
+  loadWantToVisit();
+}
+
+function closeWantModal() {
+  $('wantModal').classList.add('hidden');
+}
+
+function updateWantCount(n) {
+  const badge = $('wantCount');
+  if (!badge) return;
+  badge.textContent = n > 0 ? String(n) : '';
+  badge.classList.toggle('hidden', !(n > 0));
+}
+
 async function loadWantToVisit() {
   if (!currentUser) {
-    renderWantPrompt();
+    updateWantCount(0);
     return;
   }
   try {
@@ -1898,31 +1929,17 @@ async function loadWantToVisit() {
   }
 }
 
-function renderWantPrompt() {
-  const section = $('wantToVisitSection');
-  const list = $('wantToVisitList');
-  section.classList.remove('hidden');
-  list.innerHTML = `
-    <div class="auth-prompt">
-      <p>${t('auth_required_want')}</p>
-      <button type="button" class="link-btn" id="wantSignIn">${t('sign_in')}</button>
-    </div>
-  `;
-  const actions = section.querySelector('.history-actions');
-  if (actions) actions.classList.add('hidden');
-  $('wantSignIn').addEventListener('click', () => openAuthModal('login'));
-}
-
 function renderWantToVisit(items) {
-  const section = $('wantToVisitSection');
+  updateWantCount(items.length);
   const list = $('wantToVisitList');
-  const actions = section.querySelector('.history-actions');
-  if (actions) actions.classList.remove('hidden');
+  const clear = $('clearWantBtn');
+  if (!list) return;
   if (!items.length) {
-    section.classList.add('hidden');
-    list.innerHTML = '';
+    list.innerHTML = `<p class="want-empty">${t('want_empty')}</p>`;
+    if (clear) clear.classList.add('hidden');
     return;
   }
+  if (clear) clear.classList.remove('hidden');
   list.innerHTML = items
     .map((item) => {
       const maps = item.map_url
@@ -1934,7 +1951,6 @@ function renderWantToVisit(items) {
   list.querySelectorAll('.want-remove').forEach((btn) => {
     btn.addEventListener('click', () => removeWantToVisit(btn.dataset.sourceId));
   });
-  section.classList.remove('hidden');
 }
 
 async function removeWantToVisit(sourceId) {

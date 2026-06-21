@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="/static/styles.css?v=14" />
+  <link rel="stylesheet" href="/static/styles.css?v=15" />
   <link rel="stylesheet" href="/static/mood.css?v=15" />
 </head>
 <body class="planning">
@@ -27,6 +27,7 @@
     <div class="topbar-right">
       <button id="editBtn" type="button" class="pill-btn hidden"><i data-lucide="chevron-left" aria-hidden="true"></i> <span data-i18n="edit_trip">Edit trip</span></button>
       <button id="locateBtn" type="button" class="icon-btn hidden" title="Use my location" aria-label="Use my location"><i data-lucide="locate-fixed"></i></button>
+      <button id="wantBtn" type="button" class="pill-btn want-btn hidden"><span class="want-star" aria-hidden="true">★</span> <span data-i18n="nav_want">Saved</span><span id="wantCount" class="want-count hidden"></span></button>
       <button id="accountBtn" type="button" class="pill-btn account-btn"><i data-lucide="user-circle" aria-hidden="true"></i> <span id="accountLabel" data-i18n="sign_in">Sign in</span></button>
       <div class="lang-toggle" id="langToggle" aria-label="Language">
         <button type="button" class="lang-btn" data-lang="en">EN</button>
@@ -143,14 +144,6 @@
       </div>
     </section>
 
-    <details id="wantToVisitSection" class="history hidden">
-      <summary data-i18n="want_to_visit_title">Want to visit</summary>
-      <div id="wantToVisitList"></div>
-      <div class="history-actions">
-        <button id="clearWantBtn" type="button" class="link-btn" data-i18n="clear_want_to_visit">Clear all</button>
-      </div>
-    </details>
-
     <details id="historySection" class="history hidden">
       <summary data-i18n="history_title">Recently seen</summary>
       <div id="historyList"></div>
@@ -262,9 +255,20 @@
     </div>
   </div>
 
+  <div id="wantModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="wantTitle">
+    <div class="auth-panel">
+      <button id="wantCloseBtn" type="button" class="icon-btn auth-close" aria-label="Close"><i data-lucide="x"></i></button>
+      <h2 id="wantTitle" data-i18n="want_to_visit_title">Want to visit</h2>
+      <div id="wantToVisitList" class="want-list"></div>
+      <div class="want-modal-actions">
+        <button id="clearWantBtn" type="button" class="link-btn" data-i18n="clear_want_to_visit">Clear all</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/vendor/lucide-icons.js?v=6"></script>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
-  <script src="/static/app.js?v=35"></script>
+  <script src="/static/app.js?v=36"></script>
   <script src="/static/mood.js?v=22"></script>
 </body>
 </html>
