@@ -268,14 +268,15 @@ POST /api/feedback
 The score is a weighted blend of factors computable from available data:
 
 ```text
-18% Time Fit
-18% Weather Fit
-14% Safety Fit
-13% Distance Fit
-10% Personal Preference Fit   (from this user's feedback; neutral on cold start)
- 9% Group Fit
+15% Time Fit
+15% Weather Fit
+13% Safety Fit
+12% Distance Fit
+12% Effort Fit                (Easy / Medium / Active)
  9% Interest Fit
- 9% Place Quality
+ 8% Group Fit
+ 8% Place Quality
+ 8% Personal Preference Fit   (from this user's feedback; neutral on cold start)
 ```
 
 On a focused single-interest search the top-N are re-ordered so matching places

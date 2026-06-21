@@ -172,6 +172,47 @@ def _group_fit(place: PlaceCandidate, request: AdventureRequest) -> int:
     return _clamp(score)
 
 
+def _effort_fit(place: PlaceCandidate, request: AdventureRequest) -> int:
+    score = 100
+    walk = place.estimated_walking_km
+
+    if request.intensity == "easy":
+        if place.difficulty == "medium":
+            score -= 25
+        elif place.difficulty == "hard":
+            score -= 60
+        if walk > 4:
+            score -= 25
+        elif walk > 2.5:
+            score -= 18
+        elif walk > 1.8:
+            score -= 10
+    elif request.intensity == "medium":
+        if place.difficulty == "hard":
+            score -= 20
+        elif place.difficulty == "easy" and walk < 1:
+            score -= 14
+        if walk > 5:
+            score -= 18
+        elif walk < 0.8:
+            score -= 10
+    else:  # active
+        if place.difficulty == "easy":
+            score -= 28
+        elif place.difficulty == "medium":
+            score -= 8
+        if walk < 1:
+            score -= 22
+        elif walk < 1.8:
+            score -= 14
+        elif walk >= 3.5:
+            score += 6
+        if "active" in _place_interests(place):
+            score += 8
+
+    return _clamp(score)
+
+
 def _safety_fit(place: PlaceCandidate, request: AdventureRequest, weather: WeatherSummary, total_minutes: int) -> tuple[int, list[str]]:
     score = 88
     warnings: list[str] = []
@@ -266,6 +307,8 @@ def _why(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, break
         items.append(t(lang, "why_travel", minutes=route.one_way_minutes))
     if breakdown.group_fit >= 80:
         items.append(t(lang, "why_group"))
+    if breakdown.effort_fit >= 85:
+        items.append(t(lang, "why_effort"))
     if breakdown.interest_fit >= 80:
         items.append(t(lang, "why_interest"))
     if breakdown.personal_preference_fit >= 85:
@@ -310,28 +353,32 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
     time_fit = _time_fit(total_minutes, request.available_minutes)
     weather_fit = weather.score
     distance_fit = _distance_fit(route, request)
+    effort_fit = _effort_fit(place, request)
     group_fit = _group_fit(place, request)
     interest_fit = _interest_fit(place, request.interests)
     place_quality = _place_quality(place)
     personal_preference_fit = _personal_preference_fit(place, profile)
     safety_fit, warnings = _safety_fit(place, request, weather, total_minutes)
 
-    # Adventure Score v0.2: adds a modest Personal Preference Fit term.
+    # Adventure Score: explicit effort fit keeps Easy/Medium/Active searches
+    # behaviorally distinct while safety and group fit still guard bad matches.
     score = round(
-        0.18 * time_fit
-        + 0.18 * weather_fit
-        + 0.13 * distance_fit
-        + 0.14 * safety_fit
-        + 0.09 * group_fit
+        0.15 * time_fit
+        + 0.15 * weather_fit
+        + 0.12 * distance_fit
+        + 0.13 * safety_fit
+        + 0.12 * effort_fit
+        + 0.08 * group_fit
         + 0.09 * interest_fit
-        + 0.09 * place_quality
-        + 0.10 * personal_preference_fit
+        + 0.08 * place_quality
+        + 0.08 * personal_preference_fit
     )
     breakdown = ScoreBreakdown(
         time_fit=time_fit,
         weather_fit=weather_fit,
         distance_fit=distance_fit,
         safety_fit=safety_fit,
+        effort_fit=effort_fit,
         group_fit=group_fit,
         interest_fit=interest_fit,
         place_quality=place_quality,
@@ -395,6 +442,8 @@ def rejected_from_scored(items: list[ScoredCandidate], chosen_ids: set[str], lim
             reasons.append(t(lang, "rej_no_time"))
         if b.safety_fit < 65:
             reasons.append(t(lang, "rej_safety"))
+        if b.effort_fit < 65:
+            reasons.append(t(lang, "rej_effort"))
         if b.group_fit < 65:
             reasons.append(t(lang, "rej_group"))
         if b.interest_fit < 55:

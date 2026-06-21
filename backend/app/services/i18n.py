@@ -83,6 +83,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "why_weather": "Weather looks suitable: {summary}.",
         "why_travel": "Travel time is manageable: about {minutes} min one way.",
         "why_group": "Suitable for the selected group and difficulty level.",
+        "why_effort": "Matches your selected effort level.",
         "why_interest": "Matches your selected interests.",
         "why_preference": "Similar to places you've liked before.",
         "why_walking": "Walking is limited to about {km:.1f} km.",
@@ -99,6 +100,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         # Rejected reasons
         "rej_no_time": "does not fit the available time",
         "rej_safety": "safety/weather risk",
+        "rej_effort": "does not match the selected effort level",
         "rej_group": "not ideal for the selected group",
         "rej_interest": "weak match with interests",
         "rej_lower_score": "lower overall Adventure Score",
@@ -131,6 +133,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "why_weather": "Погода подходящая: {summary}.",
         "why_travel": "Время в пути приемлемое: около {minutes} мин в одну сторону.",
         "why_group": "Подходит для выбранной группы и уровня сложности.",
+        "why_effort": "Соответствует выбранному уровню нагрузки.",
         "why_interest": "Соответствует вашим интересам.",
         "why_preference": "Похоже на места, которые вам уже нравились.",
         "why_walking": "Пешая часть ограничена примерно {km:.1f} км.",
@@ -147,6 +150,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         # Rejected reasons
         "rej_no_time": "не вписывается в доступное время",
         "rej_safety": "риск по безопасности или погоде",
+        "rej_effort": "не соответствует выбранному уровню нагрузки",
         "rej_group": "не идеально для выбранной группы",
         "rej_interest": "слабое совпадение с интересами",
         "rej_lower_score": "ниже общий Adventure Score",
