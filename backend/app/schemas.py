@@ -182,6 +182,7 @@ class ScoreBreakdown(BaseModel):
     weather_fit: int
     distance_fit: int
     safety_fit: int
+    effort_fit: int = 70
     group_fit: int
     interest_fit: int
     place_quality: int

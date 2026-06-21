@@ -139,6 +139,128 @@ def test_reduced_mobility_penalizes_hard_long_route():
     assert any("mobility" in w.lower() for w in reduced.warnings)
 
 
+def test_effort_fit_tracks_requested_intensity():
+    weather = WeatherSummary(source="test", summary="clear", score=90, confidence="estimated")
+    route = RouteInfo(
+        source="test",
+        one_way_minutes=10,
+        round_trip_minutes=20,
+        distance_km=5,
+        map_url="x",
+        confidence="estimated",
+    )
+    easy_place = PlaceCandidate(
+        source="test",
+        source_id="test:easy-walk",
+        name="Easy Walk",
+        type="park",
+        lat=42.45,
+        lon=18.70,
+        estimated_activity_minutes=60,
+        estimated_walking_km=0.8,
+        difficulty="easy",
+        quality_score=80,
+    )
+    active_place = PlaceCandidate(
+        source="test",
+        source_id="test:active-trail",
+        name="Active Trail",
+        type="trail",
+        lat=42.45,
+        lon=18.70,
+        estimated_activity_minutes=60,
+        estimated_walking_km=4.0,
+        difficulty="hard",
+        quality_score=80,
+    )
+
+    easy_request = AdventureRequest(
+        lat=42.43,
+        lon=18.69,
+        available_minutes=240,
+        transport_mode="car",
+        interests=["nature"],
+        intensity="easy",
+    )
+    active_request = AdventureRequest(
+        lat=42.43,
+        lon=18.69,
+        available_minutes=240,
+        transport_mode="car",
+        interests=["nature"],
+        intensity="active",
+    )
+
+    easy_short = score_candidate(easy_place, route, weather, easy_request)
+    easy_hard = score_candidate(active_place, route, weather, easy_request)
+    active_short = score_candidate(easy_place, route, weather, active_request)
+    active_hard = score_candidate(active_place, route, weather, active_request)
+
+    assert easy_short.breakdown.effort_fit > easy_hard.breakdown.effort_fit
+    assert active_hard.breakdown.effort_fit > active_short.breakdown.effort_fit
+
+
+def test_effort_can_change_ranking_direction():
+    weather = WeatherSummary(source="test", summary="clear", score=90, confidence="estimated")
+    route = RouteInfo(
+        source="test",
+        one_way_minutes=10,
+        round_trip_minutes=20,
+        distance_km=5,
+        map_url="x",
+        confidence="estimated",
+    )
+    easy_place = PlaceCandidate(
+        source="test",
+        source_id="test:easy-view",
+        name="Easy View",
+        type="viewpoint",
+        lat=42.45,
+        lon=18.70,
+        estimated_activity_minutes=60,
+        estimated_walking_km=1.0,
+        difficulty="easy",
+        quality_score=78,
+    )
+    active_place = PlaceCandidate(
+        source="test",
+        source_id="test:hard-view",
+        name="Hard View",
+        type="viewpoint",
+        lat=42.45,
+        lon=18.70,
+        estimated_activity_minutes=60,
+        estimated_walking_km=4.0,
+        difficulty="hard",
+        quality_score=78,
+    )
+
+    easy_request = AdventureRequest(
+        lat=42.43,
+        lon=18.69,
+        available_minutes=240,
+        transport_mode="car",
+        interests=["viewpoints"],
+        intensity="easy",
+    )
+    active_request = AdventureRequest(
+        lat=42.43,
+        lon=18.69,
+        available_minutes=240,
+        transport_mode="car",
+        interests=["viewpoints"],
+        intensity="active",
+    )
+
+    easy_short = score_candidate(easy_place, route, weather, easy_request)
+    easy_hard = score_candidate(active_place, route, weather, easy_request)
+    active_short = score_candidate(easy_place, route, weather, active_request)
+    active_hard = score_candidate(active_place, route, weather, active_request)
+
+    assert easy_short.score > easy_hard.score
+    assert active_hard.score > active_short.score
+
+
 def test_to_recommendation_carries_source_id():
     place = PlaceCandidate(source="osm", source_id="osm:node:42", name="Lookout", type="viewpoint", lat=42.4, lon=18.7)
     route = RouteInfo(source="test", one_way_minutes=10, round_trip_minutes=20, distance_km=5, map_url="x", confidence="estimated")
