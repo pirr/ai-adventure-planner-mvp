@@ -82,6 +82,9 @@ class Settings:
     rate_limit_parse: str = os.getenv("RATE_LIMIT_PARSE", "5/minute;30/day")
     # Account registration/login/OAuth entrypoints.
     rate_limit_auth: str = os.getenv("RATE_LIMIT_AUTH", "5/minute;50/day")
+    # Optional growth gate: anonymous users can receive the first recommendation
+    # batch, but must register/sign in before requesting rotated "more" results.
+    require_auth_for_more_recommendations: bool = _env_bool("REQUIRE_AUTH_FOR_MORE_RECOMMENDATIONS", False)
     # --- Authentication ---
     auth_session_cookie_name: str = os.getenv("AUTH_SESSION_COOKIE_NAME", "ap_session")
     auth_session_days: int = int(os.getenv("AUTH_SESSION_DAYS", "30"))

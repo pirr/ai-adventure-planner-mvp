@@ -146,14 +146,14 @@ def _enable(monkeypatch, provider, grant=1):
 def test_features_off_with_template_provider(monkeypatch):
     # Pin the provider: the suite must not depend on the ambient .env LLM config.
     monkeypatch.setattr("app.main.get_llm_provider", lambda: TemplateProvider())
-    assert client.get("/api/features").json() == {"parse": False}
+    assert client.get("/api/features").json() == {"parse": False, "require_auth_for_more_recommendations": False}
     res = client.post("/api/parse-request", json={"text": "two hours", "anonymous_id": "u"})
     assert res.status_code == 404
 
 
 def test_features_on_with_real_provider(monkeypatch):
     _enable(monkeypatch, FakeParseProvider())
-    assert client.get("/api/features").json() == {"parse": True}
+    assert client.get("/api/features").json() == {"parse": True, "require_auth_for_more_recommendations": False}
 
 
 def test_parse_request_returns_parsed_fields(monkeypatch):

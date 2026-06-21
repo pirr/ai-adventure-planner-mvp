@@ -193,6 +193,7 @@ body.planning .filterbar, body.planning .facet-panel { display: none; }
 /* expanded sheet: stack result cards full-width so they fit the screen */
 .sheet.open .carousel { flex-direction: column; overflow: visible; }
 .sheet.open .recommendation { flex: 0 0 auto; width: 100%; max-width: none; }
+.sheet.open .load-more-card { flex: 0 0 auto; width: 100%; max-width: none; min-height: 136px; }
 
 /* ---- "Describe your trip" (free-text + voice) --------------------------- */
 .describe-box { display: flex; gap: 8px; align-items: center; margin: 4px 0 14px; }

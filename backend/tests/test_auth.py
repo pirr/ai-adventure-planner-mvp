@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import dataclasses
+from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 
 from app.config import settings as real_settings
 from app import main
+from app.schemas import AdventureResponse, Recommendation, ScoreBreakdown, WeatherSummary
 from app.services import auth, recommendations
 from app.services.storage import Storage
 
@@ -31,6 +33,62 @@ def _register(client: TestClient, email: str = "User@Example.com") -> dict:
     assert response.status_code == 200
     assert "httponly" in response.headers["set-cookie"].lower()
     return response.json()
+
+
+def _recommendation_payload(**overrides) -> dict:
+    payload = {
+        "lat": 42.4304,
+        "lon": 18.6964,
+        "available_minutes": 300,
+        "transport_mode": "car",
+        "use_live_data": False,
+        "interests": ["history"],
+        "anonymous_id": "anon-1",
+        "limit": 1,
+    }
+    payload.update(overrides)
+    return payload
+
+
+async def _fake_recommendations(payload, account_id=None):  # noqa: ARG001
+    return AdventureResponse(
+        request_id="req-more",
+        generated_at=datetime.utcnow(),
+        weather=WeatherSummary(source="test", summary="Clear", score=80),
+        recommendations=[
+            Recommendation(
+                id="sample-1",
+                source_id="sample:1",
+                title="Sample place",
+                place_type="viewpoint",
+                lat=payload.lat,
+                lon=payload.lon,
+                adventure_score=80,
+                score_breakdown=ScoreBreakdown(
+                    time_fit=80,
+                    weather_fit=80,
+                    distance_fit=80,
+                    safety_fit=80,
+                    effort_fit=80,
+                    group_fit=80,
+                    interest_fit=80,
+                    place_quality=80,
+                ),
+                total_minutes=90,
+                travel_minutes=30,
+                activity_minutes=60,
+                distance_km=4.0,
+                walking_km=1.0,
+                difficulty="easy",
+                description="A test recommendation.",
+                why=["Fits the test."],
+                warnings=[],
+                map_url="https://maps.example.test",
+                source="test",
+            )
+        ],
+        rejected_alternatives=[],
+    )
 
 
 def test_auth_routes_register_me_and_logout(tmp_path, monkeypatch):
@@ -85,6 +143,47 @@ def test_visited_routes_require_auth_and_csrf(tmp_path, monkeypatch):
     )
     assert ok.status_code == 200
     assert client.delete("/api/visited", headers={"X-CSRF-Token": csrf}).json()["cleared"] == 1
+
+
+def test_features_reports_more_recommendations_auth_gate(monkeypatch):
+    monkeypatch.setattr(main, "settings", _settings(require_auth_for_more_recommendations=True))
+    client = TestClient(main.app)
+
+    response = client.get("/api/features")
+
+    assert response.status_code == 200
+    assert response.json()["require_auth_for_more_recommendations"] is True
+
+
+def test_more_recommendations_gate_only_blocks_anonymous_rotation(tmp_path, monkeypatch):
+    _patch_store(tmp_path, monkeypatch)
+    monkeypatch.setattr(main, "settings", _settings(require_auth_for_more_recommendations=True))
+    monkeypatch.setattr(main, "build_recommendations", _fake_recommendations)
+    client = TestClient(main.app)
+
+    first = client.post("/api/recommendations", json=_recommendation_payload(exclude_seen=False))
+    blocked = client.post("/api/recommendations", json=_recommendation_payload(exclude_seen=True))
+
+    assert first.status_code == 200
+    assert blocked.status_code == 401
+    assert blocked.json()["detail"] == "auth_required_for_more_recommendations"
+
+
+def test_more_recommendations_gate_allows_authenticated_rotation(tmp_path, monkeypatch):
+    _patch_store(tmp_path, monkeypatch)
+    monkeypatch.setattr(main, "settings", _settings(require_auth_for_more_recommendations=True))
+    monkeypatch.setattr(main, "build_recommendations", _fake_recommendations)
+    client = TestClient(main.app)
+    csrf = _register(client)["csrf_token"]
+
+    response = client.post(
+        "/api/recommendations",
+        json=_recommendation_payload(exclude_seen=True),
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recommendations"][0]["source_id"] == "sample:1"
 
 
 def test_clear_history_preserves_account_visited_marks(tmp_path, monkeypatch):

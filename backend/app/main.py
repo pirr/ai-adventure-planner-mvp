@@ -119,7 +119,10 @@ def _raise_auth_error(exc: auth.AuthError) -> None:
 
 @app.get("/api/features")
 async def features() -> dict[str, bool]:
-    return {"parse": _parse_feature_enabled()}
+    return {
+        "parse": _parse_feature_enabled(),
+        "require_auth_for_more_recommendations": settings.require_auth_for_more_recommendations,
+    }
 
 
 @app.get("/api/auth/config")
@@ -247,6 +250,8 @@ async def sample_request() -> dict[str, Any]:
 @limiter.limit(settings.rate_limit_recommendations)
 async def recommendations(request: Request, response: Response, payload: AdventureRequest):
     session = _session(request)
+    if settings.require_auth_for_more_recommendations and session is None and payload.exclude_seen:
+        raise HTTPException(status_code=401, detail="auth_required_for_more_recommendations")
     if session is not None:
         try:
             auth.require_csrf(request, session)
