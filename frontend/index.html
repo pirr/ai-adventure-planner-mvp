@@ -143,6 +143,14 @@
       </div>
     </section>
 
+    <details id="wantToVisitSection" class="history hidden">
+      <summary data-i18n="want_to_visit_title">Want to visit</summary>
+      <div id="wantToVisitList"></div>
+      <div class="history-actions">
+        <button id="clearWantBtn" type="button" class="link-btn" data-i18n="clear_want_to_visit">Clear all</button>
+      </div>
+    </details>
+
     <details id="historySection" class="history hidden">
       <summary data-i18n="history_title">Recently seen</summary>
       <div id="historyList"></div>
@@ -210,6 +218,7 @@
             <a class="btn btn-line apple-map-link" target="_blank" rel="noopener">Apple Maps</a>
             <button type="button" class="btn btn-ghost feedback-up">👍</button>
             <button type="button" class="btn btn-ghost feedback-down">👎</button>
+            <button type="button" class="btn btn-ghost want-to-visit"></button>
             <button type="button" class="btn btn-ghost mark-visited"></button>
           </div>
           <div class="feedback-reasons hidden"></div>
@@ -255,7 +264,7 @@
 
   <script src="/static/vendor/lucide-icons.js?v=6"></script>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
-  <script src="/static/app.js?v=34"></script>
+  <script src="/static/app.js?v=35"></script>
   <script src="/static/mood.js?v=22"></script>
 </body>
 </html>

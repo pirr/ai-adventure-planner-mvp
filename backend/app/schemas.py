@@ -201,6 +201,7 @@ class CommunitySignal(BaseModel):
     liked_ratio: float = Field(default=0.0, ge=0, le=1)  # share of distinct raters who thumbed up
     sample_size: int = Field(default=0, ge=0)  # distinct raters behind liked_ratio (0 -> hide chip)
     recent_visits: int = Field(default=0, ge=0)  # distinct users who marked visited within the window (0 -> hide chip)
+    want_to_visit: int = Field(default=0, ge=0)  # distinct users who marked "want to visit" (0 -> hide chip)
 
 
 class Recommendation(BaseModel):
@@ -244,6 +245,8 @@ class Recommendation(BaseModel):
     # Aggregated "wisdom of our adventurers" for this place; None until enough
     # first-party feedback/visits accrue to clear the badge threshold.
     community: CommunitySignal | None = None
+    # Whether the current (logged-in) user has marked this place "want to visit".
+    wanted: bool = False
 
 
 class RejectedAlternative(BaseModel):
@@ -293,3 +296,8 @@ class AnalyticsEvent(BaseModel):
 class VisitedRequest(BaseModel):
     anonymous_id: str = Field(..., max_length=64)
     source_id: str = Field(..., max_length=200)
+
+
+class WantToVisitRequest(BaseModel):
+    source_id: str = Field(..., max_length=200)
+    wanted: bool = True

@@ -32,8 +32,21 @@ def test_community_signals_counts_distinct_raters(tmp_path):
     _add_rating(db, "osm:1", "down", "d0")
 
     sig = db.community_signals(["osm:1", "osm:absent"])
-    assert sig["osm:1"] == {"ups": 5, "downs": 1, "raters": 6, "recent_visits": 0}
+    assert sig["osm:1"] == {"ups": 5, "downs": 1, "raters": 6, "recent_visits": 0, "want_to_visit": 0}
     assert "osm:absent" not in sig  # places with no signal are omitted (cold start)
+
+
+def test_community_signals_counts_distinct_wanters(tmp_path):
+    db = Storage(tmp_path / "c.db")
+    a1 = db.create_email_account("a1@example.com", "hash")["id"]
+    a2 = db.create_email_account("a2@example.com", "hash")["id"]
+    db.set_want_to_visit_account(a1, "osm:1", True)
+    db.set_want_to_visit_account(a2, "osm:1", True)
+    db.set_want_to_visit_account(a1, "osm:1", True)  # same account again -> not double counted
+    db.set_want_to_visit_account(a2, "osm:1", False)  # toggled off -> not counted
+
+    sig = db.community_signals(["osm:1"])
+    assert sig["osm:1"]["want_to_visit"] == 1  # only a1 still wants it
 
 
 def test_community_signals_visits_use_window_and_both_mark_tables(tmp_path):
@@ -121,6 +134,29 @@ def test_community_badge_thresholds():
     assert rec_v is not None and rec_v.recent_visits == 5 and rec_v.sample_size == 0
 
 
+def test_want_to_visit_raises_score_above_neutral_when_gated():
+    place, route, weather, request = _fixtures()
+    below = {"osm:1": {"want_to_visit": 2}}  # below community_min_raters(3)
+    some = {"osm:1": {"want_to_visit": 5}}
+    many = {"osm:1": {"want_to_visit": 20}}
+    below_fit = score_candidate(place, route, weather, request, None, below).breakdown.community_confidence
+    some_fit = score_candidate(place, route, weather, request, None, some).breakdown.community_confidence
+    many_fit = score_candidate(place, route, weather, request, None, many).breakdown.community_confidence
+    assert below_fit == 70  # intent below the gate doesn't move the score
+    assert 70 < some_fit < many_fit  # demand nudges up, saturating with more wanters
+
+
+def test_want_to_visit_badge_threshold():
+    place, route, weather, request = _fixtures()
+    # below the wants badge bar (default 5) and no other dimension clears -> no badge
+    low = {"osm:1": {"ups": 0, "downs": 0, "raters": 0, "recent_visits": 0, "want_to_visit": 4}}
+    assert to_recommendation(score_candidate(place, route, weather, request, None, low), None, low).community is None
+    # at/above the bar -> "want to go" chip appears; other dimensions stay hidden (0)
+    want = {"osm:1": {"ups": 0, "downs": 0, "raters": 0, "recent_visits": 0, "want_to_visit": 6}}
+    rec = to_recommendation(score_candidate(place, route, weather, request, None, want), None, want).community
+    assert rec is not None and rec.want_to_visit == 6 and rec.sample_size == 0 and rec.recent_visits == 0
+
+
 # --- env-driven tuning -------------------------------------------------------
 
 def test_community_gates_are_env_tunable(monkeypatch):
@@ -139,6 +175,7 @@ def test_community_gates_are_env_tunable(monkeypatch):
     relaxed = types.SimpleNamespace(
         community_min_raters=2, community_shrink_prior=real.community_shrink_prior,
         community_badge_min_raters=2, community_badge_min_visits=real.community_badge_min_visits,
+        community_want_span=real.community_want_span, community_badge_min_wants=real.community_badge_min_wants,
     )
     monkeypatch.setattr(scoring, "settings", relaxed)
     assert score_candidate(place, route, weather, request, None, two_up).breakdown.community_confidence > 70

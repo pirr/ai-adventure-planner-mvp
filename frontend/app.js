@@ -396,6 +396,15 @@ const I18N = {
     badge_walk: '{km} km walk',
     badge_community_liked: '♥ {pct}% liked · {n} adventurers',
     badge_community_visits: '{n} visited recently',
+    badge_community_wants: '{n} want to go',
+    want_to_visit: '☆ Want to visit',
+    want_to_visit_saved: '★ Saved',
+    want_to_visit_title: 'Want to visit',
+    clear_want_to_visit: 'Clear all',
+    want_remove: 'Remove',
+    want_confirm: 'Clear all places in your "Want to visit" list?',
+    want_cleared: 'Want-to-visit list cleared.',
+    auth_required_want: 'Sign in to save places you want to visit.',
     difficulty_easy: 'easy',
     difficulty_medium: 'medium',
     difficulty_hard: 'hard',
@@ -589,6 +598,15 @@ const I18N = {
     badge_walk: '{km} км пешком',
     badge_community_liked: '♥ {pct}% понравилось · {n} путешеств.',
     badge_community_visits: '{n} побывали недавно',
+    badge_community_wants: '{n} хотят посетить',
+    want_to_visit: '☆ Хочу посетить',
+    want_to_visit_saved: '★ В списке',
+    want_to_visit_title: 'Хочу посетить',
+    clear_want_to_visit: 'Очистить',
+    want_remove: 'Удалить',
+    want_confirm: 'Очистить все места из списка «Хочу посетить»?',
+    want_cleared: 'Список «Хочу посетить» очищен.',
+    auth_required_want: 'Войдите, чтобы сохранять места, которые хотите посетить.',
     difficulty_easy: 'лёгкий',
     difficulty_medium: 'средний',
     difficulty_hard: 'сложный',
@@ -707,6 +725,7 @@ function setLang(lang) {
   updateProgress();
   if (lastResponse) renderResults(lastResponse, { refit: false });
   loadHistory();
+  loadWantToVisit();
 }
 
 document.querySelectorAll('.lang-btn').forEach((btn) => {
@@ -814,6 +833,7 @@ function selectedInterests() {
 $('searchBtn').addEventListener('click', () => runSearch());
 $('clearHistoryBtn').addEventListener('click', clearHistory);
 $('clearVisitedBtn').addEventListener('click', clearVisited);
+$('clearWantBtn').addEventListener('click', clearWantToVisit);
 
 function parseChildrenAges(value) {
   return value
@@ -971,6 +991,7 @@ async function submitAuth(path, payload, successMessage) {
   showAuthMessage(successMessage, true);
   closeAuthModal();
   loadHistory();
+  loadWantToVisit();
   if (retryLoadMoreAfterAuth) {
     retryLoadMoreAfterAuth = false;
     loadMoreAuthBlocked = false;
@@ -1021,6 +1042,7 @@ function wireAuthUi() {
     } catch (error) {}
     closeAuthModal();
     loadHistory();
+    loadWantToVisit();
   });
 }
 
@@ -1423,6 +1445,7 @@ function communityBadgesHtml(item) {
   const chips = [];
   if (c.sample_size) chips.push(`<span class="badge community">${t('badge_community_liked', { pct: Math.round(c.liked_ratio * 100), n: c.sample_size })}</span>`);
   if (c.recent_visits) chips.push(`<span class="badge community">${t('badge_community_visits', { n: c.recent_visits })}</span>`);
+  if (c.want_to_visit) chips.push(`<span class="badge community">${t('badge_community_wants', { n: c.want_to_visit })}</span>`);
   return chips.join('');
 }
 
@@ -1554,6 +1577,13 @@ function buildCard(item, isTop) {
   const reasonsBox = fragment.querySelector('.feedback-reasons');
   fragment.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up', null, requestId));
   fragment.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id, requestId));
+  const wantBtn = fragment.querySelector('.want-to-visit');
+  const applyWant = (w) => {
+    wantBtn.textContent = t(w ? 'want_to_visit_saved' : 'want_to_visit');
+    wantBtn.classList.toggle('is-saved', w);
+  };
+  applyWant(!!item.wanted);
+  wantBtn.addEventListener('click', () => toggleWantToVisit(item, wantBtn, applyWant));
   const visitedBtn = fragment.querySelector('.mark-visited');
   visitedBtn.textContent = t('mark_visited');
   visitedBtn.addEventListener('click', () => markVisited(item));
@@ -1735,6 +1765,35 @@ async function markVisited(item) {
   }
 }
 
+async function toggleWantToVisit(item, btn, applyWant) {
+  if (!currentUser) {
+    openAuthModal('login');
+    showAuthMessage(t('auth_required_action'));
+    return;
+  }
+  const next = !item.wanted;
+  if (btn) btn.disabled = true;
+  try {
+    const response = await apiFetch('/api/want-to-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_id: item.source_id, wanted: next }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+  } catch (error) {
+    alert(t('account_update_failed', { error: error.message }));
+    if (btn) btn.disabled = false;
+    return;
+  }
+  item.wanted = next;
+  if (applyWant) applyWant(next);
+  // Keep the card the user didn't directly click (and a fresh re-render) in sync.
+  const rec = ((lastResponse && lastResponse.recommendations) || []).find((r) => r.id === item.id);
+  if (rec) rec.wanted = next;
+  if (btn) btn.disabled = false;
+  loadWantToVisit();
+}
+
 async function clearVisited() {
   if (!currentUser) {
     openAuthModal('login');
@@ -1824,6 +1883,104 @@ async function clearHistory() {
   alert(t('history_cleared'));
 }
 
+async function loadWantToVisit() {
+  if (!currentUser) {
+    renderWantPrompt();
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/want-to-visit');
+    if (!res.ok) throw new Error(await readError(res));
+    const data = await res.json();
+    renderWantToVisit(data.items || []);
+  } catch (error) {
+    renderWantToVisit([]);
+  }
+}
+
+function renderWantPrompt() {
+  const section = $('wantToVisitSection');
+  const list = $('wantToVisitList');
+  section.classList.remove('hidden');
+  list.innerHTML = `
+    <div class="auth-prompt">
+      <p>${t('auth_required_want')}</p>
+      <button type="button" class="link-btn" id="wantSignIn">${t('sign_in')}</button>
+    </div>
+  `;
+  const actions = section.querySelector('.history-actions');
+  if (actions) actions.classList.add('hidden');
+  $('wantSignIn').addEventListener('click', () => openAuthModal('login'));
+}
+
+function renderWantToVisit(items) {
+  const section = $('wantToVisitSection');
+  const list = $('wantToVisitList');
+  const actions = section.querySelector('.history-actions');
+  if (actions) actions.classList.remove('hidden');
+  if (!items.length) {
+    section.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = items
+    .map((item) => {
+      const maps = item.map_url
+        ? `<a class="link-btn" href="${escapeHtml(item.map_url)}" target="_blank" rel="noopener">${t('open_maps')}</a>`
+        : '';
+      return `<div class="item want-item"><strong>${escapeHtml(item.title)}</strong> · ${t('score_label', { score: item.score })} ${maps}<button type="button" class="link-btn want-remove" data-source-id="${escapeHtml(item.source_id)}">${t('want_remove')}</button></div>`;
+    })
+    .join('');
+  list.querySelectorAll('.want-remove').forEach((btn) => {
+    btn.addEventListener('click', () => removeWantToVisit(btn.dataset.sourceId));
+  });
+  section.classList.remove('hidden');
+}
+
+async function removeWantToVisit(sourceId) {
+  if (!sourceId) return;
+  try {
+    const response = await apiFetch('/api/want-to-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_id: sourceId, wanted: false }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+  } catch (error) {
+    alert(t('account_update_failed', { error: error.message }));
+    return;
+  }
+  // Flip any visible card for this place back to "Want to visit", then refresh.
+  const rec = ((lastResponse && lastResponse.recommendations) || []).find((r) => r.source_id === sourceId);
+  if (rec) {
+    rec.wanted = false;
+    renderResults(lastResponse, { refit: false });
+  }
+  loadWantToVisit();
+}
+
+async function clearWantToVisit() {
+  if (!currentUser) {
+    openAuthModal('login');
+    showAuthMessage(t('auth_required_action'));
+    return;
+  }
+  if (!confirm(t('want_confirm'))) return;
+  try {
+    const response = await apiFetch('/api/want-to-visit', { method: 'DELETE' });
+    if (!response.ok) throw new Error(await readError(response));
+  } catch (error) {
+    alert(t('account_update_failed', { error: error.message }));
+    return;
+  }
+  if (lastResponse) {
+    (lastResponse.recommendations || []).forEach((r) => { r.wanted = false; });
+    renderResults(lastResponse, { refit: false });
+  }
+  renderWantToVisit([]);
+  alert(t('want_cleared'));
+}
+
 function breakdownLabel(key) {
   const dict = I18N[currentLang] || I18N.en;
   return dict['bd_' + key] || I18N.en['bd_' + key] || humanize(key);
@@ -1848,4 +2005,4 @@ updateProgress();
 wireAuthUi();
 loadFeatures();
 loadAuthConfig();
-loadAuthStatus().then(loadHistory);
+loadAuthStatus().then(() => { loadHistory(); loadWantToVisit(); });

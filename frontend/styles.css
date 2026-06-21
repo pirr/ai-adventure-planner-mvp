@@ -210,6 +210,9 @@ body.exploring .planner { display: none; }
 .btn-line:hover { border-color: var(--pine-700); color: var(--pine-700); }
 .btn-ghost { background: transparent; color: var(--muted); padding: 10px 14px; }
 .btn-ghost:hover { color: var(--ink-900); background: var(--sand-200); }
+.btn-ghost.want-to-visit.is-saved { color: var(--good); }
+.want-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.want-item .want-remove { margin-left: auto; }
 .link-btn { background: none; color: var(--clay-500); font-family: var(--display); font-weight: 700; font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0; }
 .history-actions { display: flex; flex-wrap: wrap; gap: 18px; }
 

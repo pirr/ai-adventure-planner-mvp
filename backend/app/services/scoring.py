@@ -108,12 +108,18 @@ def _community_confidence_fit(place: PlaceCandidate, community: dict | None) -> 
         return COMMUNITY_NEUTRAL
     ups, downs = sig.get("ups", 0), sig.get("downs", 0)
     rated = ups + downs
-    if rated < settings.community_min_raters:
-        return COMMUNITY_NEUTRAL
     prior = settings.community_shrink_prior
-    raw = (ups / rated) * 100
-    shrunk = (raw * rated + COMMUNITY_NEUTRAL * prior) / (rated + prior)
-    return _clamp(shrunk)
+    # Experience: liked-ratio shrunk toward neutral by sample size (unchanged).
+    score: float = COMMUNITY_NEUTRAL
+    if rated >= settings.community_min_raters:
+        raw = (ups / rated) * 100
+        score = (raw * rated + COMMUNITY_NEUTRAL * prior) / (rated + prior)
+    # Intent: one-sided "want to visit" demand nudges the score upward, saturating
+    # with distinct wanters (the prior shrinks thin samples), capped by want_span.
+    wants = sig.get("want_to_visit", 0)
+    if wants >= settings.community_min_raters:
+        score += settings.community_want_span * (wants / (wants + prior))
+    return _clamp(score)
 
 
 def _community_badge(community: dict | None, source_id: str | None) -> CommunitySignal | None:
@@ -123,9 +129,11 @@ def _community_badge(community: dict | None, source_id: str | None) -> Community
     if not sig:
         return None
     raters, visits = sig.get("raters", 0), sig.get("recent_visits", 0)
+    wants = sig.get("want_to_visit", 0)
     show_liked = raters >= settings.community_badge_min_raters
     show_visits = visits >= settings.community_badge_min_visits
-    if not (show_liked or show_visits):
+    show_wants = wants >= settings.community_badge_min_wants
+    if not (show_liked or show_visits or show_wants):
         return None
     ups, downs = sig.get("ups", 0), sig.get("downs", 0)
     rated = ups + downs
@@ -133,6 +141,7 @@ def _community_badge(community: dict | None, source_id: str | None) -> Community
         liked_ratio=round(ups / rated, 2) if (show_liked and rated) else 0.0,
         sample_size=raters if show_liked else 0,
         recent_visits=visits if show_visits else 0,
+        want_to_visit=wants if show_wants else 0,
     )
 
 

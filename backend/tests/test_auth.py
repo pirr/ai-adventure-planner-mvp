@@ -206,7 +206,38 @@ def test_clear_history_preserves_account_visited_marks(tmp_path, monkeypatch):
 
     cleared = client.delete("/api/history", headers={"X-CSRF-Token": csrf})
     assert cleared.status_code == 200
-    assert store.account_place_marks(account_id) == {"seen": set(), "visited": {"p1"}}
+    assert store.account_place_marks(account_id) == {"seen": set(), "visited": {"p1"}, "want_to_visit": set()}
+
+
+def test_want_to_visit_endpoints_toggle_and_list(tmp_path, monkeypatch):
+    store = _patch_store(tmp_path, monkeypatch)
+    client = TestClient(main.app)
+    csrf = _register(client)["csrf_token"]
+    account_id = client.get("/api/auth/me").json()["user"]["id"]
+
+    for sid in ("osm:1", "osm:2"):
+        r = client.post("/api/want-to-visit", json={"source_id": sid, "wanted": True}, headers={"X-CSRF-Token": csrf})
+        assert r.status_code == 200 and r.json()["wanted"] is True
+    assert store.account_place_marks(account_id)["want_to_visit"] == {"osm:1", "osm:2"}
+
+    listed = client.get("/api/want-to-visit").json()["items"]
+    assert {item["source_id"] for item in listed} == {"osm:1", "osm:2"}
+
+    # Toggle one off, then clear the rest.
+    off = client.post("/api/want-to-visit", json={"source_id": "osm:1", "wanted": False}, headers={"X-CSRF-Token": csrf})
+    assert off.status_code == 200 and off.json()["wanted"] is False
+    assert store.account_place_marks(account_id)["want_to_visit"] == {"osm:2"}
+
+    cleared = client.delete("/api/want-to-visit", headers={"X-CSRF-Token": csrf})
+    assert cleared.status_code == 200 and cleared.json()["cleared"] == 1
+    assert store.account_place_marks(account_id)["want_to_visit"] == set()
+
+
+def test_want_to_visit_requires_auth(tmp_path, monkeypatch):
+    _patch_store(tmp_path, monkeypatch)
+    client = TestClient(main.app)
+    resp = client.post("/api/want-to-visit", json={"source_id": "osm:1", "wanted": True})
+    assert resp.status_code >= 400  # no session -> rejected
 
 
 def test_merge_anonymous_data_into_account(tmp_path):
@@ -236,7 +267,7 @@ def test_merge_anonymous_data_into_account(tmp_path):
         assert conn.execute("SELECT account_id FROM feedback WHERE request_id='s1'").fetchone()["account_id"] == account["id"]
         assert conn.execute("SELECT account_id FROM events WHERE request_id='s1'").fetchone()["account_id"] == account["id"]
     marks = store.account_place_marks(account["id"])
-    assert marks == {"seen": {"p1"}, "visited": {"p1"}}
+    assert marks == {"seen": {"p1"}, "visited": {"p1"}, "want_to_visit": set()}
 
 
 def test_google_oauth_callback_creates_session(tmp_path, monkeypatch):

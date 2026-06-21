@@ -142,6 +142,7 @@ class Storage:
                     source_id TEXT NOT NULL,
                     seen INTEGER NOT NULL DEFAULT 0,
                     visited INTEGER NOT NULL DEFAULT 0,
+                    want_to_visit INTEGER NOT NULL DEFAULT 0,
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY (account_id, source_id)
                 );
@@ -164,6 +165,8 @@ class Storage:
                 self._ensure_column(conn, table, "account_id", "INTEGER")
             # 0.2.1: which explainer (llm/template) produced each session, for A/B.
             self._ensure_column(conn, "search_sessions", "explainer", "TEXT")
+            # 0.7: "want to visit" intent mark (login-only) on account places.
+            self._ensure_column(conn, "account_place_marks", "want_to_visit", "INTEGER NOT NULL DEFAULT 0")
             conn.executescript(
                 """
                 CREATE INDEX IF NOT EXISTS idx_search_sessions_account ON search_sessions(account_id, created_at);
@@ -598,12 +601,14 @@ class Storage:
 
     def community_signals(self, source_ids: list[str | None]) -> dict[str, dict[str, int]]:
         """Cross-user 'wisdom of our adventurers' for the given places, keyed by
-        canonical ``source_id``. Returns ``{source_id: {ups, downs, raters, recent_visits}}``
-        for places that have any signal; places with none are omitted (cold start).
+        canonical ``source_id``. Returns
+        ``{source_id: {ups, downs, raters, recent_visits, want_to_visit}}`` for places
+        that have any signal; places with none are omitted (cold start).
 
         Counts are by *distinct user* (account or anonymous), so one person can't
         inflate a place. ``ups``/``downs``/``raters`` come from thumbs feedback;
-        ``recent_visits`` from "mark visited" within ``community_visit_window_days``.
+        ``recent_visits`` from "mark visited" within ``community_visit_window_days``;
+        ``want_to_visit`` from logged-in "want to visit" marks (all-time, intent signal).
         """
         ids = [s for s in dict.fromkeys(source_ids) if s]  # dedupe, drop None, keep order
         if not ids:
@@ -612,6 +617,7 @@ class Storage:
         up_raters: dict[str, set] = defaultdict(set)
         down_raters: dict[str, set] = defaultdict(set)
         visitors: dict[str, set] = defaultdict(set)
+        wanters: dict[str, set] = defaultdict(set)
         cutoff = (datetime.utcnow() - timedelta(days=settings.community_visit_window_days)).isoformat()
         with self._connect() as conn:
             rating_rows = conn.execute(
@@ -636,6 +642,14 @@ class Storage:
                 """,
                 [cutoff, *ids, cutoff, *ids],
             ).fetchall()
+            # "Want to visit" is intent, not a dated event: count it all-time (no window).
+            want_rows = conn.execute(
+                f"""
+                SELECT source_id, CAST(account_id AS TEXT) AS rater FROM account_place_marks
+                WHERE want_to_visit = 1 AND source_id IN ({placeholders})
+                """,
+                ids,
+            ).fetchall()
         for row in rating_rows:
             sid, rater = row["source_id"], row["rater"]
             if not sid or not rater:
@@ -648,13 +662,24 @@ class Storage:
             sid, rater = row["source_id"], row["rater"]
             if sid and rater:
                 visitors[sid].add(rater)
+        for row in want_rows:
+            sid, rater = row["source_id"], row["rater"]
+            if sid and rater:
+                wanters[sid].add(rater)
         signals: dict[str, dict[str, int]] = {}
         for sid in ids:
             ups, downs = len(up_raters.get(sid, ())), len(down_raters.get(sid, ()))
             raters = len(up_raters.get(sid, set()) | down_raters.get(sid, set()))
             recent_visits = len(visitors.get(sid, ()))
-            if raters or recent_visits:
-                signals[sid] = {"ups": ups, "downs": downs, "raters": raters, "recent_visits": recent_visits}
+            want_to_visit = len(wanters.get(sid, ()))
+            if raters or recent_visits or want_to_visit:
+                signals[sid] = {
+                    "ups": ups,
+                    "downs": downs,
+                    "raters": raters,
+                    "recent_visits": recent_visits,
+                    "want_to_visit": want_to_visit,
+                }
         return signals
 
     @staticmethod
@@ -726,10 +751,66 @@ class Storage:
             )
             return cursor.rowcount
 
+    def set_want_to_visit_account(self, account_id: int | None, source_id: str | None, wanted: bool) -> None:
+        """Toggle this account's "want to visit" intent for one place (login-only)."""
+        if account_id is None or not source_id:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO account_place_marks (account_id, source_id, want_to_visit, updated_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(account_id, source_id) DO UPDATE SET want_to_visit=excluded.want_to_visit, updated_at=excluded.updated_at",
+                (account_id, source_id, 1 if wanted else 0, datetime.utcnow().isoformat()),
+            )
+
+    def clear_want_to_visit_account(self, account_id: int | None) -> int:
+        """Un-mark every "want to visit" place for this account. Returns rows affected."""
+        if account_id is None:
+            return 0
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE account_place_marks SET want_to_visit=0, updated_at=? WHERE account_id=? AND want_to_visit=1",
+                (datetime.utcnow().isoformat(), account_id),
+            )
+            return cursor.rowcount
+
+    def wanted_places_account(self, account_id: int | None, limit: int = 20) -> list[dict[str, Any]]:
+        """This account's "want to visit" places, newest first, with display info
+        (title, score, map_url) recovered from a recommendation row for each place.
+        Falls back to source_id as the title when no recommendation row remains."""
+        if account_id is None:
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT m.source_id AS source_id,
+                       m.updated_at AS saved_at,
+                       r.title AS title,
+                       r.score AS score,
+                       json_extract(r.payload_json, '$.map_url') AS map_url
+                FROM account_place_marks m
+                LEFT JOIN recommendations r
+                  ON json_extract(r.payload_json, '$.source_id') = m.source_id
+                WHERE m.account_id = ? AND m.want_to_visit = 1
+                GROUP BY m.source_id
+                ORDER BY m.updated_at DESC
+                LIMIT ?
+                """,
+                (account_id, limit),
+            ).fetchall()
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["title"] = item["title"] or item["source_id"]
+            items.append(item)
+        return items
+
     def place_marks(self, anonymous_id: str | None) -> dict[str, set[str]]:
-        """This user's seen and visited place source_ids (empty without an id)."""
+        """This user's seen and visited place source_ids (empty without an id).
+
+        ``want_to_visit`` is always empty here: it is a login-only intent stored on
+        accounts, but the key is present so the marks dict shape matches accounts."""
         if not anonymous_id:
-            return {"seen": set(), "visited": set()}
+            return {"seen": set(), "visited": set(), "want_to_visit": set()}
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT source_id, seen, visited FROM place_marks WHERE anonymous_id = ?",
@@ -737,19 +818,20 @@ class Storage:
             ).fetchall()
         seen = {row["source_id"] for row in rows if row["seen"]}
         visited = {row["source_id"] for row in rows if row["visited"]}
-        return {"seen": seen, "visited": visited}
+        return {"seen": seen, "visited": visited, "want_to_visit": set()}
 
     def account_place_marks(self, account_id: int | None) -> dict[str, set[str]]:
         if account_id is None:
-            return {"seen": set(), "visited": set()}
+            return {"seen": set(), "visited": set(), "want_to_visit": set()}
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT source_id, seen, visited FROM account_place_marks WHERE account_id = ?",
+                "SELECT source_id, seen, visited, want_to_visit FROM account_place_marks WHERE account_id = ?",
                 (account_id,),
             ).fetchall()
         seen = {row["source_id"] for row in rows if row["seen"]}
         visited = {row["source_id"] for row in rows if row["visited"]}
-        return {"seen": seen, "visited": visited}
+        want_to_visit = {row["source_id"] for row in rows if row["want_to_visit"]}
+        return {"seen": seen, "visited": visited, "want_to_visit": want_to_visit}
 
     @staticmethod
     def _usage_day() -> str:
