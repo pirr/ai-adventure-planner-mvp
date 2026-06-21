@@ -301,7 +301,6 @@ const I18N = {
     found_count: '{n} found',
     pick_today: 'Top pick',
     use_location: 'Use my location',
-    use_demo: 'Use Tivat demo',
     loc_not_set: 'Location is not set yet.',
     map_you_are_here: 'Your location',
     map_location_set: 'Location set from the map.',
@@ -457,9 +456,8 @@ const I18N = {
     reason_other: 'Other',
     search_failed: 'Search failed: {error}',
     search_network_failed: 'Connection dropped while loading recommendations. Please check the connection and try again.',
-    demo_status: 'Demo location set: Tivat, Montenegro.',
     geo_unavailable: 'Geolocation is not available in this browser.',
-    geo_insecure_status: 'Geolocation is blocked because this page is not a secure context. Using demo coordinates.',
+    geo_insecure_status: 'Geolocation is blocked because this page is not a secure context. Enter coordinates or tap the map.',
     geo_insecure_error:
       'Geolocation needs HTTPS or http://localhost. This page is {origin}. Open it via http://localhost:8080 (or behind HTTPS), then try again.',
     geo_requesting: 'Requesting location permission...',
@@ -467,7 +465,7 @@ const I18N = {
     geo_denied: 'Permission was denied. Allow location access for this site in your browser, then try again.',
     geo_position_unavailable: 'Position is unavailable. Your device could not determine a location (no GPS/Wi-Fi signal).',
     geo_timeout: 'The location request timed out. Try again.',
-    geo_fail_status: 'Could not get your location. Using demo coordinates.',
+    geo_fail_status: 'Could not get your location. Enter coordinates or tap the map.',
     geo_fail_error: 'Could not get location: {reason}',
   },
   ru: {
@@ -493,7 +491,6 @@ const I18N = {
     found_count: 'найдено: {n}',
     pick_today: 'Топ',
     use_location: 'Моя геолокация',
-    use_demo: 'Демо: Тиват',
     loc_not_set: 'Локация ещё не задана.',
     map_you_are_here: 'Ваша локация',
     map_location_set: 'Локация задана по карте.',
@@ -649,9 +646,8 @@ const I18N = {
     reason_other: 'Другое',
     search_failed: 'Поиск не удался: {error}',
     search_network_failed: 'Соединение оборвалось во время загрузки рекомендаций. Проверьте связь и попробуйте ещё раз.',
-    demo_status: 'Демо-локация задана: Тиват, Черногория.',
     geo_unavailable: 'Геолокация недоступна в этом браузере.',
-    geo_insecure_status: 'Геолокация заблокирована: страница не в защищённом контексте. Используются демо-координаты.',
+    geo_insecure_status: 'Геолокация заблокирована: страница не в защищённом контексте. Введите координаты или выберите точку на карте.',
     geo_insecure_error:
       'Для геолокации нужен HTTPS или http://localhost. Текущий адрес: {origin}. Откройте через http://localhost:8080 (или по HTTPS) и попробуйте снова.',
     geo_requesting: 'Запрашиваем разрешение на геолокацию...',
@@ -659,7 +655,7 @@ const I18N = {
     geo_denied: 'Доступ запрещён. Разрешите доступ к геолокации для этого сайта и попробуйте снова.',
     geo_position_unavailable: 'Местоположение недоступно. Устройство не смогло определить координаты (нет сигнала GPS/Wi-Fi).',
     geo_timeout: 'Время запроса геолокации истекло. Попробуйте снова.',
-    geo_fail_status: 'Не удалось определить вашу локацию. Используются демо-координаты.',
+    geo_fail_status: 'Не удалось определить вашу локацию. Введите координаты или выберите точку на карте.',
     geo_fail_error: 'Не удалось получить локацию: {reason}',
   },
 };
@@ -762,7 +758,6 @@ function requestGeolocation() {
 
 $('useLocationBtn').addEventListener('click', requestGeolocation);
 $('locateBtn').addEventListener('click', requestGeolocation);
-$('demoBtn').addEventListener('click', () => setLocation(42.4304, 18.6964, t('demo_status')));
 
 ['lat', 'lon'].forEach((id) =>
   $(id).addEventListener('change', () => {
