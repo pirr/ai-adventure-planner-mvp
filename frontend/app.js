@@ -2,12 +2,21 @@ const $ = (id) => document.getElementById(id);
 const carouselEl = $('carousel');
 const errorBox = $('errorBox');
 const sheetEl = $('sheet');
+const sheetBodyEl = document.querySelector('.sheet-body');
 let lastRequestId = null;
 let lastResponse = null;
 let lastPayload = null;
 let currentUser = null;
 let csrfToken = null;
 let authConfig = { email_enabled: true, google_enabled: false };
+let appFeatures = { parse: false, require_auth_for_more_recommendations: false };
+let featuresLoaded = false;
+let featuresPromise = null;
+let loadingMore = false;
+let loadMoreExhausted = false;
+let loadMoreError = false;
+let loadMoreAuthBlocked = false;
+let retryLoadMoreAfterAuth = false;
 
 function anonymousId() {
   let id = localStorage.getItem('anon_id');
@@ -200,6 +209,7 @@ function pauseSpy(duration = 700, { resumeOnScrollEnd = true } = {}) {
 }
 
 function onCarouselScroll() {
+  maybeLoadMoreFromScroll();
   if (spyPaused || scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = null;
@@ -208,6 +218,7 @@ function onCarouselScroll() {
   });
 }
 carouselEl.addEventListener('scroll', onCarouselScroll, { passive: true });
+if (sheetBodyEl) sheetBodyEl.addEventListener('scroll', maybeLoadMoreFromScroll, { passive: true });
 // Resume the spy as soon as the programmatic scroll settles (modern browsers);
 // the timeout in pauseSpy() covers browsers without 'scrollend'.
 carouselEl.addEventListener('scrollend', () => {
@@ -352,6 +363,12 @@ const I18N = {
     visited_cleared: 'Visited places cleared.',
     mark_visited: "I've been here",
     no_live_results: 'No live places found. Try a larger time window, another area, or search again.',
+    more_recommendations: 'More recommendations',
+    loading_more_recommendations: 'Loading more recommendations...',
+    no_more_recommendations: 'No more recommendations for this search.',
+    more_recommendations_error: 'Could not load more recommendations.',
+    retry: 'Retry',
+    auth_more_recommendations: 'Create an account to see more recommendations.',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
     history_confirm: 'Delete your account search history, feedback and events?',
@@ -538,6 +555,12 @@ const I18N = {
     visited_cleared: 'Посещённые места очищены.',
     mark_visited: 'Я здесь был',
     no_live_results: 'Онлайн-места не найдены. Увеличьте время, выберите другой район или попробуйте снова.',
+    more_recommendations: 'Больше рекомендаций',
+    loading_more_recommendations: 'Загружаем больше рекомендаций...',
+    no_more_recommendations: 'Для этого поиска больше рекомендаций нет.',
+    more_recommendations_error: 'Не удалось загрузить больше рекомендаций.',
+    retry: 'Повторить',
+    auth_more_recommendations: 'Создайте аккаунт, чтобы увидеть больше рекомендаций.',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
     history_confirm: 'Удалить историю поиска аккаунта, отзывы и события?',
@@ -843,6 +866,25 @@ function apiFetch(url, options = {}) {
 }
 window.apiFetch = apiFetch;
 
+async function loadFeatures() {
+  if (featuresPromise) return featuresPromise;
+  featuresPromise = apiFetch('/api/features', { cache: 'no-store' })
+    .then(async (response) => {
+      if (response.ok) appFeatures = { ...appFeatures, ...(await response.json()) };
+      featuresLoaded = true;
+      window.appFeatures = appFeatures;
+      renderLoadMoreState();
+      return appFeatures;
+    })
+    .catch(() => {
+      featuresLoaded = true;
+      window.appFeatures = appFeatures;
+      renderLoadMoreState();
+      return appFeatures;
+    });
+  return featuresPromise;
+}
+
 async function readError(response) {
   try {
     const data = await response.json();
@@ -863,6 +905,7 @@ function setAuthState(data) {
   currentUser = data && data.user ? data.user : null;
   csrfToken = data && data.csrf_token ? data.csrf_token : null;
   updateAuthUi();
+  renderLoadMoreState();
 }
 
 function updateAuthUi() {
@@ -927,6 +970,11 @@ async function submitAuth(path, payload, successMessage) {
   showAuthMessage(successMessage, true);
   closeAuthModal();
   loadHistory();
+  if (retryLoadMoreAfterAuth) {
+    retryLoadMoreAfterAuth = false;
+    loadMoreAuthBlocked = false;
+    setTimeout(() => loadMoreRecommendations({ force: true }), 0);
+  }
 }
 
 function authPayload(emailId, passwordId) {
@@ -1018,8 +1066,7 @@ async function postRecommendations(payload, { retries = 1 } = {}) {
         cache: 'no-store',
       });
       if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Request failed: ${response.status}`);
+        throw new Error(await readError(response));
       }
       return response.json();
     } catch (error) {
@@ -1048,12 +1095,165 @@ function annotateRequestId(data) {
   });
 }
 
+function resetLoadMoreState() {
+  loadingMore = false;
+  loadMoreExhausted = false;
+  loadMoreError = false;
+  loadMoreAuthBlocked = false;
+  retryLoadMoreAfterAuth = false;
+}
+
+function recommendationKey(item) {
+  return item && (item.source_id || item.id || '');
+}
+
+function authRequiredForMore(error) {
+  return String((error && error.message) || error || '').includes('auth_required_for_more_recommendations');
+}
+
+function loadMoreAllowedForCurrentUser() {
+  return currentUser || !appFeatures.require_auth_for_more_recommendations;
+}
+
+function buildLoadMoreCard() {
+  const card = document.createElement('div');
+  card.className = 'load-more-card';
+
+  if (!currentUser && (loadMoreAuthBlocked || appFeatures.require_auth_for_more_recommendations)) {
+    card.classList.add('needs-auth');
+    card.innerHTML = `
+      <p>${t('auth_more_recommendations')}</p>
+      <button type="button" class="btn btn-solid">${t('create_account')}</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => {
+      retryLoadMoreAfterAuth = true;
+      openAuthModal('register');
+    });
+    return card;
+  }
+
+  if (loadMoreError) {
+    card.classList.add('is-error');
+    card.innerHTML = `
+      <div class="load-more-icon" aria-hidden="true"><i data-lucide="refresh-cw"></i></div>
+      <p>${t('more_recommendations_error')}</p>
+      <button type="button" class="btn btn-line">${t('retry')}</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => loadMoreRecommendations({ force: true }));
+    return card;
+  }
+
+  if (loadMoreExhausted) {
+    card.classList.add('is-done');
+    card.innerHTML = `
+      <div class="load-more-icon" aria-hidden="true"><i data-lucide="check"></i></div>
+      <p>${t('no_more_recommendations')}</p>
+    `;
+    return card;
+  }
+
+  card.classList.toggle('is-loading', loadingMore);
+  card.innerHTML = `
+    <div class="load-more-icon" aria-hidden="true"><i data-lucide="${loadingMore ? 'loader-circle' : 'sparkles'}"></i></div>
+    <p>${loadingMore ? t('loading_more_recommendations') : t('more_recommendations')}</p>
+  `;
+  return card;
+}
+
+function renderLoadMoreState() {
+  const existing = carouselEl.querySelector('.load-more-card');
+  if (!existing) return;
+  existing.replaceWith(buildLoadMoreCard());
+  if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+}
+
+function appendRecommendations(data) {
+  annotateRequestId(data);
+  if (!lastResponse) {
+    renderResults(data, { refit: false });
+    return (data.recommendations || []).length;
+  }
+
+  const current = lastResponse.recommendations || [];
+  const seen = new Set(current.map(recommendationKey).filter(Boolean));
+  const additions = [];
+  (data.recommendations || []).forEach((item) => {
+    const key = recommendationKey(item);
+    if (key && seen.has(key)) return;
+    if (key) seen.add(key);
+    additions.push(item);
+  });
+
+  if (!additions.length) return 0;
+  const keep = activeId;
+  lastResponse.recommendations = current.concat(additions);
+  renderResults(lastResponse, { refit: false });
+  if (keep) setActive(keep, { pan: false, scroll: false });
+  return additions.length;
+}
+
+async function loadMoreRecommendations({ force = false } = {}) {
+  if (!lastPayload || !lastResponse || loadingMore || loadMoreExhausted) return;
+  if (!featuresLoaded) await loadFeatures();
+
+  loadMoreError = false;
+  if (!loadMoreAllowedForCurrentUser()) {
+    loadMoreAuthBlocked = true;
+    retryLoadMoreAfterAuth = true;
+    renderLoadMoreState();
+    return;
+  }
+
+  loadingMore = true;
+  loadMoreAuthBlocked = false;
+  renderLoadMoreState();
+  const generation = searchGeneration;
+  const payload = { ...lastPayload, exclude_seen: true, anonymous_id: anonymousId() };
+
+  try {
+    const data = await postRecommendations(payload);
+    if (generation !== searchGeneration) return;
+    const added = appendRecommendations(data);
+    loadMoreExhausted = added === 0;
+    track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length, load_more: true } });
+    loadHistory();
+  } catch (error) {
+    if (generation !== searchGeneration) return;
+    if (authRequiredForMore(error)) {
+      loadMoreAuthBlocked = true;
+      retryLoadMoreAfterAuth = true;
+    } else {
+      loadMoreError = true;
+      if (force) setError(recommendationErrorText(error));
+    }
+  } finally {
+    if (generation === searchGeneration) {
+      loadingMore = false;
+      renderLoadMoreState();
+    }
+  }
+}
+
+function maybeLoadMoreFromScroll() {
+  if (!lastResponse || !lastPayload || loadingMore || loadMoreExhausted) return;
+  if (loadMoreAuthBlocked && !currentUser) return;
+  if (sheetEl.classList.contains('open')) {
+    if (!sheetBodyEl) return;
+    const remaining = sheetBodyEl.scrollHeight - sheetBodyEl.scrollTop - sheetBodyEl.clientHeight;
+    if (remaining <= 320) loadMoreRecommendations();
+    return;
+  }
+  const remaining = carouselEl.scrollWidth - carouselEl.scrollLeft - carouselEl.clientWidth;
+  if (remaining <= 240) loadMoreRecommendations();
+}
+
 // Bumped on every fresh search; in-flight responses from older searches drop
 // their result instead of rendering stale places over the new result set.
 let searchGeneration = 0;
 
 async function runSearch() {
   const generation = ++searchGeneration;
+  resetLoadMoreState();
   clearError();
   track('search_started');
   // Collapse to peek only on the first entry from planning; on re-searches from
@@ -1254,6 +1454,7 @@ function renderCards(items) {
     }
     carouselEl.appendChild(buildCard(item, index === 0));
   });
+  carouselEl.appendChild(buildLoadMoreCard());
   if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 }
 
@@ -1630,5 +1831,6 @@ function escapeHtml(value) {
 applyStaticI18n();
 updateProgress();
 wireAuthUi();
+loadFeatures();
 loadAuthConfig();
 loadAuthStatus().then(loadHistory);
