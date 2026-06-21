@@ -140,8 +140,13 @@ async def build_recommendations(
         len(candidate_places),
         _elapsed_ms(stage_started),
     )
+    # Community Confidence: aggregate other adventurers' feedback/visits for just
+    # the routed candidates (one bounded query), then thread it through every scoring
+    # pass and into the final badges. Empty until first-party data accrues.
+    community = storage.community_signals([place.source_id for place in candidate_places])
+
     # First pass ranks every candidate using the weather at the user's origin.
-    scored = [score_candidate(place, route, weather, request, profile) for place, route in zip(candidate_places, routes)]
+    scored = [score_candidate(place, route, weather, request, profile, community) for place, route in zip(candidate_places, routes)]
     scored.sort(key=lambda candidate: _order_key(candidate, rotate, seen), reverse=True)
 
     # Second pass re-scores only the strongest candidates with the weather at
@@ -194,12 +199,12 @@ async def build_recommendations(
         if forecast is None:
             # No destination forecast, but an enriched place still needs its
             # score refreshed (with the origin weather) to pick up the rating.
-            rescored.append(score_candidate(place, candidate.route, weather, request, profile) if info else candidate)
+            rescored.append(score_candidate(place, candidate.route, weather, request, profile, community) if info else candidate)
             continue
         arrival_weather, timeline = forecast.at_arrival(
             candidate.route.one_way_minutes, candidate.place.estimated_activity_minutes, request.lang
         )
-        refreshed = score_candidate(place, candidate.route, arrival_weather, request, profile)
+        refreshed = score_candidate(place, candidate.route, arrival_weather, request, profile, community)
         refreshed.arrival_weather = arrival_weather
         refreshed.forecast = timeline
         rescored.append(refreshed)
@@ -212,7 +217,7 @@ async def build_recommendations(
     photos = await asyncio.gather(
         *[get_place_photo(item.place, request.use_live_data, request.anonymous_id) for item in top]
     )
-    recommendations = [to_recommendation(item, photo) for item, photo in zip(top, photos)]
+    recommendations = [to_recommendation(item, photo, community) for item, photo in zip(top, photos)]
     explainer = provider if provider is not None else _explainer_provider(request)
     stage_started = time.perf_counter()
     recommendations = await explain_recommendations(recommendations, request, explainer)

@@ -150,6 +150,24 @@ class Settings:
     # Per-anonymous_id daily cap (~4 enriched searches). Soft fairness control:
     # the id is client-supplied, so the global limit is the real backstop.
     google_places_user_daily_limit: int = int(os.getenv("GOOGLE_PLACES_USER_DAILY_LIMIT", "60"))
+    # --- Community Confidence (first-party "wisdom of our adventurers") ---
+    # All four gates are tunable per-deployment: small/concentrated audiences can
+    # lower them to surface signal sooner; larger ones can raise them for tighter
+    # statistical confidence. The shrinkage prior protects the (invisible) score
+    # from thin-data noise, so the score floor can be loosened more aggressively
+    # than the (publicly shown) badge floors.
+    # Minimum distinct ratings before the liked-ratio moves the score at all.
+    community_min_raters: int = int(os.getenv("COMMUNITY_MIN_RATERS", "3"))
+    # Pseudo-count pulling thin samples toward neutral 70 (higher = more skeptical).
+    community_shrink_prior: int = int(os.getenv("COMMUNITY_SHRINK_PRIOR", "8"))
+    # Distinct raters required to show the "% liked" social-proof chip. Keep this
+    # >= 4 so the chip is neither statistically flimsy nor near-deanonymizing.
+    community_badge_min_raters: int = int(os.getenv("COMMUNITY_BADGE_MIN_RATERS", "5"))
+    # Distinct recent visitors required to show the "visited recently" chip.
+    community_badge_min_visits: int = int(os.getenv("COMMUNITY_BADGE_MIN_VISITS", "3"))
+    # Rolling window (days) for counting "recent" visits. Wider than 30 so the
+    # visits chip isn't starved at low traffic; drives the chip + recent_visits count.
+    community_visit_window_days: int = int(os.getenv("COMMUNITY_VISIT_WINDOW_DAYS", "90"))
 
 
 settings = Settings()

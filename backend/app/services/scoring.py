@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Iterable
 
-from app.schemas import AdventureRequest, HourlyForecast, PlaceCandidate, PlacePhoto, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
+from app.config import settings
+from app.schemas import AdventureRequest, CommunitySignal, HourlyForecast, PlaceCandidate, PlacePhoto, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
 from app.services.i18n import t
 
 
@@ -86,6 +87,53 @@ def apply_primary_rerank(candidates: list["ScoredCandidate"], request: Adventure
 
 def _clamp(value: int | float) -> int:
     return max(0, min(100, int(round(value))))
+
+
+# Community Confidence: aggregated first-party signal from other adventurers.
+# Guardrails against rich-get-richer popularity bias: the liked-ratio only nudges
+# the score once a place has a few distinct ratings, and even then it is shrunk
+# toward neutral by sample size. Badges (the loud social-proof chips) need a higher
+# bar so they only appear once a place is genuinely well-attested. The four gates
+# are env-tunable via Settings (see config.py); only the neutral baseline is fixed,
+# because it must match ScoreBreakdown's cold-start default.
+COMMUNITY_NEUTRAL = 70  # mirrors personal_preference_fit's cold-start neutral
+
+
+def _community_confidence_fit(place: PlaceCandidate, community: dict | None) -> int:
+    """Cross-user 'wisdom of our adventurers' for this place, shrunk toward neutral
+    by sample size. Neutral (70) on cold start or thin data so a place is never
+    carried (or sunk) by one or two votes."""
+    sig = (community or {}).get(place.source_id)
+    if not sig:
+        return COMMUNITY_NEUTRAL
+    ups, downs = sig.get("ups", 0), sig.get("downs", 0)
+    rated = ups + downs
+    if rated < settings.community_min_raters:
+        return COMMUNITY_NEUTRAL
+    prior = settings.community_shrink_prior
+    raw = (ups / rated) * 100
+    shrunk = (raw * rated + COMMUNITY_NEUTRAL * prior) / (rated + prior)
+    return _clamp(shrunk)
+
+
+def _community_badge(community: dict | None, source_id: str | None) -> CommunitySignal | None:
+    """Build the user-facing social-proof badge for a place, or None when neither
+    dimension clears its display threshold (keeps badges meaningful and anonymous)."""
+    sig = (community or {}).get(source_id)
+    if not sig:
+        return None
+    raters, visits = sig.get("raters", 0), sig.get("recent_visits", 0)
+    show_liked = raters >= settings.community_badge_min_raters
+    show_visits = visits >= settings.community_badge_min_visits
+    if not (show_liked or show_visits):
+        return None
+    ups, downs = sig.get("ups", 0), sig.get("downs", 0)
+    rated = ups + downs
+    return CommunitySignal(
+        liked_ratio=round(ups / rated, 2) if (show_liked and rated) else 0.0,
+        sample_size=raters if show_liked else 0,
+        recent_visits=visits if show_visits else 0,
+    )
 
 
 def _time_fit(total_minutes: int, available_minutes: int) -> int:
@@ -313,6 +361,8 @@ def _why(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, break
         items.append(t(lang, "why_interest"))
     if breakdown.personal_preference_fit >= 85:
         items.append(t(lang, "why_preference"))
+    if breakdown.community_confidence >= 80:
+        items.append(t(lang, "why_community"))
     if place.estimated_walking_km <= 2.5:
         items.append(t(lang, "why_walking", km=place.estimated_walking_km))
     if not items:
@@ -348,7 +398,7 @@ def _confidence(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary
     return "mixed"
 
 
-def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, request: AdventureRequest, profile: dict | None = None) -> ScoredCandidate:
+def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSummary, request: AdventureRequest, profile: dict | None = None, community: dict | None = None) -> ScoredCandidate:
     total_minutes = route.round_trip_minutes + place.estimated_activity_minutes
     time_fit = _time_fit(total_minutes, request.available_minutes)
     weather_fit = weather.score
@@ -358,10 +408,13 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
     interest_fit = _interest_fit(place, request.interests)
     place_quality = _place_quality(place)
     personal_preference_fit = _personal_preference_fit(place, profile)
+    community_confidence = _community_confidence_fit(place, community)
     safety_fit, warnings = _safety_fit(place, request, weather, total_minutes)
 
     # Adventure Score: explicit effort fit keeps Easy/Medium/Active searches
     # behaviorally distinct while safety and group fit still guard bad matches.
+    # Personal and community fit split the old 8% personalization weight evenly;
+    # both are neutral (70) until data exists, so cold-start scores are unchanged.
     score = round(
         0.15 * time_fit
         + 0.15 * weather_fit
@@ -371,7 +424,8 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
         + 0.08 * group_fit
         + 0.09 * interest_fit
         + 0.08 * place_quality
-        + 0.08 * personal_preference_fit
+        + 0.04 * personal_preference_fit
+        + 0.04 * community_confidence
     )
     breakdown = ScoreBreakdown(
         time_fit=time_fit,
@@ -383,6 +437,7 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
         interest_fit=interest_fit,
         place_quality=place_quality,
         personal_preference_fit=personal_preference_fit,
+        community_confidence=community_confidence,
     )
     return ScoredCandidate(
         place=place,
@@ -397,7 +452,7 @@ def score_candidate(place: PlaceCandidate, route: RouteInfo, weather: WeatherSum
     )
 
 
-def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None) -> Recommendation:
+def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None, community: dict | None = None) -> Recommendation:
     place = scored.place
     route = scored.route
     return Recommendation(
@@ -428,6 +483,7 @@ def to_recommendation(scored: ScoredCandidate, photo: PlacePhoto | None = None) 
         arrival_weather=scored.arrival_weather,
         forecast=scored.forecast,
         tags=place.tags,
+        community=_community_badge(community, place.source_id),
     )
 
 

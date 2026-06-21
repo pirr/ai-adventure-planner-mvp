@@ -86,6 +86,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "why_effort": "Matches your selected effort level.",
         "why_interest": "Matches your selected interests.",
         "why_preference": "Similar to places you've liked before.",
+        "why_community": "Other adventurers rated this place highly.",
         "why_walking": "Walking is limited to about {km:.1f} km.",
         "why_best": "This is the best available option after filtering nearby places.",
         # Type descriptions
@@ -136,6 +137,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "why_effort": "Соответствует выбранному уровню нагрузки.",
         "why_interest": "Соответствует вашим интересам.",
         "why_preference": "Похоже на места, которые вам уже нравились.",
+        "why_community": "Другие путешественники высоко оценили это место.",
         "why_walking": "Пешая часть ограничена примерно {km:.1f} км.",
         "why_best": "Это лучший доступный вариант после фильтрации мест поблизости.",
         # Type descriptions
