@@ -7,7 +7,7 @@ link and a plain-language explanation of why it fits.
 
 The core flow:
 
-1. Get the user's location (browser geolocation, tap-the-map, or demo coords).
+1. Get the user's location (browser geolocation, tap-the-map, or manual coordinates).
 2. Collect time, transport, group, intensity and interests — via a guided
    wizard or a single free-text sentence ("family trip, 5 hours, fortress and
    views") parsed by an LLM.
@@ -112,8 +112,8 @@ http://YOUR_LOCAL_IP:8000      # e.g. http://192.168.1.23:8000
 ```
 
 Browser geolocation usually requires HTTPS, except on `localhost`. If phone
-geolocation is blocked over local HTTP, use the demo coordinates, tap the map,
-or enter coordinates manually — or serve over HTTPS via the tunnel below.
+geolocation is blocked over local HTTP, tap the map, enter coordinates manually,
+or serve over HTTPS via the tunnel below.
 
 ### Without Docker
 
