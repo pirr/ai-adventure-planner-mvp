@@ -226,7 +226,7 @@ async def search_candidate_places(
     """
     if not enabled():
         return [], []
-    granted = storage.reserve_api_calls(
+    granted = storage.api_usage.reserve_api_calls(
         "google_candidates",
         anonymous_id,
         1,
@@ -340,7 +340,7 @@ async def enrich_places(
             continue
         misses.append(place)
 
-    granted = storage.reserve_api_calls(
+    granted = storage.api_usage.reserve_api_calls(
         "google",
         anonymous_id,
         len(misses),

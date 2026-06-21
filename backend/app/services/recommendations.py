@@ -14,6 +14,8 @@ from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import fallback_route, get_routes
 from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations, get_llm_provider
+from app.services.community import community_signals
+from app.services.preferences import preference_profile, preference_profile_for_account
 from app.services.scoring import ScoredCandidate, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
 from app.services.storage import storage
 from app.services.weather import get_destination_forecasts, get_weather
@@ -86,9 +88,9 @@ async def build_recommendations(
     request_id = str(uuid.uuid4())
     # Personal Preference Fit signal from this user's past feedback (cold-start safe).
     profile = (
-        storage.preference_profile_for_account(account_id)
+        preference_profile_for_account(account_id, store=storage)
         if account_id is not None
-        else storage.preference_profile(request.anonymous_id)
+        else preference_profile(request.anonymous_id, store=storage)
     )
     stage_started = time.perf_counter()
     weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data, request.lang)
@@ -114,9 +116,9 @@ async def build_recommendations(
     # Per-user place state: hard-drop visited places before we spend routing
     # calls on them; keep `seen` to optionally rotate past them below.
     marks = (
-        storage.account_place_marks(account_id)
+        storage.place_marks.account_place_marks(account_id)
         if account_id is not None
-        else storage.place_marks(request.anonymous_id)
+        else storage.place_marks.place_marks(request.anonymous_id)
     )
     visited, seen = marks["visited"], marks["seen"]
     if visited:
@@ -143,7 +145,7 @@ async def build_recommendations(
     # Community Confidence: aggregate other adventurers' feedback/visits for just
     # the routed candidates (one bounded query), then thread it through every scoring
     # pass and into the final badges. Empty until first-party data accrues.
-    community = storage.community_signals([place.source_id for place in candidate_places])
+    community = community_signals([place.source_id for place in candidate_places], store=storage)
 
     # First pass ranks every candidate using the weather at the user's origin.
     scored = [score_candidate(place, route, weather, request, profile, community) for place, route in zip(candidate_places, routes)]

@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from app.schemas import AdventureRequest, PlaceCandidate, RouteInfo, WeatherSummary
+from app.services.community import community_signals
 from app.services.scoring import score_candidate, to_recommendation
 from app.services.storage import Storage
 
@@ -31,28 +32,28 @@ def test_community_signals_counts_distinct_raters(tmp_path):
     _add_rating(db, "osm:1", "up", "u0")  # same user again -> not double counted
     _add_rating(db, "osm:1", "down", "d0")
 
-    sig = db.community_signals(["osm:1", "osm:absent"])
+    sig = community_signals(["osm:1", "osm:absent"], store=db)
     assert sig["osm:1"] == {"ups": 5, "downs": 1, "raters": 6, "recent_visits": 0, "want_to_visit": 0}
     assert "osm:absent" not in sig  # places with no signal are omitted (cold start)
 
 
 def test_community_signals_counts_distinct_wanters(tmp_path):
     db = Storage(tmp_path / "c.db")
-    a1 = db.create_email_account("a1@example.com", "hash")["id"]
-    a2 = db.create_email_account("a2@example.com", "hash")["id"]
-    db.set_want_to_visit_account(a1, "osm:1", True)
-    db.set_want_to_visit_account(a2, "osm:1", True)
-    db.set_want_to_visit_account(a1, "osm:1", True)  # same account again -> not double counted
-    db.set_want_to_visit_account(a2, "osm:1", False)  # toggled off -> not counted
+    a1 = db.accounts.create_email_account("a1@example.com", "hash")["id"]
+    a2 = db.accounts.create_email_account("a2@example.com", "hash")["id"]
+    db.place_marks.set_want_to_visit_account(a1, "osm:1", True)
+    db.place_marks.set_want_to_visit_account(a2, "osm:1", True)
+    db.place_marks.set_want_to_visit_account(a1, "osm:1", True)  # same account again -> not double counted
+    db.place_marks.set_want_to_visit_account(a2, "osm:1", False)  # toggled off -> not counted
 
-    sig = db.community_signals(["osm:1"])
+    sig = community_signals(["osm:1"], store=db)
     assert sig["osm:1"]["want_to_visit"] == 1  # only a1 still wants it
 
 
 def test_community_signals_visits_use_window_and_both_mark_tables(tmp_path):
     db = Storage(tmp_path / "c.db")
-    db.mark_visited("v1", "osm:2")
-    db.mark_visited("v2", "osm:2")
+    db.place_marks.mark_visited("v1", "osm:2")
+    db.place_marks.mark_visited("v2", "osm:2")
     with db._connect() as conn:
         # Beyond the default 90-day window -> excluded.
         old = (datetime.utcnow() - timedelta(days=120)).isoformat()
@@ -66,14 +67,14 @@ def test_community_signals_visits_use_window_and_both_mark_tables(tmp_path):
             (99, "osm:2", datetime.utcnow().isoformat()),
         )
 
-    sig = db.community_signals(["osm:2"])
+    sig = community_signals(["osm:2"], store=db)
     assert sig["osm:2"]["recent_visits"] == 3  # v1, v2, account 99; the 120-day-old visit is excluded
 
 
 def test_community_signals_no_ids_is_empty(tmp_path):
     db = Storage(tmp_path / "c.db")
-    assert db.community_signals([]) == {}
-    assert db.community_signals([None]) == {}
+    assert community_signals([], store=db) == {}
+    assert community_signals([None], store=db) == {}
 
 
 # --- scoring integration -----------------------------------------------------
@@ -185,7 +186,7 @@ def test_community_gates_are_env_tunable(monkeypatch):
 
 def test_visit_window_is_configurable(tmp_path, monkeypatch):
     import types
-    from app.services import storage as storage_mod
+    from app.services import community as community_mod
 
     db = Storage(tmp_path / "c.db")
     with db._connect() as conn:
@@ -195,7 +196,7 @@ def test_visit_window_is_configurable(tmp_path, monkeypatch):
             ("u", "osm:9", sixty),
         )
     # Default 90-day window includes a 60-day-old visit...
-    assert db.community_signals(["osm:9"])["osm:9"]["recent_visits"] == 1
+    assert community_signals(["osm:9"], store=db)["osm:9"]["recent_visits"] == 1
     # ...narrowing the window to 30 days drops it (and the place, having no other signal).
-    monkeypatch.setattr(storage_mod, "settings", types.SimpleNamespace(community_visit_window_days=30))
-    assert "osm:9" not in db.community_signals(["osm:9"])
+    monkeypatch.setattr(community_mod, "settings", types.SimpleNamespace(community_visit_window_days=30))
+    assert "osm:9" not in community_signals(["osm:9"], store=db)

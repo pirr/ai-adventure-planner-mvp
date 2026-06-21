@@ -1,3 +1,4 @@
+from app.services.analytics import ab_summary
 from app.services.recommendations import _ab_bucket
 from app.services.storage import Storage
 
@@ -26,7 +27,7 @@ def test_ab_summary(tmp_path):
                 "INSERT INTO events (created_at, event, request_id) VALUES (?, ?, ?)", ("t", "maps_opened", request_id)
             )
 
-    summary = {row["variant"]: row for row in db.ab_summary()}
+    summary = {row["variant"]: row for row in ab_summary(db)}
     assert summary["llm"]["sessions"] == 2
     assert summary["llm"]["feedback"] == 2
     assert summary["llm"]["thumbs_up_rate"] == 0.5

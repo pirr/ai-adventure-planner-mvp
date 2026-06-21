@@ -206,7 +206,7 @@ def test_clear_history_preserves_account_visited_marks(tmp_path, monkeypatch):
 
     cleared = client.delete("/api/history", headers={"X-CSRF-Token": csrf})
     assert cleared.status_code == 200
-    assert store.account_place_marks(account_id) == {"seen": set(), "visited": {"p1"}, "want_to_visit": set()}
+    assert store.place_marks.account_place_marks(account_id) == {"seen": set(), "visited": {"p1"}, "want_to_visit": set()}
 
 
 def test_want_to_visit_endpoints_toggle_and_list(tmp_path, monkeypatch):
@@ -218,7 +218,7 @@ def test_want_to_visit_endpoints_toggle_and_list(tmp_path, monkeypatch):
     for sid in ("osm:1", "osm:2"):
         r = client.post("/api/want-to-visit", json={"source_id": sid, "wanted": True}, headers={"X-CSRF-Token": csrf})
         assert r.status_code == 200 and r.json()["wanted"] is True
-    assert store.account_place_marks(account_id)["want_to_visit"] == {"osm:1", "osm:2"}
+    assert store.place_marks.account_place_marks(account_id)["want_to_visit"] == {"osm:1", "osm:2"}
 
     listed = client.get("/api/want-to-visit").json()["items"]
     assert {item["source_id"] for item in listed} == {"osm:1", "osm:2"}
@@ -226,11 +226,11 @@ def test_want_to_visit_endpoints_toggle_and_list(tmp_path, monkeypatch):
     # Toggle one off, then clear the rest.
     off = client.post("/api/want-to-visit", json={"source_id": "osm:1", "wanted": False}, headers={"X-CSRF-Token": csrf})
     assert off.status_code == 200 and off.json()["wanted"] is False
-    assert store.account_place_marks(account_id)["want_to_visit"] == {"osm:2"}
+    assert store.place_marks.account_place_marks(account_id)["want_to_visit"] == {"osm:2"}
 
     cleared = client.delete("/api/want-to-visit", headers={"X-CSRF-Token": csrf})
     assert cleared.status_code == 200 and cleared.json()["cleared"] == 1
-    assert store.account_place_marks(account_id)["want_to_visit"] == set()
+    assert store.place_marks.account_place_marks(account_id)["want_to_visit"] == set()
 
 
 def test_want_to_visit_requires_auth(tmp_path, monkeypatch):
@@ -259,14 +259,14 @@ def test_merge_anonymous_data_into_account(tmp_path):
             "INSERT INTO place_marks (anonymous_id, source_id, seen, visited, updated_at) "
             "VALUES ('anon-1', 'p1', 1, 1, '2026-01-01T00:00:00')"
         )
-    account = store.create_email_account("person@example.com", "hash")
-    store.merge_anonymous_into_account("anon-1", account["id"])
+    account = store.accounts.create_email_account("person@example.com", "hash")
+    store.lifecycle.merge_anonymous_into_account("anon-1", account["id"])
 
     with store._connect() as conn:
         assert conn.execute("SELECT account_id FROM search_sessions WHERE id='s1'").fetchone()["account_id"] == account["id"]
         assert conn.execute("SELECT account_id FROM feedback WHERE request_id='s1'").fetchone()["account_id"] == account["id"]
         assert conn.execute("SELECT account_id FROM events WHERE request_id='s1'").fetchone()["account_id"] == account["id"]
-    marks = store.account_place_marks(account["id"])
+    marks = store.place_marks.account_place_marks(account["id"])
     assert marks == {"seen": {"p1"}, "visited": {"p1"}, "want_to_visit": set()}
 
 
