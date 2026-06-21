@@ -210,6 +210,9 @@ body.exploring .planner { display: none; }
 .btn-line:hover { border-color: var(--pine-700); color: var(--pine-700); }
 .btn-ghost { background: transparent; color: var(--muted); padding: 10px 14px; }
 .btn-ghost:hover { color: var(--ink-900); background: var(--sand-200); }
+.btn-ghost.want-to-visit.is-saved { color: var(--good); }
+.want-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.want-item .want-remove { margin-left: auto; }
 .link-btn { background: none; color: var(--clay-500); font-family: var(--display); font-weight: 700; font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0; }
 .history-actions { display: flex; flex-wrap: wrap; gap: 18px; }
 
@@ -234,6 +237,14 @@ body.exploring .planner { display: none; }
 .auth-panel h2 { font-family: var(--display); font-size: 24px; margin: 0 44px 8px 0; }
 .auth-message { min-height: 20px; margin: 0 0 12px; color: var(--warn); font-size: 13px; font-weight: 700; }
 .auth-message.ok { color: var(--pine-700); }
+
+/* "Want to visit" top-bar entry + overlay list */
+.want-btn .want-star { color: var(--clay-500); }
+.want-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--clay-500); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; }
+.want-list { max-height: 60vh; overflow-y: auto; margin: 4px 0 14px; }
+.want-list .want-item { margin: 10px 0; }
+.want-empty { color: var(--muted); font-size: 14px; margin: 8px 0 14px; }
+.want-modal-actions { display: flex; justify-content: flex-end; }
 .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; padding: 4px; background: var(--sand-200); border-radius: 999px; }
 .auth-tab { min-height: 38px; border-radius: 999px; font-family: var(--display); font-weight: 700; color: var(--muted); }
 .auth-tab.is-active { background: var(--paper); color: var(--pine-800); box-shadow: var(--float-xs); }

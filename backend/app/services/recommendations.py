@@ -218,6 +218,10 @@ async def build_recommendations(
         *[get_place_photo(item.place, request.use_live_data, request.anonymous_id) for item in top]
     )
     recommendations = [to_recommendation(item, photo, community) for item, photo in zip(top, photos)]
+    # Per-user render state: which of these the current user already wants to visit.
+    wanted = marks.get("want_to_visit", set())
+    for rec in recommendations:
+        rec.wanted = rec.source_id in wanted
     explainer = provider if provider is not None else _explainer_provider(request)
     stage_started = time.perf_counter()
     recommendations = await explain_recommendations(recommendations, request, explainer)

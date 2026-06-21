@@ -23,6 +23,7 @@ from app.schemas import (
     FeedbackRequest,
     ParseTextRequest,
     VisitedRequest,
+    WantToVisitRequest,
 )
 from app.services import auth
 from app.services.llm.factory import get_llm_provider
@@ -320,6 +321,33 @@ async def visited_clear(request: Request, anonymous_id: str | None = None) -> di
     except auth.AuthError as exc:
         _raise_auth_error(exc)
     return {"status": "ok", "cleared": storage.clear_visited_account(session.account_id)}
+
+
+@app.post("/api/want-to-visit")
+async def want_to_visit(request: Request, payload: WantToVisitRequest) -> dict[str, Any]:
+    session = _required_session(request)
+    try:
+        auth.require_csrf(request, session)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    storage.set_want_to_visit_account(session.account_id, payload.source_id, payload.wanted)
+    return {"status": "ok", "wanted": payload.wanted}
+
+
+@app.get("/api/want-to-visit")
+async def want_to_visit_list(request: Request) -> dict[str, Any]:
+    session = _required_session(request)
+    return {"items": storage.wanted_places_account(session.account_id)}
+
+
+@app.delete("/api/want-to-visit")
+async def want_to_visit_clear(request: Request) -> dict[str, Any]:
+    session = _required_session(request)
+    try:
+        auth.require_csrf(request, session)
+    except auth.AuthError as exc:
+        _raise_auth_error(exc)
+    return {"status": "ok", "cleared": storage.clear_want_to_visit_account(session.account_id)}
 
 
 @app.get("/api/history")

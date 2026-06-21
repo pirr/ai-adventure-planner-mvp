@@ -168,6 +168,12 @@ class Settings:
     # Rolling window (days) for counting "recent" visits. Wider than 30 so the
     # visits chip isn't starved at low traffic; drives the chip + recent_visits count.
     community_visit_window_days: int = int(os.getenv("COMMUNITY_VISIT_WINDOW_DAYS", "90"))
+    # "Want to visit" is a one-sided demand/intent signal: distinct wanters nudge the
+    # (invisible) score upward, saturating via community_shrink_prior and gated by
+    # community_min_raters (reused). community_want_span caps the max upward nudge in
+    # points; community_badge_min_wants gates the public "N want to go" chip.
+    community_want_span: int = int(os.getenv("COMMUNITY_WANT_SPAN", "20"))
+    community_badge_min_wants: int = int(os.getenv("COMMUNITY_BADGE_MIN_WANTS", "5"))
 
 
 settings = Settings()
