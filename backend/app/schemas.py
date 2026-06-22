@@ -55,6 +55,10 @@ class ParseTextRequest(BaseModel):
     anonymous_id: str | None = Field(default=None, max_length=64)
 
 
+class ExplanationsRequest(BaseModel):
+    request_id: str = Field(..., max_length=64)
+
+
 class AuthRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=256)

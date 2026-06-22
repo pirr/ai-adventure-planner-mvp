@@ -20,12 +20,14 @@ from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthStatusResponse,
+    ExplanationsRequest,
     FeedbackRequest,
     ParseTextRequest,
     VisitedRequest,
     WantToVisitRequest,
 )
 from app.services import auth
+from app.services import explanations as explanations_service
 from app.services.analytics import ab_summary
 from app.services.llm.factory import get_llm_provider
 from app.services.llm.template import TemplateProvider
@@ -263,6 +265,19 @@ async def recommendations(request: Request, response: Response, payload: Adventu
     result = await build_recommendations(payload, account_id=session.account_id if session else None)
     save_response(result.request_id, payload, result, account_id=session.account_id if session else None)
     return result
+
+
+@app.post("/api/explanations")
+@limiter.limit(settings.rate_limit_explanations)
+async def explanations(request: Request, payload: ExplanationsRequest) -> dict[str, Any]:
+    session = _session(request)
+    if session is not None:
+        try:
+            auth.require_csrf(request, session)
+        except auth.AuthError as exc:
+            _raise_auth_error(exc)
+    items = await explanations_service.resolve(payload.request_id)
+    return {"request_id": payload.request_id, "explanations": items}
 
 
 @app.post("/api/feedback")

@@ -91,6 +91,9 @@ class Settings:
     rate_limit_recommendations: str = os.getenv("RATE_LIMIT_RECOMMENDATIONS", "10/minute;100/day")
     # LLM free-text parse: bound paid model calls per IP.
     rate_limit_parse: str = os.getenv("RATE_LIMIT_PARSE", "5/minute;30/day")
+    # Follow-up call that loads deferred LLM explanations; at most one per
+    # recommendations call, so allow roughly 2x the recommendations budget.
+    rate_limit_explanations: str = os.getenv("RATE_LIMIT_EXPLANATIONS", "20/minute;200/day")
     # Account registration/login/OAuth entrypoints.
     rate_limit_auth: str = os.getenv("RATE_LIMIT_AUTH", "5/minute;50/day")
     # Optional growth gate: anonymous users can receive the first recommendation
