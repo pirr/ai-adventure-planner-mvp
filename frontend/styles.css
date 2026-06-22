@@ -444,6 +444,20 @@ body.planning .sheet { display: none; }
 .card-loading .compass { font-size: 34px; color: var(--clay-500); margin-bottom: 4px; }
 .card-loading .compass .lucide { width: 34px; height: 34px; }
 .card-loading p { font-family: var(--display); font-weight: 700; font-size: 14px; color: var(--ink-700); }
+/* Deferred LLM explanations: shimmer the summary + "why" areas until the
+   /api/explanations call fills them; the underlying rule-based text stays in
+   the DOM as the fallback if that call fails. */
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.is-pending-explanation { position: relative; min-height: 1.1em; color: transparent; }
+.is-pending-explanation > * { visibility: hidden; }
+.is-pending-explanation::after {
+  content: ""; position: absolute; inset: 0; border-radius: 8px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.05) 75%);
+  background-size: 200% 100%; animation: shimmer 1.3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-pending-explanation::after { animation: none; background: rgba(0,0,0,0.06); }
+}
 .card-empty { flex: 0 0 100%; display: grid; place-items: center; gap: 8px; min-height: 190px; padding: 30px 18px; text-align: center; color: var(--ink-700); }
 .card-empty .compass { color: var(--clay-500); }
 .card-empty .compass .lucide { width: 34px; height: 34px; }

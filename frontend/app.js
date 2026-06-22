@@ -450,6 +450,7 @@ const I18N = {
     bd_community_confidence: 'Community',
     why_title: 'Why here',
     why_now_title: 'Why now',
+    explanation_loading: 'Writing why this fits…',
     risks_title: 'Worth knowing',
     watch_out_title: 'Watch out',
     no_risk: 'No major risk detected by MVP rules.',
@@ -654,6 +655,7 @@ const I18N = {
     bd_community_confidence: 'Сообщество',
     why_title: 'Почему сюда',
     why_now_title: 'Почему сейчас',
+    explanation_loading: 'Пишем, почему подходит…',
     risks_title: 'Стоит знать',
     watch_out_title: 'Обратите внимание',
     no_risk: 'Существенных рисков по правилам MVP не выявлено.',
@@ -1111,6 +1113,72 @@ async function postRecommendations(payload, { retries = 1 } = {}) {
   throw lastError;
 }
 
+// Deferred LLM explanations: the recommendations response returns instantly with
+// rule-based text and explanations_pending=true; we shimmer the summary + "why"
+// areas, then fill them once from /api/explanations. Any failure leaves the
+// rule-based text that is already on the card.
+function applyExplanationToCard(item) {
+  const card = carouselEl.querySelector(`.recommendation[data-id="${CSS.escape(item.id)}"]`);
+  if (!card) return;
+  const isTop = card.classList.contains('is-top');
+  const desc = card.querySelector('.description');
+  if (desc) {
+    desc.textContent = item.summary || item.description;
+    desc.classList.remove('is-pending-explanation');
+    desc.removeAttribute('aria-busy');
+  }
+  const why = card.querySelector('.why');
+  if (why) {
+    why.innerHTML = whyInnerHtml(item, isTop);
+    why.classList.remove('is-pending-explanation');
+    why.removeAttribute('aria-busy');
+  }
+}
+
+function clearPendingShimmer(requestId) {
+  (lastResponse && lastResponse.recommendations || []).forEach((item) => {
+    if ((item._request_id || lastRequestId) === requestId) item._explanations_pending = false;
+  });
+  carouselEl.querySelectorAll('.is-pending-explanation').forEach((el) => {
+    el.classList.remove('is-pending-explanation');
+    el.removeAttribute('aria-busy');
+  });
+}
+
+async function requestExplanations(requestId) {
+  if (!requestId) return;
+  const generation = searchGeneration;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await apiFetch('/api/explanations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: requestId }),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('explanations_failed');
+    const data = await response.json();
+    if (generation !== searchGeneration) return;
+    const byId = new Map((data.explanations || []).map((e) => [e.id, e]));
+    (lastResponse && lastResponse.recommendations || []).forEach((item) => {
+      const e = byId.get(item.id);
+      if (!e) return;
+      if (e.summary != null) item.summary = e.summary;
+      if (e.why) item.why = e.why;
+      if (e.data_confidence_note != null) item.data_confidence_note = e.data_confidence_note;
+      item._explanations_pending = false;
+      applyExplanationToCard(item);
+    });
+  } catch (error) {
+    // Best-effort: leave the rule-based text already on the cards.
+  } finally {
+    clearTimeout(timer);
+    if (generation === searchGeneration) clearPendingShimmer(requestId);
+  }
+}
+
 // In-card loading: a centered compass spinner + text inside #carousel, shown while
 // the search runs and replaced by renderResults() (which rebuilds the carousel).
 function renderLoading() {
@@ -1125,6 +1193,7 @@ function renderLoading() {
 function annotateRequestId(data) {
   (data.recommendations || []).forEach((item) => {
     if (!item._request_id) item._request_id = data.request_id;
+    if (data.explanations_pending) item._explanations_pending = true;
   });
 }
 
@@ -1247,6 +1316,7 @@ async function loadMoreRecommendations({ force = false } = {}) {
     const data = await postRecommendations(payload);
     if (generation !== searchGeneration) return;
     const added = appendRecommendations(data);
+    if (data.explanations_pending) requestExplanations(data.request_id);
     loadMoreExhausted = added === 0;
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length, load_more: true } });
     loadHistory();
@@ -1302,6 +1372,7 @@ async function runSearch() {
     if (generation !== searchGeneration) return; // superseded by a newer search
     annotateRequestId(data);
     renderResults(data);
+    if (data.explanations_pending) requestExplanations(data.request_id);
     track('search_completed', { request_id: data.request_id, meta: { count: (data.recommendations || []).length } });
     loadHistory();
   } catch (error) {
@@ -1505,6 +1576,14 @@ function renderCards(items) {
   if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 }
 
+function whyInnerHtml(item, isTop) {
+  return `
+    <h3>${isTop ? t('why_now_title') : t('why_title')}</h3>
+    ${(item.why || []).map((text) => `<div class="item good">✓ ${escapeHtml(text)}</div>`).join('')}
+    ${item.data_confidence_note ? `<div class="item">${escapeHtml(item.data_confidence_note)}</div>` : ''}
+  `;
+}
+
 function buildCard(item, isTop) {
   const template = $('recommendationTemplate');
   const fragment = template.content.cloneNode(true);
@@ -1569,11 +1648,17 @@ function buildCard(item, isTop) {
       return `<div class="bd-row"><span class="bd-k">${breakdownLabel(key)}</span><span class="bd-bar"><i class="${tier}" style="width:${Math.max(0, Math.min(100, value))}%"></i></span><span class="bd-v">${value}</span></div>`;
     })
     .join('');
-  fragment.querySelector('.why').innerHTML = `
-    <h3>${isTop ? t('why_now_title') : t('why_title')}</h3>
-    ${item.why.map((text) => `<div class="item good">✓ ${escapeHtml(text)}</div>`).join('')}
-    ${item.data_confidence_note ? `<div class="item">${escapeHtml(item.data_confidence_note)}</div>` : ''}
-  `;
+  fragment.querySelector('.why').innerHTML = whyInnerHtml(item, isTop);
+  if (item._explanations_pending) {
+    ['.description', '.why'].forEach((sel) => {
+      const node = fragment.querySelector(sel);
+      if (node) {
+        node.classList.add('is-pending-explanation');
+        node.setAttribute('aria-busy', 'true');
+        node.setAttribute('aria-label', t('explanation_loading'));
+      }
+    });
+  }
   fragment.querySelector('.warnings').innerHTML = item.warnings.length
     ? `<h3>${isTop ? t('watch_out_title') : t('risks_title')}</h3>${item.warnings.map((text) => `<div class="item warn">⚠ ${escapeHtml(text)}</div>`).join('')}`
     : `<div class="item good">${t('no_risk')}</div>`;

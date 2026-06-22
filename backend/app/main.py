@@ -269,7 +269,7 @@ async def recommendations(request: Request, response: Response, payload: Adventu
 
 @app.post("/api/explanations")
 @limiter.limit(settings.rate_limit_explanations)
-async def explanations(request: Request, payload: ExplanationsRequest) -> dict[str, Any]:
+async def explanations(request: Request, response: Response, payload: ExplanationsRequest) -> dict[str, Any]:
     session = _session(request)
     if session is not None:
         try:
