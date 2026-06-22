@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime
 from typing import Any
 
 from app.schemas import FeedbackRequest
-from app.services.storage.db import Database
+from app.services.storage.db import Connection, Database
 
 
 class FeedbackRepo:
@@ -18,7 +17,7 @@ class FeedbackRepo:
         self.db = db
 
     @staticmethod
-    def insert(conn: sqlite3.Connection, feedback: FeedbackRequest, account_id: int | None) -> None:
+    def insert(conn: Connection, feedback: FeedbackRequest, account_id: int | None) -> None:
         conn.execute(
             "INSERT INTO feedback (created_at, request_id, recommendation_id, rating, reason, anonymous_id, account_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (datetime.utcnow().isoformat(), feedback.request_id, feedback.recommendation_id, feedback.rating, feedback.reason, feedback.anonymous_id, account_id),
@@ -31,9 +30,9 @@ class FeedbackRepo:
 
     def feedback_with_payload(
         self, *, anonymous_id: str | None = None, account_id: int | None = None
-    ) -> list[sqlite3.Row]:
+    ) -> list[dict[str, Any]]:
         """Each of this user's ratings joined to the recommendation payload it
-        targeted: rows of ``(rating, payload_json)``. Keyed by anonymous_id or
+        targeted: dicts of ``(rating, payload_json)``. Keyed by anonymous_id or
         account_id; returns ``[]`` when neither is given."""
         if account_id is not None:
             column, value = "account_id", account_id
@@ -42,7 +41,7 @@ class FeedbackRepo:
         else:
             return []
         with self.db.connect() as conn:
-            return conn.execute(
+            rows = conn.execute(
                 f"""
                 SELECT f.rating AS rating, r.payload_json AS payload_json
                 FROM feedback f
@@ -51,3 +50,4 @@ class FeedbackRepo:
                 """,
                 (value,),
             ).fetchall()
+        return [dict(row) for row in rows]

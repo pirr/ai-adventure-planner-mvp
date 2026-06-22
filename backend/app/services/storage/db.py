@@ -1,16 +1,49 @@
 from __future__ import annotations
 
 import sqlite3
-from contextlib import contextmanager
-from collections.abc import Iterator
+from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager, contextmanager
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
+from typing import Any, Protocol
 
-from app.config import settings
+from app.config import Settings, settings
 
 
-class Database:
-    """Owns the SQLite connection, schema and migrations. Repos share one
-    instance and ask it for connections; it knows nothing about the domain."""
+class Connection(Protocol):
+    """The slice of a DB-API connection the repos use: a parametrized `execute`.
+    Both `sqlite3.Connection` and (future) `psycopg.Connection` satisfy this
+    structurally, so repos can type their `conn` parameters against it instead of
+    a concrete driver. Defined as a Protocol because we don't own those classes."""
+
+    def execute(self, sql: str, parameters: Sequence[Any] = ..., /) -> Any: ...
+
+
+# A read row addressed by column name. `sqlite3.Row` and a plain `dict` both
+# satisfy this; repos return/accept `Row` so callers never see a driver type.
+Row = Mapping[str, Any]
+
+
+class Database(ABC):
+    """Storage backend contract: hands out connections and (per backend) owns the
+    schema. Repos depend on this ABC, not on a concrete driver; `create_database`
+    picks the configured implementation. An ABC (not a Protocol) because we own
+    every implementation and want a missing method to fail loudly at construction."""
+
+    @abstractmethod
+    def connect(self) -> Connection:
+        """A new connection; its `with` block is a single transaction."""
+
+    @abstractmethod
+    def transaction(self) -> AbstractContextManager[Connection]:
+        """A connection whose `with` block commits on success / rolls back on
+        error. Use to make multi-table writes atomic. Each backend implements it
+        itself: `with conn:` semantics differ across drivers."""
+
+
+class SqliteDatabase(Database):
+    """SQLite-backed `Database`: owns the connection, schema and migrations. Knows
+    nothing about the domain; repos share one instance and ask it for connections."""
 
     def __init__(self, path: Path = settings.sqlite_path):
         self.path = path
@@ -192,3 +225,19 @@ class Database:
         existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+def create_database(settings: Settings) -> Database:
+    """The configured storage backend. Selected by `settings.storage_backend`;
+    this is the one place that knows which concrete `Database` to build, so the
+    rest of the app depends only on the abstract contract."""
+    backend = settings.storage_backend
+    if backend == "sqlite":
+        return SqliteDatabase(settings.sqlite_path)
+    if backend == "postgres":
+        raise NotImplementedError(
+            "Postgres storage backend is not implemented yet — see docs/POSTGRES_PORTING.md"
+        )
+    raise ValueError(
+        f"unknown STORAGE_BACKEND {backend!r} (expected 'sqlite' or 'postgres')"
+    )

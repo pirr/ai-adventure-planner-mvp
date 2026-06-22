@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime
 from typing import Any
 
 from app.schemas import AdventureRequest, Recommendation
-from app.services.storage.db import Database
+from app.services.storage.db import Connection, Database
 
 
 class SearchRepo:
@@ -20,7 +19,7 @@ class SearchRepo:
 
     @staticmethod
     def insert_session(
-        conn: sqlite3.Connection,
+        conn: Connection,
         request_id: str,
         request: AdventureRequest,
         account_id: int | None,
@@ -33,7 +32,7 @@ class SearchRepo:
         )
 
     @staticmethod
-    def insert_recommendations(conn: sqlite3.Connection, request_id: str, recommendations: list[Recommendation]) -> None:
+    def insert_recommendations(conn: Connection, request_id: str, recommendations: list[Recommendation]) -> None:
         for rec in recommendations:
             conn.execute(
                 "INSERT OR REPLACE INTO recommendations (id, request_id, title, score, payload_json) VALUES (?, ?, ?, ?, ?)",

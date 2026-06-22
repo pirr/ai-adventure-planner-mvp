@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 from contextlib import contextmanager
 from collections.abc import Iterator
 from pathlib import Path
@@ -11,7 +10,7 @@ from app.services.storage.accounts import AccountsRepo
 from app.services.storage.api_usage import ApiUsageRepo
 from app.services.storage.auth import AuthRepo
 from app.services.storage.community import CommunityRepo
-from app.services.storage.db import Database
+from app.services.storage.db import Connection, Database, SqliteDatabase, create_database
 from app.services.storage.events import EventsRepo
 from app.services.storage.feedback import FeedbackRepo
 from app.services.storage.lifecycle import LifecycleRepo
@@ -27,8 +26,17 @@ class Storage:
     repos. The only methods kept here are the two no-logic write coordinators
     that touch the `users` table alongside a domain write."""
 
-    def __init__(self, path: Path = settings.sqlite_path):
-        self.db = Database(path)
+    def __init__(self, path: Path | None = None, db: Database | None = None):
+        # Three ways to get a backend: an explicit `db` (any backend, e.g. a
+        # future Postgres one); an explicit `path` meaning "a SQLite file here"
+        # (the test seam — every test wants a throwaway sqlite db); or neither,
+        # in which case config picks the backend (the production singleton).
+        if db is not None:
+            self.db = db
+        elif path is not None:
+            self.db = SqliteDatabase(path)
+        else:
+            self.db = create_database(settings)
         self.users = UsersRepo()
         self.accounts = AccountsRepo(self.db)
         self.auth = AuthRepo(self.db, self.accounts)
@@ -40,12 +48,12 @@ class Storage:
         self.api_usage = ApiUsageRepo(self.db)
         self.lifecycle = LifecycleRepo(self.db)
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self) -> Connection:
         """Test/seed seam: a raw connection (its `with` block is a transaction)."""
         return self.db.connect()
 
     @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(self) -> Iterator[Connection]:
         """One transaction services use to make multi-repo writes atomic."""
         with self.db.transaction() as conn:
             yield conn

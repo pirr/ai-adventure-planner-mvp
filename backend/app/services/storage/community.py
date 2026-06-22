@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 
-from app.services.storage.db import Database
+from app.services.storage.db import Database, Row
 
 
 @dataclass
@@ -13,9 +12,9 @@ class RawSignals:
     ``ratings`` rows also carry ``rating``. ``services/community.py`` dedupes
     raters and decides what counts."""
 
-    ratings: list[sqlite3.Row]
-    visits: list[sqlite3.Row]
-    wants: list[sqlite3.Row]
+    ratings: list[Row]
+    visits: list[Row]
+    wants: list[Row]
 
 
 class CommunityRepo:

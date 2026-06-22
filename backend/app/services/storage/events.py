@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from datetime import datetime
 from typing import Any
 
 from app.schemas import AnalyticsEvent
-from app.services.storage.db import Database
+from app.services.storage.db import Connection, Database
 
 
 class EventsRepo:
@@ -18,7 +17,7 @@ class EventsRepo:
         self.db = db
 
     @staticmethod
-    def insert(conn: sqlite3.Connection, event: AnalyticsEvent, account_id: int | None) -> None:
+    def insert(conn: Connection, event: AnalyticsEvent, account_id: int | None) -> None:
         conn.execute(
             "INSERT INTO events (created_at, event, request_id, recommendation_id, anonymous_id, account_id, meta) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (

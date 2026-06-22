@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime
+
+from app.services.storage.db import Connection
 
 
 class UsersRepo:
@@ -11,7 +12,7 @@ class UsersRepo:
     that records the activity (a search, feedback, an event)."""
 
     @staticmethod
-    def touch(conn: sqlite3.Connection, anonymous_id: str | None, locale: str | None = None) -> None:
+    def touch(conn: Connection, anonymous_id: str | None, locale: str | None = None) -> None:
         if not anonymous_id:
             return
         conn.execute(

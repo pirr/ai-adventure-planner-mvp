@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime
 from typing import Any
 
-from app.services.storage.db import Database
+from app.services.storage.db import Connection, Database
 
 
 class PlaceMarksRepo:
@@ -16,7 +15,7 @@ class PlaceMarksRepo:
         self.db = db
 
     @staticmethod
-    def record_seen(conn: sqlite3.Connection, anonymous_id: str | None, source_ids: list[str | None]) -> None:
+    def record_seen(conn: Connection, anonymous_id: str | None, source_ids: list[str | None]) -> None:
         """Mark each given place as seen for this user (no-op without an id)."""
         if not anonymous_id:
             return
@@ -31,7 +30,7 @@ class PlaceMarksRepo:
             )
 
     @staticmethod
-    def record_account_seen(conn: sqlite3.Connection, account_id: int, source_ids: list[str | None]) -> None:
+    def record_account_seen(conn: Connection, account_id: int, source_ids: list[str | None]) -> None:
         now = datetime.utcnow().isoformat()
         for source_id in source_ids:
             if not source_id:
