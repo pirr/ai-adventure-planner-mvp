@@ -57,6 +57,12 @@ class Settings:
     # use fresh weather, routing, personalization, seen/visited state and LLM.
     search_candidate_cache_ttl_seconds: int = int(os.getenv("SEARCH_CANDIDATE_CACHE_TTL_SECONDS", "21600"))
     search_candidate_cache_max_entries: int = int(os.getenv("SEARCH_CANDIDATE_CACHE_MAX_ENTRIES", "256"))
+    # Deferred LLM explanations: recommendations are returned immediately and the
+    # prose is fetched separately. The finished recommendations are stashed in
+    # process, keyed by request_id, for the follow-up /api/explanations call.
+    defer_explanations: bool = _env_bool("DEFER_EXPLANATIONS", True)
+    explanation_stash_ttl_seconds: int = int(os.getenv("EXPLANATION_STASH_TTL_SECONDS", "300"))
+    explanation_stash_max_entries: int = int(os.getenv("EXPLANATION_STASH_MAX_ENTRIES", "512"))
     # Number of cheap-pre-ranked candidates sent to live routing. Keep this
     # comfortably above the max result limit so quality/diversity survive.
     search_route_candidate_limit: int = int(os.getenv("SEARCH_ROUTE_CANDIDATE_LIMIT", "32"))
