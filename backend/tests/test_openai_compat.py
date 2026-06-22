@@ -202,3 +202,17 @@ def test_parse_prompt_includes_drinks_and_example():
     assert "drinks" in _PARSE_SYSTEM_PROMPT
     messages = build_parse_messages("I want to drink a beer nearby", "en")
     assert any("drinks" in m["content"] for m in messages if m["role"] == "assistant")
+
+
+def test_explain_body_includes_max_tokens():
+    provider = OpenAICompatibleProvider(
+        base_url="https://api.openai.com/v1", model="gpt-4o-mini", explain_max_tokens=500,
+    )
+    body = provider._body([{"role": "user", "content": "x"}], "gpt-4o-mini", max_tokens=500)
+    assert body["max_tokens"] == 500
+
+
+def test_body_without_max_tokens_omits_it():
+    provider = OpenAICompatibleProvider(base_url="https://api.openai.com/v1", model="gpt-4o-mini")
+    body = provider._body([{"role": "user", "content": "x"}], "gpt-4o-mini")
+    assert "max_tokens" not in body

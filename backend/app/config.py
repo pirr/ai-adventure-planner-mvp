@@ -124,6 +124,8 @@ class Settings:
     llm_api_key: str | None = os.getenv("LLM_API_KEY")
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "20"))
     llm_max_explained: int = int(os.getenv("LLM_MAX_EXPLAINED", "5"))
+    # Cap explanation generation length (output tokens dominate LLM latency/cost).
+    llm_explain_max_tokens: int = int(os.getenv("LLM_EXPLAIN_MAX_TOKENS", "700"))
     llm_fallback_models: tuple[str] = tuple(os.getenv("LLM_FALLBACK_MODELS", "").split(","))
     gemini_reasoning_effort: str | None = os.getenv("GEMINI_REASONING_EFFORT", "")
     # Free-text situation parsing ("Describe your trip"). Requires a real LLM

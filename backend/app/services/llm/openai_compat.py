@@ -21,8 +21,8 @@ _SYSTEM_PROMPT = (
     "numbers, place names, opening hours, weather, traffic, distances or travel times that are not "
     "in the input; if something is unknown, say it is unavailable; do not change or soften the "
     "safety warnings. Be concise and concrete. Respond in the requested language. "
-    'Output a single JSON object: {"explanations": [{"id": <id>, "summary": <string, max 30 words>, '
-    '"why": [<2-4 short strings>], "data_confidence_note": <short string>}]} with one entry per '
+    'Output a single JSON object: {"explanations": [{"id": <id>, "summary": <string, max 24 words>, '
+    '"why": [<2-3 short strings>], "data_confidence_note": <short string>}]} with one entry per '
     "option, in the same order. Output JSON only."
 )
 
@@ -260,7 +260,7 @@ def parse_explanations(
 
         if isinstance(why_raw, list):
             why = []
-            for value in why_raw[:4]:
+            for value in why_raw[:3]:
                 text = _limit_chars(value, 180)
                 if text:
                     why.append(text)
@@ -393,6 +393,7 @@ class OpenAICompatibleProvider(LLMProvider):
         json_mode: bool = True,
         rule_based_fallback: bool = True,
         gemini_reasoning_effort: str | None = None,
+        explain_max_tokens: int | None = None,
     ):
         self.base_url = self._normalize_base_url(base_url)
         self.model = model
@@ -403,6 +404,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.json_mode = json_mode
         self.rule_based_fallback = rule_based_fallback
         self.gemini_reasoning_effort = gemini_reasoning_effort
+        self.explain_max_tokens = explain_max_tokens
 
     @staticmethod
     def _normalize_base_url(base_url: str) -> str:
@@ -443,12 +445,14 @@ class OpenAICompatibleProvider(LLMProvider):
 
         return models
 
-    def _body(self, messages: list[dict[str, str]], model: str) -> dict[str, Any]:
+    def _body(self, messages: list[dict[str, str]], model: str, max_tokens: int | None = None) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "temperature": 0.2,
         }
+        if max_tokens:
+            body["max_tokens"] = max_tokens
 
         # Gemini OpenAI-compatible endpoint works well with prompt-only JSON output.
         # Some Gemini-compatible paths are stricter about unsupported OpenAI params,
@@ -518,9 +522,10 @@ class OpenAICompatibleProvider(LLMProvider):
         client: httpx.AsyncClient,
         model: str,
         messages: list[dict[str, str]],
+        max_tokens: int | None = None,
     ) -> str:
         url = f"{self.base_url}/chat/completions"
-        body = self._body(messages, model)
+        body = self._body(messages, model, max_tokens=max_tokens)
         headers = self._headers()
 
         last_error: Exception | None = None
@@ -676,6 +681,7 @@ class OpenAICompatibleProvider(LLMProvider):
                         client=client,
                         model=model,
                         messages=messages,
+                        max_tokens=self.explain_max_tokens,
                     )
 
                     explanations = parse_explanations(content, payload.recommendations)
