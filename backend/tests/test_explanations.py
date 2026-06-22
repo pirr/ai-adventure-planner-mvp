@@ -88,3 +88,59 @@ def test_stash_evicts_oldest_over_max(monkeypatch):
     for i in range(4):
         explanations.stash(f"r{i}", [_rec()], req)
     assert len(explanations._pending) <= 2
+
+
+from app.services import recommendations as recs_module
+from app.services.llm import TemplateProvider
+from app.services.storage import Storage
+
+_TIVAT = dict(
+    lat=42.4304, lon=18.6964, available_minutes=300, transport_mode="car",
+    use_live_data=False, interests=["history", "fortresses", "viewpoints"],
+)
+
+
+class _RecordingProvider(LLMProvider):
+    name = "recording"
+
+    def __init__(self):
+        self.called = False
+
+    async def explain(self, payload: ExplanationInput):
+        self.called = True
+        return [Explanation(summary="Scores 86 here.", why=["ok"]) for _ in payload.recommendations]
+
+
+def test_defer_sets_pending_and_skips_inline_llm(tmp_path, monkeypatch):
+    explanations._pending.clear()
+    monkeypatch.setattr("app.services.recommendations.storage", Storage(tmp_path / "a.db"))
+    provider = _RecordingProvider()
+    resp = asyncio.run(recs_module.build_recommendations(
+        AdventureRequest(**_TIVAT, anonymous_id="u", limit=3),
+        provider=provider, defer_explanations=True,
+    ))
+    assert resp.explanations_pending is True
+    assert provider.called is False
+    assert resp.request_id in explanations._pending
+
+
+def test_template_provider_is_not_pending(tmp_path, monkeypatch):
+    explanations._pending.clear()
+    monkeypatch.setattr("app.services.recommendations.storage", Storage(tmp_path / "b.db"))
+    resp = asyncio.run(recs_module.build_recommendations(
+        AdventureRequest(**_TIVAT, limit=3),
+        provider=TemplateProvider(), defer_explanations=True,
+    ))
+    assert resp.explanations_pending is False
+
+
+def test_defer_false_runs_inline(tmp_path, monkeypatch):
+    explanations._pending.clear()
+    monkeypatch.setattr("app.services.recommendations.storage", Storage(tmp_path / "c.db"))
+    provider = _RecordingProvider()
+    resp = asyncio.run(recs_module.build_recommendations(
+        AdventureRequest(**_TIVAT, anonymous_id="u", limit=3),
+        provider=provider, defer_explanations=False,
+    ))
+    assert resp.explanations_pending is False
+    assert provider.called is True

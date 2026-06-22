@@ -14,6 +14,7 @@ from app.services.places import get_candidate_places
 from app.services.routing import fallback_route, get_routes
 from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations
 from app.services.llm.ab import explainer_provider
+from app.services.explanations import stash as stash_explanations
 from app.services.community import community_signals
 from app.services.preferences import preference_profile, preference_profile_for_account
 from app.services.scoring import ScoredCandidate, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
@@ -69,6 +70,7 @@ async def build_recommendations(
     request: AdventureRequest,
     provider: LLMProvider | None = None,
     account_id: int | None = None,
+    defer_explanations: bool | None = None,
 ) -> AdventureResponse:
     overall_started = time.perf_counter()
     request_id = str(uuid.uuid4())
@@ -211,14 +213,20 @@ async def build_recommendations(
     for rec in recommendations:
         rec.wanted = rec.source_id in wanted
     explainer = provider if provider is not None else explainer_provider(request)
-    stage_started = time.perf_counter()
-    recommendations = await explain_recommendations(recommendations, request, explainer)
-    logger.info(
-        "recommendations_timing request_id=%s stage=explain recommendations=%d duration_ms=%d",
-        request_id,
-        len(recommendations),
-        _elapsed_ms(stage_started),
-    )
+    defer = settings.defer_explanations if defer_explanations is None else defer_explanations
+    explanations_pending = False
+    if defer and recommendations and not isinstance(explainer, TemplateProvider):
+        stash_explanations(request_id, recommendations, request)
+        explanations_pending = True
+    else:
+        stage_started = time.perf_counter()
+        recommendations = await explain_recommendations(recommendations, request, explainer)
+        logger.info(
+            "recommendations_timing request_id=%s stage=explain recommendations=%d duration_ms=%d",
+            request_id,
+            len(recommendations),
+            _elapsed_ms(stage_started),
+        )
     chosen_ids = {item.place.source_id for item in top}
     rejected = rejected_from_scored(final, chosen_ids, limit=3, lang=request.lang)
     response = AdventureResponse(
@@ -228,6 +236,7 @@ async def build_recommendations(
         recommendations=recommendations,
         rejected_alternatives=rejected,
         data_warnings=weather_warnings + place_warnings + google_warnings,
+        explanations_pending=explanations_pending,
     )
     logger.info(
         "recommendations_timing request_id=%s stage=total recommendations=%d duration_ms=%d",

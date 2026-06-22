@@ -263,6 +263,10 @@ class AdventureResponse(BaseModel):
     recommendations: list[Recommendation]
     rejected_alternatives: list[RejectedAlternative]
     data_warnings: list[str] = Field(default_factory=list)
+    # True when the LLM prose is being fetched separately (the client should
+    # show a placeholder and call /api/explanations). False when the rule-based
+    # text on each card is already final (template provider / A/B control).
+    explanations_pending: bool = False
 
 
 FeedbackReason = Literal["too_far", "too_difficult", "bad_weather", "not_interesting", "inaccurate", "other"]
