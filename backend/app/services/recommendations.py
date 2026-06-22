@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import time
 import uuid
@@ -13,7 +12,8 @@ from app.services import google_places
 from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import fallback_route, get_routes
-from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations, get_llm_provider
+from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations
+from app.services.llm.ab import explainer_provider
 from app.services.community import community_signals
 from app.services.preferences import preference_profile, preference_profile_for_account
 from app.services.scoring import ScoredCandidate, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
@@ -22,20 +22,6 @@ from app.services.weather import get_destination_forecasts, get_weather
 
 
 logger = logging.getLogger(__name__)
-
-
-def _ab_bucket(anonymous_id: str) -> int:
-    """Stable 0/1 bucket from the anonymous id (hashlib, not the salted hash())."""
-    return int(hashlib.sha1(anonymous_id.encode()).hexdigest(), 16) % 2
-
-
-def _explainer_provider(request: AdventureRequest) -> LLMProvider:
-    """The configured LLM provider, unless the A/B control bucket is selected
-    (then templates). No-op when A/B is off or no LLM/anonymous_id is present."""
-    provider = get_llm_provider()
-    if not settings.ab_test_enabled or isinstance(provider, TemplateProvider) or not request.anonymous_id:
-        return provider
-    return provider if _ab_bucket(request.anonymous_id) == 1 else TemplateProvider()
 
 
 def _is_recommendable(candidate: ScoredCandidate, request: AdventureRequest) -> bool:
@@ -224,7 +210,7 @@ async def build_recommendations(
     wanted = marks.get("want_to_visit", set())
     for rec in recommendations:
         rec.wanted = rec.source_id in wanted
-    explainer = provider if provider is not None else _explainer_provider(request)
+    explainer = provider if provider is not None else explainer_provider(request)
     stage_started = time.perf_counter()
     recommendations = await explain_recommendations(recommendations, request, explainer)
     logger.info(
