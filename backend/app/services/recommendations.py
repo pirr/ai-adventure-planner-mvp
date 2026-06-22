@@ -80,22 +80,24 @@ async def build_recommendations(
         if account_id is not None
         else preference_profile(request.anonymous_id, store=storage)
     )
+    # Origin weather and place search are independent; run them concurrently so
+    # the slower of the two (Overpass on a cache miss) sets the latency, not the sum.
     stage_started = time.perf_counter()
-    weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data, request.lang)
-    logger.info("recommendations_timing request_id=%s stage=weather duration_ms=%d", request_id, _elapsed_ms(stage_started))
-    stage_started = time.perf_counter()
-    places, place_warnings = await get_candidate_places(
-        request.lat,
-        request.lon,
-        request.available_minutes,
-        request.transport_mode,
-        request.interests,
-        request.use_live_data,
-        request.lang,
-        request.anonymous_id,
+    (weather, weather_warnings), (places, place_warnings) = await asyncio.gather(
+        get_weather(request.lat, request.lon, request.use_live_data, request.lang),
+        get_candidate_places(
+            request.lat,
+            request.lon,
+            request.available_minutes,
+            request.transport_mode,
+            request.interests,
+            request.use_live_data,
+            request.lang,
+            request.anonymous_id,
+        ),
     )
     logger.info(
-        "recommendations_timing request_id=%s stage=places candidates=%d duration_ms=%d",
+        "recommendations_timing request_id=%s stage=weather_places candidates=%d duration_ms=%d",
         request_id,
         len(places),
         _elapsed_ms(stage_started),
