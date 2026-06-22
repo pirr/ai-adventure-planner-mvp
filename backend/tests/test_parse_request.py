@@ -133,6 +133,7 @@ class FakeParseProvider(LLMProvider):
 class FakeStorage:
     def __init__(self, grant=1):
         self.grant = grant
+        self.api_usage = self  # main.py reaches the budget via storage.api_usage.reserve_api_calls
 
     def reserve_api_calls(self, api, anonymous_id, requested, *, daily_limit, user_daily_limit):
         return self.grant

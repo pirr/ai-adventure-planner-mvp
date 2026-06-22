@@ -29,6 +29,11 @@ class Settings:
     user_agent: str = os.getenv("USER_AGENT", "ai-adventure-planner-mvp/0.1")
     data_dir: Path = Path(os.getenv("DATA_DIR", "./data"))
     sqlite_path: Path = Path(os.getenv("SQLITE_PATH", "./data/adventures.db"))
+    # Storage backend selector, read by create_database(). "sqlite" (default) or
+    # "postgres" (not yet implemented — see docs/POSTGRES_PORTING.md).
+    storage_backend: str = os.getenv("STORAGE_BACKEND", "sqlite")
+    # Postgres DSN for the future postgres backend; unused while backend=sqlite.
+    database_url: str | None = os.getenv("DATABASE_URL") or None
     overpass_url: str = os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter")
     # Optional fallback Overpass mirrors, tried (in order) when the primary is
     # busy (502/503/504). Comma-separated, OVERPASS_MIRRORS. Empty by default:

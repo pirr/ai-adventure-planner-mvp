@@ -120,7 +120,7 @@ def _reserve_google_photo(anonymous_id: str | None) -> bool:
     is exhausted — or the request isn't budgetable (no ``anonymous_id``) — so the
     caller stops hitting Google and keeps the free photo sources tried above.
     """
-    granted = storage.reserve_api_calls(
+    granted = storage.api_usage.reserve_api_calls(
         "google",
         anonymous_id,
         1,

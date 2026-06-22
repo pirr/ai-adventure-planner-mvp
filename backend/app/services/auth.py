@@ -80,7 +80,7 @@ def google_oauth_enabled() -> bool:
 
 
 def auth_user_from_account(account: dict) -> AuthUser:
-    provider = storage.account_provider(int(account["id"]))
+    provider = storage.accounts.account_provider(int(account["id"]))
     return AuthUser(
         id=int(account["id"]),
         email=account["email"],
@@ -94,7 +94,7 @@ def session_context_from_request(request) -> SessionContext | None:
     if not token:
         return None
     token_hash = _hash_token(token)
-    session = storage.session_for_token_hash(token_hash)
+    session = storage.auth.session_for_token_hash(token_hash)
     if not session:
         return None
     return SessionContext(
@@ -111,7 +111,7 @@ def start_session(response, account: dict, *, user_agent: str | None = None) -> 
     token = secrets.token_urlsafe(32)
     csrf_token = secrets.token_urlsafe(32)
     token_hash = _hash_token(token)
-    storage.create_session(
+    storage.auth.create_session(
         token_hash=token_hash,
         account_id=int(account["id"]),
         csrf_token=csrf_token,
@@ -132,7 +132,7 @@ def start_session(response, account: dict, *, user_agent: str | None = None) -> 
         account_id=int(account["id"]),
         email=account["email"],
         email_verified=bool(account["email_verified"]),
-        provider=storage.account_provider(int(account["id"])),
+        provider=storage.accounts.account_provider(int(account["id"])),
         csrf_token=csrf_token,
     )
 
@@ -186,23 +186,23 @@ def require_csrf(request, session: SessionContext) -> None:
 def register_email(email: str, password: str, anonymous_id: str | None, locale: str | None = None) -> dict:
     if len(password) < settings.auth_password_min_length:
         raise AuthError("password_too_short", status_code=422)
-    if storage.get_account_by_email(email):
+    if storage.accounts.get_account_by_email(email):
         raise AuthError("email_already_registered", status_code=409)
     try:
-        account = storage.create_email_account(email, hash_password(password), locale)
+        account = storage.accounts.create_email_account(email, hash_password(password), locale)
     except Exception as exc:  # sqlite uniqueness races should stay user-safe
         if exc.__class__.__name__ == "IntegrityError":
             raise AuthError("email_already_registered", status_code=409) from exc
         raise
-    storage.merge_anonymous_into_account(anonymous_id, int(account["id"]))
+    storage.lifecycle.merge_anonymous_into_account(anonymous_id, int(account["id"]))
     return account
 
 
 def login_email(email: str, password: str, anonymous_id: str | None) -> dict:
-    account = storage.get_account_by_email(email)
+    account = storage.accounts.get_account_by_email(email)
     if not account or not verify_password(account.get("password_hash"), password):
         raise AuthError("invalid_credentials", status_code=401)
-    storage.merge_anonymous_into_account(anonymous_id, int(account["id"]))
+    storage.lifecycle.merge_anonymous_into_account(anonymous_id, int(account["id"]))
     return account
 
 
@@ -211,7 +211,7 @@ def create_google_authorization_url(anonymous_id: str | None = None) -> tuple[st
         raise AuthError("google_oauth_disabled", status_code=404)
     state = secrets.token_urlsafe(32)
     expires_at = (datetime.utcnow() + timedelta(minutes=_OAUTH_STATE_MINUTES)).isoformat()
-    storage.create_oauth_state(_hash_token(state), anonymous_id, expires_at)
+    storage.auth.create_oauth_state(_hash_token(state), anonymous_id, expires_at)
     params = {
         "client_id": settings.google_oauth_client_id,
         "redirect_uri": settings.google_oauth_redirect_uri,
@@ -265,7 +265,7 @@ def _google_email_verified(email: str, claims: dict) -> bool:
 
 
 async def finish_google_login(code: str, state: str) -> tuple[dict, str | None]:
-    state_row = storage.consume_oauth_state(_hash_token(state))
+    state_row = storage.auth.consume_oauth_state(_hash_token(state))
     if state_row is None:
         raise AuthError("invalid_oauth_state", status_code=400)
     token_payload = await exchange_google_code(code)
@@ -277,10 +277,10 @@ async def finish_google_login(code: str, state: str) -> tuple[dict, str | None]:
     email = claims.get("email")
     if not subject or not email:
         raise AuthError("google_oauth_failed", status_code=502)
-    account = storage.create_or_link_google_account(
+    account = storage.accounts.create_or_link_google_account(
         provider_subject=str(subject),
         email=str(email),
         email_verified=_google_email_verified(str(email), claims),
     )
-    storage.merge_anonymous_into_account(state_row.get("anonymous_id"), int(account["id"]))
+    storage.lifecycle.merge_anonymous_into_account(state_row.get("anonymous_id"), int(account["id"]))
     return account, state_row.get("anonymous_id")

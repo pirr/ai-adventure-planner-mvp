@@ -26,9 +26,11 @@ from app.schemas import (
     WantToVisitRequest,
 )
 from app.services import auth
+from app.services.analytics import ab_summary
 from app.services.llm.factory import get_llm_provider
 from app.services.llm.template import TemplateProvider
 from app.services.recommendations import build_recommendations
+from app.services.search import save_response
 from app.services.storage import storage
 
 app = FastAPI(title=settings.app_name, version=settings.version)
@@ -173,7 +175,7 @@ async def auth_logout(request: Request, response: Response) -> AuthStatusRespons
         auth.require_csrf(request, session)
     except auth.AuthError as exc:
         _raise_auth_error(exc)
-    storage.revoke_session(session.token_hash)
+    storage.auth.revoke_session(session.token_hash)
     auth.clear_session_cookie(response)
     return AuthStatusResponse(user=None, csrf_token=None)
 
@@ -211,7 +213,7 @@ async def auth_google_callback(request: Request, code: str | None = None, state:
 async def parse_request(request: Request, response: Response, payload: ParseTextRequest) -> dict[str, Any]:
     if not _parse_feature_enabled():
         raise HTTPException(status_code=404, detail="parse_disabled")
-    granted = storage.reserve_api_calls(
+    granted = storage.api_usage.reserve_api_calls(
         "parse",
         payload.anonymous_id,
         1,
@@ -259,7 +261,7 @@ async def recommendations(request: Request, response: Response, payload: Adventu
         except auth.AuthError as exc:
             _raise_auth_error(exc)
     result = await build_recommendations(payload, account_id=session.account_id if session else None)
-    storage.save_response(result.request_id, payload, result, account_id=session.account_id if session else None)
+    save_response(result.request_id, payload, result, account_id=session.account_id if session else None)
     return result
 
 
@@ -277,7 +279,7 @@ async def feedback(request: Request, payload: FeedbackRequest) -> dict[str, str]
 
 @app.get("/api/feedback")
 async def feedback_list() -> dict[str, Any]:
-    return {"items": storage.feedback_summary()}
+    return {"items": storage.feedback.summary()}
 
 
 @app.post("/api/events")
@@ -294,12 +296,12 @@ async def events(request: Request, payload: AnalyticsEvent) -> dict[str, str]:
 
 @app.get("/api/events")
 async def events_list() -> dict[str, Any]:
-    return {"items": storage.events_summary()}
+    return {"items": storage.events.summary()}
 
 
 @app.get("/api/ab")
 async def ab() -> dict[str, Any]:
-    return {"variants": storage.ab_summary()}
+    return {"variants": ab_summary(storage)}
 
 
 @app.post("/api/visited")
@@ -309,7 +311,7 @@ async def visited(request: Request, payload: VisitedRequest) -> dict[str, str]:
         auth.require_csrf(request, session)
     except auth.AuthError as exc:
         _raise_auth_error(exc)
-    storage.mark_visited_account(session.account_id, payload.source_id)
+    storage.place_marks.mark_visited_account(session.account_id, payload.source_id)
     return {"status": "ok"}
 
 
@@ -320,7 +322,7 @@ async def visited_clear(request: Request, anonymous_id: str | None = None) -> di
         auth.require_csrf(request, session)
     except auth.AuthError as exc:
         _raise_auth_error(exc)
-    return {"status": "ok", "cleared": storage.clear_visited_account(session.account_id)}
+    return {"status": "ok", "cleared": storage.place_marks.clear_visited_account(session.account_id)}
 
 
 @app.post("/api/want-to-visit")
@@ -330,14 +332,14 @@ async def want_to_visit(request: Request, payload: WantToVisitRequest) -> dict[s
         auth.require_csrf(request, session)
     except auth.AuthError as exc:
         _raise_auth_error(exc)
-    storage.set_want_to_visit_account(session.account_id, payload.source_id, payload.wanted)
+    storage.place_marks.set_want_to_visit_account(session.account_id, payload.source_id, payload.wanted)
     return {"status": "ok", "wanted": payload.wanted}
 
 
 @app.get("/api/want-to-visit")
 async def want_to_visit_list(request: Request) -> dict[str, Any]:
     session = _required_session(request)
-    return {"items": storage.wanted_places_account(session.account_id)}
+    return {"items": storage.place_marks.wanted_places_account(session.account_id)}
 
 
 @app.delete("/api/want-to-visit")
@@ -347,13 +349,13 @@ async def want_to_visit_clear(request: Request) -> dict[str, Any]:
         auth.require_csrf(request, session)
     except auth.AuthError as exc:
         _raise_auth_error(exc)
-    return {"status": "ok", "cleared": storage.clear_want_to_visit_account(session.account_id)}
+    return {"status": "ok", "cleared": storage.place_marks.clear_want_to_visit_account(session.account_id)}
 
 
 @app.get("/api/history")
 async def history(request: Request, anonymous_id: str | None = None) -> dict[str, Any]:  # noqa: ARG001
     session = _required_session(request)
-    return {"items": storage.history_for_account(session.account_id)}
+    return {"items": storage.search.history_for_account(session.account_id)}
 
 
 @app.delete("/api/history")
@@ -363,4 +365,4 @@ async def history_delete(request: Request, anonymous_id: str | None = None) -> d
         auth.require_csrf(request, session)
     except auth.AuthError as exc:
         _raise_auth_error(exc)
-    return {"status": "ok", "deleted_sessions": storage.delete_account_history(session.account_id)}
+    return {"status": "ok", "deleted_sessions": storage.lifecycle.delete_account_history(session.account_id)}

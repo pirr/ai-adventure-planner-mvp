@@ -12,6 +12,7 @@ from app.services.place_photos import get_place_photo
 from app.services.recommendations import build_recommendations
 from app.services.scoring import score_candidate, to_recommendation
 from app.services.storage import Storage
+from app.services.storage.api_usage import ApiUsageRepo
 
 
 def _settings(**overrides):
@@ -238,7 +239,7 @@ def _budget_store(tmp_path):
 
 
 def _reserve(store, anonymous_id, requested, daily=100, per_user=50):
-    return store.reserve_api_calls(
+    return store.api_usage.reserve_api_calls(
         "google", anonymous_id, requested, daily_limit=daily, user_daily_limit=per_user
     )
 
@@ -263,16 +264,16 @@ def test_budget_resets_on_a_new_day(tmp_path, monkeypatch):
     store = _budget_store(tmp_path)
     assert _reserve(store, "u", 2, daily=2, per_user=2) == 2
     assert _reserve(store, "u", 1, daily=2, per_user=2) == 0
-    monkeypatch.setattr(Storage, "_usage_day", staticmethod(lambda: "2099-01-01"))
+    monkeypatch.setattr(ApiUsageRepo, "_usage_day", staticmethod(lambda: "2099-01-01"))
     assert _reserve(store, "u", 1, daily=2, per_user=2) == 1
 
 
 def test_budgets_are_independent_per_api(tmp_path):
     store = _budget_store(tmp_path)
-    assert store.reserve_api_calls("google", "u", 2, daily_limit=2, user_daily_limit=2) == 2
+    assert store.api_usage.reserve_api_calls("google", "u", 2, daily_limit=2, user_daily_limit=2) == 2
     # "google" budget drained; "parse" budget untouched
-    assert store.reserve_api_calls("google", "u", 1, daily_limit=2, user_daily_limit=2) == 0
-    assert store.reserve_api_calls("parse", "u", 1, daily_limit=2, user_daily_limit=2) == 1
+    assert store.api_usage.reserve_api_calls("google", "u", 1, daily_limit=2, user_daily_limit=2) == 0
+    assert store.api_usage.reserve_api_calls("parse", "u", 1, daily_limit=2, user_daily_limit=2) == 1
 
 
 def test_old_usage_rows_are_pruned(tmp_path):
