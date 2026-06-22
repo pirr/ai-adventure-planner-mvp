@@ -55,6 +55,10 @@ class ParseTextRequest(BaseModel):
     anonymous_id: str | None = Field(default=None, max_length=64)
 
 
+class ExplanationsRequest(BaseModel):
+    request_id: str = Field(..., max_length=64)
+
+
 class AuthRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=256)
@@ -263,6 +267,10 @@ class AdventureResponse(BaseModel):
     recommendations: list[Recommendation]
     rejected_alternatives: list[RejectedAlternative]
     data_warnings: list[str] = Field(default_factory=list)
+    # True when the LLM prose is being fetched separately (the client should
+    # show a placeholder and call /api/explanations). False when the rule-based
+    # text on each card is already final (template provider / A/B control).
+    explanations_pending: bool = False
 
 
 FeedbackReason = Literal["too_far", "too_difficult", "bad_weather", "not_interesting", "inaccurate", "other"]

@@ -1,11 +1,11 @@
 from app.services.analytics import ab_summary
-from app.services.recommendations import _ab_bucket
+from app.services.llm.ab import ab_bucket
 from app.services.storage import Storage
 
 
 def test_ab_bucket_is_deterministic_and_splits():
-    assert _ab_bucket("user-x") == _ab_bucket("user-x")
-    assert {_ab_bucket(f"u{i}") for i in range(50)} == {0, 1}  # both buckets reachable
+    assert ab_bucket("user-x") == ab_bucket("user-x")
+    assert {ab_bucket(f"u{i}") for i in range(50)} == {0, 1}  # both buckets reachable
 
 
 def test_ab_summary(tmp_path):

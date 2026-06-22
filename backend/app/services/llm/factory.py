@@ -35,4 +35,5 @@ def get_llm_provider(settings: Settings = default_settings) -> LLMProvider:
         timeout=settings.llm_timeout_seconds,
         fallback_models=settings.llm_fallback_models,
         gemini_reasoning_effort=settings.gemini_reasoning_effort,
+        explain_max_tokens=settings.llm_explain_max_tokens,
     )

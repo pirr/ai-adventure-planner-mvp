@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import time
 import uuid
@@ -13,7 +12,9 @@ from app.services import google_places
 from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
 from app.services.routing import fallback_route, get_routes
-from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations, get_llm_provider
+from app.services.llm import LLMProvider, TemplateProvider, explain_recommendations
+from app.services.llm.ab import explainer_provider
+from app.services.explanations import stash as stash_explanations
 from app.services.community import community_signals
 from app.services.preferences import preference_profile, preference_profile_for_account
 from app.services.scoring import ScoredCandidate, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
@@ -22,20 +23,6 @@ from app.services.weather import get_destination_forecasts, get_weather
 
 
 logger = logging.getLogger(__name__)
-
-
-def _ab_bucket(anonymous_id: str) -> int:
-    """Stable 0/1 bucket from the anonymous id (hashlib, not the salted hash())."""
-    return int(hashlib.sha1(anonymous_id.encode()).hexdigest(), 16) % 2
-
-
-def _explainer_provider(request: AdventureRequest) -> LLMProvider:
-    """The configured LLM provider, unless the A/B control bucket is selected
-    (then templates). No-op when A/B is off or no LLM/anonymous_id is present."""
-    provider = get_llm_provider()
-    if not settings.ab_test_enabled or isinstance(provider, TemplateProvider) or not request.anonymous_id:
-        return provider
-    return provider if _ab_bucket(request.anonymous_id) == 1 else TemplateProvider()
 
 
 def _is_recommendable(candidate: ScoredCandidate, request: AdventureRequest) -> bool:
@@ -83,6 +70,7 @@ async def build_recommendations(
     request: AdventureRequest,
     provider: LLMProvider | None = None,
     account_id: int | None = None,
+    defer_explanations: bool | None = None,
 ) -> AdventureResponse:
     overall_started = time.perf_counter()
     request_id = str(uuid.uuid4())
@@ -92,22 +80,24 @@ async def build_recommendations(
         if account_id is not None
         else preference_profile(request.anonymous_id, store=storage)
     )
+    # Origin weather and place search are independent; run them concurrently so
+    # the slower of the two (Overpass on a cache miss) sets the latency, not the sum.
     stage_started = time.perf_counter()
-    weather, weather_warnings = await get_weather(request.lat, request.lon, request.use_live_data, request.lang)
-    logger.info("recommendations_timing request_id=%s stage=weather duration_ms=%d", request_id, _elapsed_ms(stage_started))
-    stage_started = time.perf_counter()
-    places, place_warnings = await get_candidate_places(
-        request.lat,
-        request.lon,
-        request.available_minutes,
-        request.transport_mode,
-        request.interests,
-        request.use_live_data,
-        request.lang,
-        request.anonymous_id,
+    (weather, weather_warnings), (places, place_warnings) = await asyncio.gather(
+        get_weather(request.lat, request.lon, request.use_live_data, request.lang),
+        get_candidate_places(
+            request.lat,
+            request.lon,
+            request.available_minutes,
+            request.transport_mode,
+            request.interests,
+            request.use_live_data,
+            request.lang,
+            request.anonymous_id,
+        ),
     )
     logger.info(
-        "recommendations_timing request_id=%s stage=places candidates=%d duration_ms=%d",
+        "recommendations_timing request_id=%s stage=weather_places candidates=%d duration_ms=%d",
         request_id,
         len(places),
         _elapsed_ms(stage_started),
@@ -224,15 +214,21 @@ async def build_recommendations(
     wanted = marks.get("want_to_visit", set())
     for rec in recommendations:
         rec.wanted = rec.source_id in wanted
-    explainer = provider if provider is not None else _explainer_provider(request)
-    stage_started = time.perf_counter()
-    recommendations = await explain_recommendations(recommendations, request, explainer)
-    logger.info(
-        "recommendations_timing request_id=%s stage=explain recommendations=%d duration_ms=%d",
-        request_id,
-        len(recommendations),
-        _elapsed_ms(stage_started),
-    )
+    explainer = provider if provider is not None else explainer_provider(request)
+    defer = settings.defer_explanations if defer_explanations is None else defer_explanations
+    explanations_pending = False
+    if defer and recommendations and not isinstance(explainer, TemplateProvider):
+        stash_explanations(request_id, recommendations, request)
+        explanations_pending = True
+    else:
+        stage_started = time.perf_counter()
+        recommendations = await explain_recommendations(recommendations, request, explainer)
+        logger.info(
+            "recommendations_timing request_id=%s stage=explain recommendations=%d duration_ms=%d",
+            request_id,
+            len(recommendations),
+            _elapsed_ms(stage_started),
+        )
     chosen_ids = {item.place.source_id for item in top}
     rejected = rejected_from_scored(final, chosen_ids, limit=3, lang=request.lang)
     response = AdventureResponse(
@@ -242,6 +238,7 @@ async def build_recommendations(
         recommendations=recommendations,
         rejected_alternatives=rejected,
         data_warnings=weather_warnings + place_warnings + google_warnings,
+        explanations_pending=explanations_pending,
     )
     logger.info(
         "recommendations_timing request_id=%s stage=total recommendations=%d duration_ms=%d",
