@@ -358,6 +358,10 @@ body.planning .sheet { display: none; }
 #dataWarnings h3 { font-family: var(--display); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--warn); margin-bottom: 8px; }
 
 .place-weather { margin: 14px 0; padding: 13px; background: var(--cream); border: 1.5px solid var(--line); border-radius: var(--r-md); }
+/* Guest teaser: dashed + transparent so it reads as a hint, not weather data. */
+.place-weather.is-upsell { background: transparent; border-style: dashed; }
+.pw-upsell { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.pw-upsell .link-btn { padding: 0; font-size: 13px; }
 .pw-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pw-head h3 { font-family: var(--display); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pine-700); }
 .pw-arrival { margin: 8px 0 10px; color: var(--ink-500); font-size: 13px; font-weight: 600; }
