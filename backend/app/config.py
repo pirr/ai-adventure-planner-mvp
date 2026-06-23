@@ -70,6 +70,17 @@ class Settings:
     openweather_api_key: str | None = os.getenv("OPENWEATHER_API_KEY")
     use_open_meteo_fallback: bool = os.getenv("USE_OPEN_METEO_FALLBACK", "true").lower() == "true"
     http_timeout_seconds: float = float(os.getenv("HTTP_TIMEOUT_SECONDS", "8"))
+    # Anonymous users get a lighter, cheaper tier: rule-based explanations instead
+    # of LLM prose, and a coarse origin-only weather read. Both default on; turn
+    # off to give anonymous users the full (logged-in) experience.
+    anon_disable_llm_explanations: bool = _env_bool("ANON_DISABLE_LLM_EXPLANATIONS", True)
+    anon_fast_weather: bool = _env_bool("ANON_FAST_WEATHER", True)
+    # Coarse-grid origin-weather cache, used only on the anonymous fast path so
+    # repeat traffic in a region reuses one live forecast. Precision is decimal
+    # places on lat/lon (1 ~= 11km). TTL <= 0 disables the cache.
+    anon_weather_cache_ttl_seconds: int = int(os.getenv("ANON_WEATHER_CACHE_TTL_SECONDS", "1800"))
+    anon_weather_cache_precision: int = int(os.getenv("ANON_WEATHER_CACHE_PRECISION", "1"))
+    anon_weather_cache_max_entries: int = int(os.getenv("ANON_WEATHER_CACHE_MAX_ENTRIES", "512"))
     # App log level (INFO by default). Set DEBUG for verbose LLM/HTTP logs.
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     # Cross-origin policy. The frontend is served same-origin by this backend,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -166,25 +167,78 @@ def fallback_weather(lang: str = "en") -> WeatherSummary:
     )
 
 
-async def get_weather(lat: float, lon: float, use_live_data: bool, lang: str = "en") -> tuple[WeatherSummary, list[str]]:
+# Coarse-grid cache of live origin weather, used only on the anonymous fast
+# path (cache_ok=True). Keyed by rounded coordinates + language so nearby
+# anonymous requests in a region reuse one forecast for a short TTL. In-process
+# and lossy on restart by design. {key: (expires_at, weather)}.
+_origin_cache: dict[tuple, tuple[float, WeatherSummary]] = {}
+
+
+def _origin_cache_key(lat: float, lon: float, lang: str) -> tuple:
+    precision = settings.anon_weather_cache_precision
+    return (round(lat, precision), round(lon, precision), lang)
+
+
+def _origin_cache_get(key: tuple) -> WeatherSummary | None:
+    entry = _origin_cache.get(key)
+    if entry is None:
+        return None
+    expires_at, weather = entry
+    if expires_at <= time.time():
+        _origin_cache.pop(key, None)
+        return None
+    return weather
+
+
+def _origin_cache_put(key: tuple, weather: WeatherSummary) -> None:
+    ttl = settings.anon_weather_cache_ttl_seconds
+    max_entries = settings.anon_weather_cache_max_entries
+    if ttl <= 0 or max_entries <= 0:
+        return
+    now = time.time()
+    for cached_key, (expires_at, _) in list(_origin_cache.items()):
+        if expires_at <= now:
+            _origin_cache.pop(cached_key, None)
+    while len(_origin_cache) >= max_entries:
+        _origin_cache.pop(next(iter(_origin_cache)))
+    _origin_cache[key] = (now + ttl, weather)
+
+
+async def get_weather(
+    lat: float, lon: float, use_live_data: bool, lang: str = "en", cache_ok: bool = False
+) -> tuple[WeatherSummary, list[str]]:
     warnings: list[str] = []
     if not use_live_data:
         warnings.append(t(lang, "warn_live_disabled"))
         return fallback_weather(lang), warnings
 
+    cache_key = _origin_cache_key(lat, lon, lang) if cache_ok else None
+    if cache_key is not None:
+        cached = _origin_cache_get(cache_key)
+        if cached is not None:
+            return cached, warnings
+
+    # Resolve live weather: OpenWeather (if keyed) then Open-Meteo. Only a live
+    # result is cached; the hardcoded fallback below is never stored.
+    weather: WeatherSummary | None = None
     if settings.openweather_api_key:
         try:
-            return await _openweather(lat, lon, settings.openweather_api_key, lang), warnings
+            weather = await _openweather(lat, lon, settings.openweather_api_key, lang)
         except Exception as exc:  # noqa: BLE001
             warnings.append(t(lang, "warn_openweather_unavailable", exc=exc.__class__.__name__))
 
-    if settings.use_open_meteo_fallback:
+    if weather is None and settings.use_open_meteo_fallback:
         try:
-            return await _open_meteo(lat, lon, lang), warnings
+            weather = await _open_meteo(lat, lon, lang)
         except Exception as exc:  # noqa: BLE001
             warnings.append(t(lang, "warn_openmeteo_unavailable", exc=exc.__class__.__name__))
 
-    return fallback_weather(lang), warnings
+    if weather is None:
+        return fallback_weather(lang), warnings
+
+    if cache_key is not None:
+        _origin_cache_put(cache_key, weather)
+    return weather, warnings
 
 
 # ---------------------------------------------------------------------------

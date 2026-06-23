@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
 from app.config import settings
@@ -23,6 +24,30 @@ from app.services.weather import get_destination_forecasts, get_weather
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ExperienceTier:
+    """How much (costly) enrichment a request gets.
+
+    Anonymous users get a deliberately lighter tier — rule-based explanations
+    and a coarse, origin-only weather read — so their requests stay cheap and
+    fast; signing in unlocks the full tier. Each lever is independently flag-
+    gated so the whole policy lives, and changes, in one place."""
+
+    llm_explanations: bool      # LLM prose vs. rule-based `why`
+    destination_forecast: bool  # per-place arrival weather vs. origin only
+    cache_origin_weather: bool  # serve origin weather from the coarse-grid cache
+
+
+def _experience_tier(account_id: int | None) -> ExperienceTier:
+    anonymous = account_id is None
+    lite_weather = anonymous and settings.anon_fast_weather
+    return ExperienceTier(
+        llm_explanations=not (anonymous and settings.anon_disable_llm_explanations),
+        destination_forecast=not lite_weather,
+        cache_origin_weather=lite_weather,
+    )
 
 
 def _is_recommendable(candidate: ScoredCandidate, request: AdventureRequest) -> bool:
@@ -74,6 +99,8 @@ async def build_recommendations(
 ) -> AdventureResponse:
     overall_started = time.perf_counter()
     request_id = str(uuid.uuid4())
+    # Anonymous users get a lighter, cheaper tier (see ExperienceTier).
+    tier = _experience_tier(account_id)
     # Personal Preference Fit signal from this user's past feedback (cold-start safe).
     profile = (
         preference_profile_for_account(account_id, store=storage)
@@ -84,7 +111,7 @@ async def build_recommendations(
     # the slower of the two (Overpass on a cache miss) sets the latency, not the sum.
     stage_started = time.perf_counter()
     (weather, weather_warnings), (places, place_warnings) = await asyncio.gather(
-        get_weather(request.lat, request.lon, request.use_live_data, request.lang),
+        get_weather(request.lat, request.lon, request.use_live_data, request.lang, cache_ok=tier.cache_origin_weather),
         get_candidate_places(
             request.lat,
             request.lon,
@@ -159,7 +186,9 @@ async def build_recommendations(
     )
     stage_started = time.perf_counter()
     forecasts = await get_destination_forecasts(
-        [(candidate.place.lat, candidate.place.lon) for candidate in pool], request.use_live_data, request.lang
+        [(candidate.place.lat, candidate.place.lon) for candidate in pool],
+        request.use_live_data and tier.destination_forecast,
+        request.lang,
     )
     logger.info(
         "recommendations_timing request_id=%s stage=destination_forecasts candidates=%d duration_ms=%d",
@@ -214,7 +243,12 @@ async def build_recommendations(
     wanted = marks.get("want_to_visit", set())
     for rec in recommendations:
         rec.wanted = rec.source_id in wanted
-    explainer = provider if provider is not None else explainer_provider(request)
+    if provider is not None:
+        explainer = provider
+    elif not tier.llm_explanations:
+        explainer = TemplateProvider()
+    else:
+        explainer = explainer_provider(request)
     defer = settings.defer_explanations if defer_explanations is None else defer_explanations
     explanations_pending = False
     if defer and recommendations and not isinstance(explainer, TemplateProvider):

@@ -367,7 +367,8 @@ const I18N = {
     no_more_recommendations: 'No more recommendations for this search.',
     more_recommendations_error: 'Could not load more recommendations.',
     retry: 'Retry',
-    auth_more_recommendations: 'Create an account to see more recommendations.',
+    auth_more_recommendations: 'Create an account for more recommendations, AI-written tips and arrival-time weather.',
+    weather_upsell: 'See the weather for when you’ll arrive —',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
     history_confirm: 'Delete your account search history, feedback and events?',
@@ -572,7 +573,8 @@ const I18N = {
     no_more_recommendations: 'Для этого поиска больше рекомендаций нет.',
     more_recommendations_error: 'Не удалось загрузить больше рекомендаций.',
     retry: 'Повторить',
-    auth_more_recommendations: 'Создайте аккаунт, чтобы увидеть больше рекомендаций.',
+    auth_more_recommendations: 'Создайте аккаунт: больше рекомендаций, советы от ИИ и погода на время прибытия.',
+    weather_upsell: 'Узнайте погоду на время прибытия —',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
     history_confirm: 'Удалить историю поиска аккаунта, отзывы и события?',
@@ -1741,7 +1743,10 @@ function renderPlaceWeather(node, item) {
   const arrival = item.arrival_weather;
   const hours = item.forecast || [];
   if (!arrival && !hours.length) {
-    container.remove();
+    // Guests get origin-only weather (no per-destination forecast). Rather than
+    // leave a hole, show one quiet line teasing the feature an account unlocks.
+    if (currentUser) container.remove();
+    else renderWeatherUpsell(container);
     return;
   }
   const fitBadge =
@@ -1757,6 +1762,17 @@ function renderPlaceWeather(node, item) {
     ${arrivalLine}
     ${strip}
   `;
+}
+
+function renderWeatherUpsell(container) {
+  container.classList.add('is-upsell');
+  container.innerHTML = `
+    <p class="pw-upsell">${t('weather_upsell')}
+      <button type="button" class="link-btn pw-upsell-cta">${t('sign_in')}</button>
+    </p>
+  `;
+  const cta = container.querySelector('.pw-upsell-cta');
+  if (cta) cta.addEventListener('click', () => openAuthModal('register'));
 }
 
 function forecastHour(hour) {
