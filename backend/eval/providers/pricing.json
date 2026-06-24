@@ -1,0 +1,6 @@
+{
+  "_comment": "Per-provider discovery cost + free-tier quota for the benchmark cost column. Edit to match your plan. usd_per_query is the cost of ONE discovery call (the benchmark issues one Geoapify call and up to a few LocationIQ Nearby calls per scenario). free_daily_quota is the free-tier request cap used for the headroom check.",
+  "osm_google": {"usd_per_query": 0.032, "free_daily_quota": 0, "note": "reference: Google Text Search backfill + per-card enrichment; see docs/map_alternatives.md"},
+  "geoapify": {"usd_per_query": 0.0, "free_daily_quota": 3000, "note": "~3k req/day free, then tiered"},
+  "locationiq": {"usd_per_query": 0.0, "free_daily_quota": 5000, "note": "~5k req/day free; Nearby fans out to a few calls per scenario"}
+}
