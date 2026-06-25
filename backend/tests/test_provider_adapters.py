@@ -103,6 +103,18 @@ def test_geoapify_fetch_parses_features(monkeypatch):
     assert museum.type == "museum" and museum.lat == 42.02 and museum.lon == 18.02
 
 
+def test_geoapify_coerces_nonstring_name(monkeypatch):
+    # Geoapify sometimes returns a numeric name (e.g. a numbered POI); name is a
+    # strict str field, so the adapter must coerce rather than crash.
+    monkeypatch.setattr(geoapify_mod, "settings", _settings(geoapify_api_key="k"))
+    payload = {"features": [{"properties": {
+        "name": 1803, "place_id": "geoN", "lat": 42.0, "lon": 18.0, "categories": ["tourism.sights"],
+    }}]}
+    _patch_http(monkeypatch, geoapify_mod, lambda url, params: payload)
+    out = asyncio.run(GeoapifyProvider().fetch(42.0, 18.0, 25.0, ["history"]))
+    assert out and out[0].name == "1803"
+
+
 def test_geoapify_without_key_returns_empty(monkeypatch):
     monkeypatch.setattr(geoapify_mod, "settings", _settings(geoapify_api_key=None))
     assert asyncio.run(GeoapifyProvider().fetch(42.0, 18.0, 25.0, ["history"])) == []
@@ -110,30 +122,50 @@ def test_geoapify_without_key_returns_empty(monkeypatch):
 
 # --- LocationIQ --------------------------------------------------------------
 
-def test_locationiq_fetch_uses_osm_tags_and_dedupes(monkeypatch):
+def test_locationiq_fetch_single_call_maps_osm_tags_and_dedupes(monkeypatch):
     monkeypatch.setattr(locationiq_mod, "settings", _settings(locationiq_api_key="k"))
-    by_tag = {
-        "museum": [{"place_id": "l1", "osm_type": "way", "osm_id": "100", "lat": "42.0", "lon": "18.0",
-                    "class": "tourism", "type": "museum", "name": "City Museum",
-                    "extratags": {"wikidata": "Q9", "opening_hours": "24/7"}}],
-        "attraction": [{"place_id": "l2", "osm_type": "node", "osm_id": "200", "lat": "42.1", "lon": "18.1",
-                        "class": "tourism", "type": "attraction", "display_name": "Big Arch, Town"}],
-        "castle": [
-            {"place_id": "l3", "osm_type": "way", "osm_id": "300", "lat": "42.2", "lon": "18.2",
-             "class": "historic", "type": "castle", "name": "Stone Fort"},
-            {"place_id": "ldup", "osm_type": "way", "osm_id": "100", "lat": "42.0", "lon": "18.0",
-             "class": "tourism", "type": "museum", "name": "City Museum dup"},  # same osm way 100 -> deduped
-        ],
-    }
-    _patch_http(monkeypatch, locationiq_mod, lambda url, params: by_tag.get(params["tag"], []))
+    items = [  # one Nearby call returns a flat list (no extratags in the response)
+        {"place_id": "l1", "osm_type": "way", "osm_id": "100", "lat": "42.0", "lon": "18.0",
+         "class": "tourism", "type": "museum", "name": "City Museum"},
+        {"place_id": "l2", "osm_type": "node", "osm_id": "200", "lat": "42.1", "lon": "18.1",
+         "class": "tourism", "type": "attraction", "display_name": "Big Arch, Town"},
+        {"place_id": "l3", "osm_type": "way", "osm_id": "300", "lat": "42.2", "lon": "18.2",
+         "class": "historic", "type": "castle", "name": "Stone Fort"},
+        {"place_id": "ldup", "osm_type": "way", "osm_id": "100", "lat": "42.0", "lon": "18.0",
+         "class": "tourism", "type": "museum", "name": "City Museum dup"},  # same osm way 100 -> deduped
+    ]
+    captured = {}
 
+    def handler(url, params):
+        captured.update(params)
+        return items
+
+    _patch_http(monkeypatch, locationiq_mod, handler)
     out = asyncio.run(LocationIQProvider().fetch(42.0, 18.0, 25.0, ["history"]))
+
     by_id = {c.source_id: c for c in out}
     assert set(by_id) == {"locationiq:way:100", "locationiq:node:200", "locationiq:way:300"}
     assert by_id["locationiq:way:100"].type == "museum"
-    assert by_id["locationiq:way:100"].quality_score == 50 + 15 + 15 + 8 + 4  # name+wikidata+tourism+hours
+    assert by_id["locationiq:way:100"].quality_score == 50 + 15 + 8  # name + tourism(museum)
     assert by_id["locationiq:node:200"].name == "Big Arch"  # from display_name
     assert by_id["locationiq:way:300"].type == "fortress"  # historic=castle
+    # one request, comma-joined class:type tags, radius in metres
+    assert "tourism:museum" in captured["tag"] and "historic:*" in captured["tag"]
+    assert captured["radius"] == 25000
+
+
+def test_locationiq_caps_radius_and_handles_error_response(monkeypatch):
+    monkeypatch.setattr(locationiq_mod, "settings", _settings(locationiq_api_key="k"))
+    captured = {}
+
+    def handler(url, params):
+        captured["radius"] = params["radius"]
+        return {"error": "Unable to geocode"}  # LocationIQ's no-match shape (not a list)
+
+    _patch_http(monkeypatch, locationiq_mod, handler)
+    out = asyncio.run(LocationIQProvider().fetch(42.0, 18.0, 90.0, ["food"]))  # 90km -> capped to 30km
+    assert out == []
+    assert captured["radius"] == 30000
 
 
 def test_locationiq_without_key_returns_empty(monkeypatch):
@@ -146,7 +178,7 @@ def test_locationiq_without_key_returns_empty(monkeypatch):
 def test_interest_maps_cover_all_interest_ids():
     for interest in INTEREST_IDS:
         assert geoapify_mod._categories_for_interests([interest]), interest
-        assert locationiq_mod._tags_for_interests([interest]), interest
+        assert locationiq_mod._tag_filter([interest]), interest
 
 
 # --- baseline wiring + seam adapter ------------------------------------------
@@ -177,6 +209,25 @@ def test_baseline_backfills_google_when_sparse(monkeypatch):
     monkeypatch.setattr(baseline_mod.google_places, "search_candidate_places", fake_search)
     out = asyncio.run(baseline_mod.OsmGoogleBaselineProvider().fetch(42.0, 18.0, 8.0, ["food"], anonymous_id="u"))
     assert [c.source_id for c in out] == ["google:g1"]
+
+
+def test_baseline_marks_degraded_when_osm_keeps_failing(monkeypatch):
+    monkeypatch.setattr(baseline_mod, "_OSM_BACKOFF", 0.0)  # no real sleeps in the test
+    g = [PlaceCandidate(source="google_places", source_id="google:g1", name="G", type="food", lat=42.0, lon=18.0)]
+
+    async def boom(lat, lon, radius_km, interests):
+        raise RuntimeError("overpass down")
+
+    async def fake_search(lat, lon, radius_km, interests, anon, lang):
+        return g, []
+
+    monkeypatch.setattr(baseline_mod.places, "_fetch_osm_places_progressive", boom)
+    monkeypatch.setattr(baseline_mod.places, "_needs_google_candidates", lambda c, i: True)
+    monkeypatch.setattr(baseline_mod.google_places, "search_candidate_places", fake_search)
+    provider = baseline_mod.OsmGoogleBaselineProvider()
+    out = asyncio.run(provider.fetch(42.0, 18.0, 8.0, ["food"], anonymous_id="u"))
+    assert provider.last_degraded is True              # flagged so the harness skips/doesn't cache
+    assert [c.source_id for c in out] == ["google:g1"]  # still degrades to Google-only
 
 
 def test_as_candidate_source_matches_production_signature():

@@ -53,11 +53,13 @@ ARMS = ["provider_only", "provider_plus_google"]
 PROVIDERS = {"geoapify": GeoapifyProvider, "locationiq": LocationIQProvider}
 
 # (id, transport, available_minutes, interests) — a small spread of trip shapes.
+# Car budgets kept at 180 min (25 km radius): big enough to be a real trip, small
+# enough that public Overpass actually answers (90 km queries reliably time out).
 PROFILES = [
-    ("car_history", "car", 240, ["history", "nature", "food"]),
+    ("car_history", "car", 180, ["history", "nature", "food"]),
     ("walk_views", "walk", 120, ["viewpoints", "history"]),
     ("bike_food", "bike", 120, ["food", "drinks"]),
-    ("car_fortress", "car", 300, ["fortresses", "water"]),
+    ("car_fortress", "car", 180, ["fortresses", "water"]),
 ]
 SMOKE_PROFILES = PROFILES[:1]
 
@@ -97,9 +99,13 @@ def _dump(candidate: PlaceCandidate) -> dict:
 
 # --- response cache (avoid re-billing / re-hitting providers across runs) -----
 
+# Bump when the adapters' output shape changes, to invalidate stale caches.
+_CACHE_VERSION = "v2"
+
+
 def _cache_path(provider: str, lat: float, lon: float, radius_km: float, interests: list[str]) -> Path:
     norm = "-".join(sorted(normalize_interest(str(i)) for i in interests)) or "none"
-    key = f"{round(lat, 3)}_{round(lon, 3)}_{round(radius_km, 1)}_{norm}"
+    key = f"{_CACHE_VERSION}_{round(lat, 3)}_{round(lon, 3)}_{round(radius_km, 1)}_{norm}"
     return CACHE_DIR / provider / f"{key}.json"
 
 
@@ -112,9 +118,10 @@ async def _fetch(provider, lat, lon, radius_km, interests, anonymous_id, use_cac
     started = time.perf_counter()
     candidates = await provider.fetch(lat, lon, radius_km, interests, "en", anonymous_id)
     latency_ms = (time.perf_counter() - started) * 1000
-    # Don't cache an empty result: a missing key or a transient miss would then
-    # mask real data on the next run. Cache only a non-empty fetch.
-    if candidates:
+    # Don't cache an empty or degraded result: a missing key, a transient miss, or
+    # a baseline that fell back to Google-only would then mask real data on reruns.
+    degraded = getattr(provider, "last_degraded", False)
+    if candidates and not degraded:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps([_dump(c) for c in candidates], ensure_ascii=False))
     return candidates, latency_ms
@@ -122,7 +129,10 @@ async def _fetch(provider, lat, lon, radius_km, interests, anonymous_id, use_cac
 
 # --- one scenario -------------------------------------------------------------
 
-async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_cfg, repeats, acc):
+async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_cfg, repeats, acc, no_google=False) -> bool:
+    """Run one (city, profile). Returns True if the baseline was unhealthy
+    (Overpass failed) and the scenario was skipped — an unhealthy reference would
+    make recall/RBO meaningless, so it contributes nothing to the scoreboard."""
     name, country, lat, lon = city
     pid, transport, minutes, interests = profile
     request = AdventureRequest(
@@ -131,10 +141,15 @@ async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_c
     )
     radius_km = radius_for_request(minutes, transport)
     base_anon = f"bench-baseline-{name}-{pid}"
+    # --no-google: pass no anonymous_id (kills the budgeted Google candidate
+    # backfill) and don't enrich -> baseline is pure OSM, $0 Google.
+    fetch_anon = None if no_google else base_anon
 
     baseline = OsmGoogleBaselineProvider()
-    base_pool, base_ms = await _fetch(baseline, lat, lon, radius_km, interests, base_anon, use_cache)
-    base_scored = await rank_offline(_clone_candidates(base_pool), request, enrich=True, anonymous_id=base_anon)
+    base_pool, base_ms = await _fetch(baseline, lat, lon, radius_km, interests, fetch_anon, use_cache)
+    if baseline.last_degraded:
+        return True
+    base_scored = await rank_offline(_clone_candidates(base_pool), request, enrich=not no_google, anonymous_id=base_anon)
     base_topk = [c.place for c in base_scored[:k]]
     base_recs = to_recommendations(base_scored, n)
     _record_baseline(acc, base_pool, base_topk, radius_km, interests, base_ms)
@@ -170,6 +185,7 @@ async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_c
                 for _ in range(repeats):
                     if provider_recs and base_recs:
                         a.judge.add(await judge_scenario(judge_cfg, request, base_recs, provider_recs))
+    return False
 
 
 def _record_baseline(acc, pool, topk, radius_km, interests, latency_ms):
@@ -304,7 +320,7 @@ async def _run(args) -> None:
         cities, profiles, arms, judge_on = cities[:1], SMOKE_PROFILES, ["provider_only"], False
     else:
         profiles = SMOKE_PROFILES if args.profiles == "smoke" else PROFILES
-        arms = args.arms
+        arms = ["provider_only"] if args.no_google else args.arms
         judge_on = args.judge
     providers = [PROVIDERS[name]() for name in args.providers]
     judge_cfg = judge_config() if judge_on else None
@@ -312,18 +328,47 @@ async def _run(args) -> None:
 
     print(f"Provider benchmark: {len(cities)} cities x {len(profiles)} profiles x {len(providers)} providers "
           f"x {len(arms)} arms  (k={args.k}, n={args.n})")
-    if not google_places.enabled():
+    if args.no_google:
+        print("--no-google: baseline is pure OSM, no enrichment/backfill — $0 Google cost.")
+    elif not google_places.enabled():
         print("NOTE: no GOOGLE_PLACES_API_KEY — baseline is OSM-only and the +Google arm is a no-op.")
+    elif "provider_plus_google" in arms:
+        # The +Google arm enriches the baseline + each provider's top pool; with a
+        # small daily cap it exhausts almost immediately and the arm becomes a no-op.
+        needed = len(cities) * len(profiles) * (1 + len(providers)) * 10
+        if settings.google_places_daily_limit < needed:
+            print(f"WARNING: the +google arm needs ~{needed} Google enrichment calls but "
+                  f"GOOGLE_PLACES_DAILY_LIMIT={settings.google_places_daily_limit}. It will exhaust early "
+                  f"and read as 0% ratings (identical to provider_only). Raise the limit for this run "
+                  f"(e.g. -e GOOGLE_PLACES_DAILY_LIMIT={needed} -e GOOGLE_PLACES_USER_DAILY_LIMIT=200) "
+                  f"or drop it with --arms provider_only.")
     _check_free_tier(providers, len(cities) * len(profiles), args.repeats)
 
     acc: dict = defaultdict(Acc)
     judge_cities = set(range(args.judge_cities)) if judge_on else set()
+    total = degraded = 0
+    first = True
     for ci, city in enumerate(cities):
         for profile in profiles:
+            if not first and args.pace:
+                await asyncio.sleep(args.pace)
+            first = False
             scenario_judge = judge_cfg if (judge_on and ci in judge_cities) else None
-            await _run_scenario(city, profile, providers, arms, args.k, args.n,
-                                not args.no_cache, scenario_judge, args.repeats, acc)
+            was_degraded = await _run_scenario(city, profile, providers, arms, args.k, args.n,
+                                               not args.no_cache, scenario_judge, args.repeats, acc,
+                                               no_google=args.no_google)
+            total += 1
+            degraded += int(was_degraded)
         print(f"  done {city[0]}, {city[1]}")
+
+    used = total - degraded
+    if degraded:
+        print(f"\nNOTE: skipped {degraded}/{total} scenarios with an unhealthy (Overpass-failed) baseline; "
+              f"scoreboard reflects {used} healthy-baseline scenarios. Degraded baselines aren't cached — "
+              f"re-run to heal the rest.")
+    if used == 0:
+        print("No healthy-baseline scenarios (Overpass unavailable for all). Re-run, raise --pace, or use fewer/denser cities.")
+        return
 
     _print_report(acc, providers, arms, args.price, judge_on)
     if args.json:
@@ -344,6 +389,9 @@ def parse_args(argv=None):
     p.add_argument("--repeats", type=int, default=1, help="Judge repeats per scenario (variance)")
     p.add_argument("--price", action="store_true", help="Show the $/1k cost column from providers/pricing.json")
     p.add_argument("--no-cache", action="store_true", help="Ignore the response cache and hit providers live")
+    p.add_argument("--no-google", action="store_true",
+                   help="Zero Google spend: baseline is pure OSM (no enrichment/backfill); forces --arms provider_only")
+    p.add_argument("--pace", type=float, default=1.0, help="Seconds between scenarios (eases public Overpass load)")
     p.add_argument("--smoke", action="store_true", help="1 city x 1 profile, provider_only, no judge")
     p.add_argument("--json", default="", help="Write a machine-readable report to this path")
     return p.parse_args(argv)

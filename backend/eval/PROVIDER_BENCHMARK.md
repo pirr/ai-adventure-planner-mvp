@@ -41,7 +41,14 @@ RATE_LIMIT_ENABLED=false docker compose up -d --build
 GEOAPIFY_API_KEY=... docker compose exec app \
   python -m eval.provider_benchmark --smoke --providers geoapify
 
-# Objective sweep, both arms, cost column + JSON report
+# $0 Google: baseline is pure OSM, no enrichment/backfill. The cleanest discovery
+# comparison (OSM vs each provider) and free to iterate. Forces --arms provider_only.
+GEOAPIFY_API_KEY=... LOCATIONIQ_API_KEY=... LLM_JUDGE_MODEL=gemini-2.5-flash \
+  docker compose exec app python -m eval.provider_benchmark \
+  --no-google --judge --judge-cities 6 --max-cities 6
+
+# Objective sweep, both arms, cost column + JSON report (the +google arm spends
+# real Google budget — raise GOOGLE_PLACES_DAILY_LIMIT for the run or it's a no-op)
 GEOAPIFY_API_KEY=... LOCATIONIQ_API_KEY=... docker compose exec app \
   python -m eval.provider_benchmark --max-cities 6 \
   --arms provider_only provider_plus_google --price --json provider_bench.json
@@ -92,11 +99,17 @@ to see exactly what Google enrichment buys back.
 
 - **No ground truth.** Overlap is agreement-*with-Google*; the judge is there
   precisely because a provider can be different-but-good.
+- **Baseline health.** Public Overpass is flaky for a rapid sweep. The baseline
+  retries with backoff; if OSM still fails, that scenario is **skipped** (an
+  unhealthy reference makes recall/RBO meaningless) and not cached, and the run
+  prints how many were skipped. Re-run to heal the rest, or raise `--pace`
+  (seconds between scenarios). Big car budgets are capped at 25 km for the same
+  reason — 90 km Overpass queries reliably time out.
 - **Category coverage.** Geoapify/LocationIQ map curated categories, not raw OSM
   tags; run the audit to see the fallback rate.
 - **Free tiers.** A full sweep can approach Geoapify/LocationIQ free quotas
-  (the harness caches and warns). LocationIQ Nearby fans out to several calls per
-  scenario.
+  (the harness caches and warns). LocationIQ Nearby is one call per scenario
+  (comma-joined `class:type` tags), capped at its 30 km max radius.
 - **+Google cost / budget.** The `provider_plus_google` arm (and the baseline)
   spend real Google budget; per-scenario `anonymous_id`s avoid the per-user cap,
   but the global `GOOGLE_PLACES_DAILY_LIMIT` (default 800) still applies — raise

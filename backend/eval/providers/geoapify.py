@@ -112,7 +112,7 @@ def _candidate_from_feature(feature: dict[str, Any]) -> PlaceCandidate | None:
     return PlaceCandidate(
         source="geoapify",
         source_id=f"geoapify:{place_id}",
-        name=name,
+        name=str(name),  # Geoapify occasionally returns a numeric name
         type=place_type,
         lat=float(lat),
         lon=float(lon),
