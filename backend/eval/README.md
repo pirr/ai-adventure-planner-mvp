@@ -41,6 +41,29 @@ Per explanation, all automatic:
 Clarity (1–5) is not automatic — see the LLM-judge (`--judge`) and the model
 **scoreboard** (`--scoreboard`).
 
+## City readiness benchmark (separate tool)
+
+`eval.city_benchmark` is not about the LLM layer — it's a pre-launch check that a
+first-time visitor in any major city gets live results, fast. It POSTs
+`/api/recommendations` (`use_live_data=true`) for 18 US/UK/EU/AU cities and fails
+any that exceed the latency budget or come back empty (the "No live places found"
+state). It needs the app **serving** (it makes real HTTP calls), and exits
+non-zero if any city fails, so it can gate a launch.
+
+```bash
+# local app, rate limiting off so the sweep isn't throttled
+RATE_LIMIT_ENABLED=false docker compose up -d --build
+docker compose exec app python -m eval.city_benchmark --delay 0
+
+# deployed app — the default --delay paces under the live 10/min limit
+docker compose exec app python -m eval.city_benchmark \
+  --base-url https://adventure-planner-mvp.fly.dev --json city_readiness.json
+```
+
+Note: the live app caches Overpass per area, so the *first* hit on a cold city
+is slow (or times out) and warms within a request or two — re-run, or pre-warm,
+before reading the numbers as steady-state.
+
 ## Model selection
 
 Treat grounding/format/safety as a **gate, not a tradeoff**: drop any model below
