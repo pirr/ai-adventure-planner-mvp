@@ -70,12 +70,57 @@ def _place_type_from_categories(categories: list[str]) -> str:
     return "place"
 
 
+# Leaf Geoapify categories that are typically micro-POIs — plaques, statues,
+# fountains, bare monuments/buildings. Kept only when an independent notability
+# signal backs them (a famous monument); otherwise they flood the top-K as noise.
+_MICRO_POI_MARKERS = ("memorial", "artwork", "sculpture", "statue", "fountain")
+
+# Generic sight/attraction buckets that need a notability signal to *stay* a
+# destination type; without one they are demoted to a plain place so they can't
+# outrank real destinations (museums, castles, viewpoints, parks).
+_GATED_TYPES = {"historic_site", "attraction"}
+
+
+def _is_notable(raw: dict[str, Any]) -> bool:
+    """Any independent marker that an OSM POI is worth surfacing. Geoapify carries
+    these in `datasource.raw`; it's the notability signal its category tree drops."""
+    return bool(
+        raw.get("wikidata") or raw.get("wikipedia") or raw.get("heritage")
+        or raw.get("wikimedia_commons") or raw.get("image")
+    )
+
+
+def _is_micro_poi(categories: list[str]) -> bool:
+    leaf = str(categories[-1]) if categories else ""
+    return leaf == "tourism.sights.building" or any(m in leaf for m in _MICRO_POI_MARKERS)
+
+
+def _resolve_type(categories: list[str], raw: dict[str, Any]) -> str | None:
+    """Central place-quality gate for Geoapify's un-ranked OSM POIs.
+
+    Geoapify hands back every plaque/statue/fountain as a first-class `tourism.*`
+    POI with no notability signal — exactly what floods the top-K. Using the raw
+    OSM tags in `datasource.raw`:
+      1. drop an un-notable micro-POI (memorial/artwork/statue/fountain/building);
+      2. demote an un-notable generic sight/attraction to a plain `place` so it
+         stays available for coverage but can't outrank a real destination.
+    Returns None to drop the candidate entirely.
+    """
+    place_type = _place_type_from_categories(categories)
+    notable = _is_notable(raw)
+    if _is_micro_poi(categories) and not notable:
+        return None
+    if place_type in _GATED_TYPES and not notable:
+        return "place"
+    return place_type
+
+
 def _quality(props: dict[str, Any], place_type: str, has_name: bool) -> int:
     raw = (props.get("datasource") or {}).get("raw") or {}
     score = 50
     if has_name:
         score += 15
-    if raw.get("wikidata") or raw.get("wikipedia"):
+    if _is_notable(raw):
         score += 15
     if place_type in {"viewpoint", "museum", "attraction"}:
         score += 8
@@ -99,8 +144,10 @@ def _candidate_from_feature(feature: dict[str, Any]) -> PlaceCandidate | None:
         return None
 
     categories = props.get("categories") or []
-    place_type = _place_type_from_categories(categories)
     raw = (props.get("datasource") or {}).get("raw") or {}
+    place_type = _resolve_type(categories, raw)
+    if place_type is None:  # un-notable micro-POI (plaque/statue/fountain) — drop as noise
+        return None
     tags: dict[str, Any] = {
         "geoapify_categories": categories,
         "interests": sorted(PLACE_INTERESTS.get(place_type, set())),
