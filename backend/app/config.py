@@ -177,6 +177,14 @@ class Settings:
     # Per-anonymous_id daily cap (~4 enriched searches). Soft fairness control:
     # the id is client-supplied, so the global limit is the real backstop.
     google_places_user_daily_limit: int = int(os.getenv("GOOGLE_PLACES_USER_DAILY_LIMIT", "60"))
+    # --- Cheap hosted place-data providers (benchmark only, see eval/provider_benchmark) ---
+    # Read by the provider-benchmark adapters under eval/, never by the production
+    # recommendation pipeline. Each is a hosted OSM-derived Places API; without a
+    # key the corresponding adapter is skipped.
+    geoapify_api_key: str | None = os.getenv("GEOAPIFY_API_KEY") or None
+    geoapify_url: str = os.getenv("GEOAPIFY_URL", "https://api.geoapify.com/v2")
+    locationiq_api_key: str | None = os.getenv("LOCATIONIQ_API_KEY") or None
+    locationiq_url: str = os.getenv("LOCATIONIQ_URL", "https://us1.locationiq.com/v1")
     # --- Community Confidence (first-party "wisdom of our adventurers") ---
     # All four gates are tunable per-deployment: small/concentrated audiences can
     # lower them to surface signal sooner; larger ones can raise them for tighter

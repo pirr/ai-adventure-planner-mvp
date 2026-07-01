@@ -6,6 +6,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Awaitable, Protocol
 
 from app.config import settings
 from app.schemas import AdventureRequest, AdventureResponse, PlaceCandidate, WeatherSummary
@@ -24,6 +25,28 @@ from app.services.weather import get_destination_forecasts, get_weather
 
 
 logger = logging.getLogger(__name__)
+
+
+class CandidateSource(Protocol):
+    """Discovery seam: anything shaped like `places.get_candidate_places`.
+
+    Production passes nothing and the default (`get_candidate_places`) is used,
+    so behaviour is unchanged. The provider benchmark injects an alternative
+    source to compare cheaper place-data providers through the real ranking
+    pipeline. Kept here (not imported from eval/) so `app/` never depends on the
+    benchmark code."""
+
+    def __call__(
+        self,
+        lat: float,
+        lon: float,
+        available_minutes: int,
+        transport_mode: str,
+        interests: list[str],
+        use_live_data: bool,
+        lang: str = "en",
+        anonymous_id: str | None = None,
+    ) -> Awaitable[tuple[list[PlaceCandidate], list[str]]]: ...
 
 
 @dataclass(frozen=True)
@@ -96,6 +119,7 @@ async def build_recommendations(
     provider: LLMProvider | None = None,
     account_id: int | None = None,
     defer_explanations: bool | None = None,
+    candidate_source: CandidateSource | None = None,
 ) -> AdventureResponse:
     overall_started = time.perf_counter()
     request_id = str(uuid.uuid4())
@@ -110,9 +134,12 @@ async def build_recommendations(
     # Origin weather and place search are independent; run them concurrently so
     # the slower of the two (Overpass on a cache miss) sets the latency, not the sum.
     stage_started = time.perf_counter()
+    # Discovery seam: production uses get_candidate_places; the benchmark can
+    # inject an alternative provider to compare it through the real pipeline.
+    discover = candidate_source or get_candidate_places
     (weather, weather_warnings), (places, place_warnings) = await asyncio.gather(
         get_weather(request.lat, request.lon, request.use_live_data, request.lang, cache_ok=tier.cache_origin_weather),
-        get_candidate_places(
+        discover(
             request.lat,
             request.lon,
             request.available_minutes,
