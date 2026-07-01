@@ -41,7 +41,7 @@ from app.services import google_places
 from app.services.places import _clone_candidates, radius_for_request
 from app.services.scoring import normalize_interest
 from eval import provider_metrics as pm
-from eval.city_benchmark import CITIES
+from eval.city_benchmark import CITIES, TOURIST_TOWNS
 from eval.provider_judge import JudgeTally, judge_config, judge_scenario
 from eval.provider_orchestrator import rank_offline, to_recommendations
 from eval.providers.baseline import OsmGoogleBaselineProvider
@@ -129,10 +129,21 @@ async def _fetch(provider, lat, lon, radius_km, interests, anonymous_id, use_cac
 
 # --- one scenario -------------------------------------------------------------
 
-async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_cfg, repeats, acc, no_google=False) -> bool:
-    """Run one (city, profile). Returns True if the baseline was unhealthy
-    (Overpass failed) and the scenario was skipped — an unhealthy reference would
-    make recall/RBO meaningless, so it contributes nothing to the scoreboard."""
+@dataclass
+class ScenarioResult:
+    """Outcome of one (city, profile). `judge_items` are deferred so every
+    comparison across the whole run can be judged concurrently at the end."""
+
+    degraded: bool = False           # baseline Overpass failed -> skipped
+    cold: bool = False               # --cache-only and no warm baseline -> skipped, no live fetch
+    live: bool = False               # a non-cached fetch happened -> pace before the next
+    judge_items: list = field(default_factory=list)  # (JudgeTally, request, base_recs, provider_recs)
+
+
+async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_cfg, repeats, acc, no_google=False, cache_only=False) -> ScenarioResult:
+    """Run one (city, profile). Computes objective metrics inline and returns the
+    judge comparisons (if any) for the caller to run concurrently. An unhealthy
+    baseline (Overpass failed) marks the result degraded so it's skipped."""
     name, country, lat, lon = city
     pid, transport, minutes, interests = profile
     request = AdventureRequest(
@@ -146,9 +157,14 @@ async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_c
     fetch_anon = None if no_google else base_anon
 
     baseline = OsmGoogleBaselineProvider()
+    # --cache-only: iterate on scoring without paying live Overpass. Skip any
+    # scenario whose baseline reference isn't already cached (the flaky, slow ones).
+    if cache_only and not _cache_path(baseline.name, lat, lon, radius_km, interests).exists():
+        return ScenarioResult(cold=True)
     base_pool, base_ms = await _fetch(baseline, lat, lon, radius_km, interests, fetch_anon, use_cache)
     if baseline.last_degraded:
-        return True
+        return ScenarioResult(degraded=True)
+    result = ScenarioResult(live=base_ms is not None)
     base_scored = await rank_offline(_clone_candidates(base_pool), request, enrich=not no_google, anonymous_id=base_anon)
     base_topk = [c.place for c in base_scored[:k]]
     base_recs = to_recommendations(base_scored, n)
@@ -156,6 +172,7 @@ async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_c
 
     for provider in providers:
         pool, latency_ms = await _fetch(provider, lat, lon, radius_km, interests, base_anon, use_cache)
+        result.live = result.live or latency_ms is not None
         for arm in arms:
             anon = f"bench-{provider.name}-{arm}-{name}-{pid}"
             scored = await rank_offline(
@@ -182,10 +199,27 @@ async def _run_scenario(city, profile, providers, arms, k, n, use_cache, judge_c
                 a.latency_ms.append(latency_ms)
             if judge_cfg:
                 provider_recs = to_recommendations(scored, n)
-                for _ in range(repeats):
-                    if provider_recs and base_recs:
-                        a.judge.add(await judge_scenario(judge_cfg, request, base_recs, provider_recs))
-    return False
+                if provider_recs and base_recs:
+                    result.judge_items += [(a.judge, request, base_recs, provider_recs)] * repeats
+    return result
+
+
+async def _run_judges(cfg, items, concurrency) -> None:
+    """Run all deferred pairwise judgements concurrently, then tally. The judge is
+    I/O-bound on the LLM endpoint — this is where the wall-clock goes — so a
+    semaphore fans them out while staying within the endpoint's rate limit. A
+    flaky call counts as 'unstable' rather than sinking the whole gather."""
+    sem = asyncio.Semaphore(max(1, concurrency))
+
+    async def _one(tally, request, base_recs, provider_recs):
+        async with sem:
+            try:
+                verdict = await judge_scenario(cfg, request, base_recs, provider_recs)
+            except Exception:  # noqa: BLE001 - one bad judge call shouldn't kill the run
+                verdict = "unstable"
+        tally.add(verdict)
+
+    await asyncio.gather(*(_one(*item) for item in items))
 
 
 def _record_baseline(acc, pool, topk, radius_km, interests, latency_ms):
@@ -315,7 +349,8 @@ def _to_json(acc, providers, arms, judge_on) -> dict:
 async def _run(args) -> None:
     from collections import defaultdict
 
-    cities = CITIES[: args.max_cities] if args.max_cities else CITIES
+    catalog = {"metros": CITIES, "towns": TOURIST_TOWNS, "all": CITIES + TOURIST_TOWNS}[args.city_set]
+    cities = catalog[: args.max_cities] if args.max_cities else catalog
     if args.smoke:
         cities, profiles, arms, judge_on = cities[:1], SMOKE_PROFILES, ["provider_only"], False
     else:
@@ -346,22 +381,29 @@ async def _run(args) -> None:
 
     acc: dict = defaultdict(Acc)
     judge_cities = set(range(args.judge_cities)) if judge_on else set()
-    total = degraded = 0
-    first = True
+    judge_items: list = []
+    total = degraded = cold = 0
+    prev_live = False
     for ci, city in enumerate(cities):
         for profile in profiles:
-            if not first and args.pace:
+            # Only pace after a live fetch: a fully-cached scenario didn't touch
+            # Overpass, so there's nothing to be polite about.
+            if prev_live and args.pace:
                 await asyncio.sleep(args.pace)
-            first = False
             scenario_judge = judge_cfg if (judge_on and ci in judge_cities) else None
-            was_degraded = await _run_scenario(city, profile, providers, arms, args.k, args.n,
-                                               not args.no_cache, scenario_judge, args.repeats, acc,
-                                               no_google=args.no_google)
+            res = await _run_scenario(city, profile, providers, arms, args.k, args.n,
+                                      not args.no_cache, scenario_judge, args.repeats, acc,
+                                      no_google=args.no_google, cache_only=args.cache_only)
             total += 1
-            degraded += int(was_degraded)
+            degraded += int(res.degraded)
+            cold += int(res.cold)
+            prev_live = res.live
+            judge_items.extend(res.judge_items)
         print(f"  done {city[0]}, {city[1]}")
 
-    used = total - degraded
+    used = total - degraded - cold
+    if cold:
+        print(f"\nNOTE: --cache-only skipped {cold}/{total} scenarios with no warm baseline (no live Overpass).")
     if degraded:
         print(f"\nNOTE: skipped {degraded}/{total} scenarios with an unhealthy (Overpass-failed) baseline; "
               f"scoreboard reflects {used} healthy-baseline scenarios. Degraded baselines aren't cached — "
@@ -369,6 +411,10 @@ async def _run(args) -> None:
     if used == 0:
         print("No healthy-baseline scenarios (Overpass unavailable for all). Re-run, raise --pace, or use fewer/denser cities.")
         return
+
+    if judge_items:
+        print(f"\nJudging {len(judge_items)} comparisons (concurrency {args.judge_concurrency})...")
+        await _run_judges(judge_cfg, judge_items, args.judge_concurrency)
 
     _print_report(acc, providers, arms, args.price, judge_on)
     if args.json:
@@ -380,6 +426,8 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--providers", nargs="+", default=list(PROVIDERS), choices=list(PROVIDERS))
     p.add_argument("--arms", nargs="+", default=ARMS, choices=ARMS)
+    p.add_argument("--city-set", choices=["metros", "towns", "all"], default="metros",
+                   help="City catalogue: global metros, small/medium tourist towns, or both")
     p.add_argument("--max-cities", type=int, default=0, help="Only the first N cities (0 = all)")
     p.add_argument("--profiles", choices=["all", "smoke"], default="all")
     p.add_argument("--k", type=int, default=5, help="Top-K compared against the baseline")
@@ -389,9 +437,12 @@ def parse_args(argv=None):
     p.add_argument("--repeats", type=int, default=1, help="Judge repeats per scenario (variance)")
     p.add_argument("--price", action="store_true", help="Show the $/1k cost column from providers/pricing.json")
     p.add_argument("--no-cache", action="store_true", help="Ignore the response cache and hit providers live")
+    p.add_argument("--cache-only", action="store_true",
+                   help="Skip scenarios with no warm baseline (zero live Overpass) — fast iteration on scoring")
     p.add_argument("--no-google", action="store_true",
                    help="Zero Google spend: baseline is pure OSM (no enrichment/backfill); forces --arms provider_only")
-    p.add_argument("--pace", type=float, default=1.0, help="Seconds between scenarios (eases public Overpass load)")
+    p.add_argument("--pace", type=float, default=1.0, help="Seconds to wait after a live (non-cached) scenario, to ease public Overpass load")
+    p.add_argument("--judge-concurrency", type=int, default=6, help="Max concurrent LLM-judge comparisons")
     p.add_argument("--smoke", action="store_true", help="1 city x 1 profile, provider_only, no judge")
     p.add_argument("--json", default="", help="Write a machine-readable report to this path")
     return p.parse_args(argv)

@@ -70,6 +70,26 @@ CITIES: list[tuple[str, str, float, float]] = [
     ("Melbourne", "AU", -37.8136, 144.9631),
 ]
 
+# Small/medium tourist towns (Latin-script, dense old-towns, good OSM coverage).
+# Kept OUT of CITIES on purpose: the readiness benchmark treats an empty result as
+# an infra failure, but here genuine sparsity is expected. Used by the provider
+# quality benchmark (--city-set towns|all) to stress selection/diversity where the
+# whole offering clusters in a few hundred metres.
+TOURIST_TOWNS: list[tuple[str, str, float, float]] = [
+    ("Kotor", "ME", 42.4247, 18.7712),
+    ("Hallstatt", "AT", 47.5622, 13.6493),
+    ("Rothenburg", "DE", 49.3755, 10.1793),
+    ("San Gimignano", "IT", 43.4674, 11.0431),
+    ("Bled", "SI", 46.3683, 14.1146),
+    ("Cesky Krumlov", "CZ", 48.8127, 14.3175),
+    ("Sintra", "PT", 38.8029, -9.3817),
+    ("Colmar", "FR", 48.0794, 7.3585),
+    ("Dubrovnik", "HR", 42.6407, 18.1077),
+    ("Bruges", "BE", 51.2093, 3.2247),
+    ("Bath", "UK", 51.3811, -2.3590),
+    ("Verona", "IT", 45.4384, 10.9916),
+]
+
 # Broad, common interests so the benchmark tests live-data *health*, not the
 # sparsity of one niche interest. Override with --interests.
 DEFAULT_INTERESTS = ["nature", "viewpoints", "history", "food"]
