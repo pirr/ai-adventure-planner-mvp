@@ -115,6 +115,36 @@ def test_geoapify_coerces_nonstring_name(monkeypatch):
     assert out and out[0].name == "1803"
 
 
+def test_geoapify_notability_gate_drops_and_demotes(monkeypatch):
+    # Geoapify floods the top-K with un-notable plaques/statues typed as
+    # historic_site/attraction. The gate drops micro-POIs and demotes generic
+    # sights that carry no notability signal, keeping the notable ones.
+    monkeypatch.setattr(geoapify_mod, "settings", _settings(geoapify_api_key="k"))
+    payload = {"features": [
+        {"properties": {  # un-notable statue -> dropped (micro-POI, no signal)
+            "name": "Some Statue", "place_id": "s1", "lat": 42.0, "lon": 18.0,
+            "categories": ["tourism", "tourism.attraction", "tourism.attraction.artwork.statue"]}},
+        {"properties": {  # famous monument (wikidata) -> kept as attraction
+            "name": "Famous Monument", "place_id": "s2", "lat": 42.1, "lon": 18.1,
+            "categories": ["tourism", "tourism.attraction", "tourism.attraction.artwork.statue"],
+            "datasource": {"raw": {"wikidata": "Q7"}}}},
+        {"properties": {  # un-notable generic sight -> demoted to plain place
+            "name": "Old Wall Bit", "place_id": "s3", "lat": 42.2, "lon": 18.2,
+            "categories": ["tourism", "tourism.sights"]}},
+        {"properties": {  # heritage-tagged sight (no wikidata) -> notable, stays historic_site
+            "name": "Heritage House", "place_id": "s4", "lat": 42.3, "lon": 18.3,
+            "categories": ["tourism", "tourism.sights"],
+            "datasource": {"raw": {"heritage": "2"}}}},
+    ]}
+    _patch_http(monkeypatch, geoapify_mod, lambda url, params: payload)
+    out = asyncio.run(GeoapifyProvider().fetch(42.0, 18.0, 25.0, ["history"]))
+    by_id = {c.source_id: c for c in out}
+    assert "geoapify:s1" not in by_id                    # un-notable statue dropped
+    assert by_id["geoapify:s2"].type == "attraction"     # notable statue kept
+    assert by_id["geoapify:s3"].type == "place"          # un-notable sight demoted
+    assert by_id["geoapify:s4"].type == "historic_site"  # heritage = notable, kept
+
+
 def test_geoapify_without_key_returns_empty(monkeypatch):
     monkeypatch.setattr(geoapify_mod, "settings", _settings(geoapify_api_key=None))
     assert asyncio.run(GeoapifyProvider().fetch(42.0, 18.0, 25.0, ["history"])) == []
