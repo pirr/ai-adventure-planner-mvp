@@ -47,6 +47,17 @@ GEOAPIFY_API_KEY=... LOCATIONIQ_API_KEY=... LLM_JUDGE_MODEL=gemini-2.5-flash \
   docker compose exec app python -m eval.provider_benchmark \
   --no-google --judge --judge-cities 6 --max-cities 6
 
+# Small/medium tourist towns instead of metros (--city-set metros|towns|all).
+# Stresses selection/diversity where the whole offering clusters in a few blocks.
+GEOAPIFY_API_KEY=... LLM_JUDGE_MODEL=gemini-2.5-flash \
+  docker compose exec app python -m eval.provider_benchmark \
+  --city-set towns --no-google --judge
+
+# Fast iteration on a warm cache: --cache-only skips scenarios with no cached
+# baseline (zero live Overpass), and the judge runs concurrently.
+docker compose exec app python -m eval.provider_benchmark \
+  --cache-only --no-google --judge --judge-concurrency 6
+
 # Objective sweep, both arms, cost column + JSON report (the +google arm spends
 # real Google budget — raise GOOGLE_PLACES_DAILY_LIMIT for the run or it's a no-op)
 GEOAPIFY_API_KEY=... LOCATIONIQ_API_KEY=... docker compose exec app \
@@ -70,6 +81,11 @@ docker compose exec app pytest \
 
 Keys: `GEOAPIFY_API_KEY`, `LOCATIONIQ_API_KEY`. Judge: `LLM_JUDGE_BASE_URL`,
 `LLM_JUDGE_MODEL`, optional `LLM_JUDGE_API_KEY`.
+
+Speed/scope flags: `--city-set metros|towns|all` (which catalogue), `--cache-only`
+(skip scenarios with no warm baseline — zero live Overpass, for fast iteration),
+`--judge-concurrency N` (parallel judge calls). `--pace` now only waits after a
+live fetch, so a fully-cached run doesn't sleep.
 
 ## Reading the numbers
 

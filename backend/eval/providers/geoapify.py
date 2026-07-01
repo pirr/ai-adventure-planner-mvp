@@ -9,6 +9,7 @@ feature `properties` carrying name/categories/place_id/lat/lon and (often)
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from app.config import settings
@@ -16,6 +17,8 @@ from app.schemas import PlaceCandidate
 from app.services.net import http_client
 from app.services.places import _estimate_activity, _estimate_walking
 from app.services.scoring import PLACE_INTERESTS
+
+logger = logging.getLogger(__name__)
 
 # Geoapify circle filter is bounded; keep the request inside a sane radius.
 _MAX_RADIUS_M = 50_000
@@ -194,10 +197,16 @@ class GeoapifyProvider:
             "lang": "ru" if lang == "ru" else "en",
             "apiKey": settings.geoapify_api_key,
         }
-        async with http_client(settings.http_timeout_seconds) as client:
-            response = await client.get(f"{settings.geoapify_url}/places", params=params)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with http_client(settings.http_timeout_seconds) as client:
+                response = await client.get(f"{settings.geoapify_url}/places", params=params)
+                response.raise_for_status()
+                data = response.json()
+        except Exception as exc:  # noqa: BLE001 - a transient network error shouldn't abort the whole run
+            logger.warning("geoapify places failed (%s)", exc.__class__.__name__)
+            return []
+        if not isinstance(data, dict):
+            return []
 
         candidates: list[PlaceCandidate] = []
         seen: set[str] = set()

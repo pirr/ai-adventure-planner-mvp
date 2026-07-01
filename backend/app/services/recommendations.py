@@ -19,7 +19,7 @@ from app.services.llm.ab import explainer_provider
 from app.services.explanations import stash as stash_explanations
 from app.services.community import community_signals
 from app.services.preferences import preference_profile, preference_profile_for_account
-from app.services.scoring import ScoredCandidate, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
+from app.services.scoring import ScoredCandidate, apply_diversity, apply_primary_rerank, rejected_from_scored, score_candidate, to_recommendation
 from app.services.storage import storage
 from app.services.weather import get_destination_forecasts, get_weather
 
@@ -261,7 +261,11 @@ async def build_recommendations(
     recommendable = [item for item in final if _is_recommendable(item, request)]
     # Focused single-interest searches lead with matching places (e.g. "drinks"
     # -> pubs first); multi-interest browse keeps the score order.
-    top = apply_primary_rerank(recommendable, request)[: request.limit]
+    ranked = apply_primary_rerank(recommendable, request)
+    # Then spread the head so a dense cluster of near-identical POIs (a dozen central
+    # war memorials, all wikidata) can't monopolise the results; name-dedup + a soft
+    # per-type cap, with a graceful fallback for single-theme towns (see scoring).
+    top = apply_diversity(ranked, limit=request.limit, interests=request.interests)[: request.limit]
     photos = await asyncio.gather(
         *[get_place_photo(item.place, request.use_live_data, request.anonymous_id) for item in top]
     )
