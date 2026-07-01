@@ -6,6 +6,7 @@ from typing import Iterable
 
 from app.config import settings
 from app.schemas import AdventureRequest, CommunitySignal, HourlyForecast, PlaceCandidate, PlacePhoto, Recommendation, RejectedAlternative, RouteInfo, ScoreBreakdown, WeatherSummary
+from app.services.geo import haversine_km
 from app.services.i18n import t
 
 
@@ -83,6 +84,97 @@ def apply_primary_rerank(candidates: list["ScoredCandidate"], request: Adventure
     matched = [c for c in candidates if place_matches_interest(c.place, primary)]
     rest = [c for c in candidates if not place_matches_interest(c.place, primary)]
     return matched + rest
+
+
+# Diversity guard for the final selection. A dense cluster of near-identical POIs
+# (a dozen central war memorials — all wikidata, so flat quality) otherwise
+# monopolises the top-K: within one type the fits barely differ and proximity ties
+# them, so the head collapses onto one spot/type. Three SOFT rules, each with a
+# graceful fallback so a small single-theme town (e.g. Kotor's old town) still fills
+# `limit`:
+#   1. name-dedup  — the same place must not appear twice (even under two types);
+#   2. spatial gap — skip a same-type POI within DIVERSITY_GAP_M of a picked one;
+#   3. type cap    — at most DIVERSITY_TYPE_CAP of any single type.
+# If the rules leave fewer than `limit`, top up from the deferred by notability
+# (quality_score) — a freed slot gets the best remaining place, not the next plaque.
+# Order-only, scores untouched.
+DIVERSITY_GAP_M = 400.0
+DIVERSITY_TYPE_CAP = 2
+
+
+def _norm_name(name: str) -> str:
+    return " ".join(name.lower().split())
+
+
+def _clusters_with(candidate: "ScoredCandidate", picked: list["ScoredCandidate"], gap_m: float) -> bool:
+    p = candidate.place
+    return any(
+        p.type == q.place.type and haversine_km(p.lat, p.lon, q.place.lat, q.place.lon) * 1000 <= gap_m
+        for q in picked
+    )
+
+
+def _on_interest_predicate(interests: list[str] | None):
+    """place -> True if it satisfies a requested interest. Everything is 'wanted'
+    for an empty or 'surprise me' request (no interest to bias variety toward)."""
+    if not interests:
+        return lambda place: True
+    norm = [normalize_interest(i) for i in interests]
+    if "surprise me" in norm:
+        return lambda place: True
+    return lambda place: any(place_matches_interest(place, i) for i in norm)
+
+
+def apply_diversity(
+    candidates: list["ScoredCandidate"], *, limit: int,
+    gap_m: float = DIVERSITY_GAP_M, type_cap: int = DIVERSITY_TYPE_CAP,
+    interests: list[str] | None = None,
+) -> list["ScoredCandidate"]:
+    """Spread the top-`limit` so no single place, cluster, or type owns the head,
+    while staying within what the user asked for and never returning fewer than a
+    plain top-`limit` (a single-theme town falls back to its core). Soft rules:
+    name-dedup, a spatial gap and a per-type cap on same-type POIs, and — when
+    `interests` is given — off-interest types are held back (a food+drinks trip
+    won't get a war memorial injected just for variety). Assumes `candidates` is
+    already score-ranked; returns the full list reordered so downstream selection
+    and alternatives still see every candidate."""
+    if limit <= 0 or len(candidates) <= 1:
+        return list(candidates)
+    on_interest = _on_interest_predicate(interests)
+    picked: list["ScoredCandidate"] = []
+    deferred: list["ScoredCandidate"] = []
+    seen_names: set[str] = set()
+    type_counts: dict[str, int] = {}
+    for candidate in candidates:
+        p = candidate.place
+        name = _norm_name(p.name)
+        redundant = (
+            len(picked) >= limit
+            or name in seen_names
+            or not on_interest(p)
+            or _clusters_with(candidate, picked, gap_m)
+            or type_counts.get(p.type, 0) >= type_cap
+        )
+        if redundant:
+            deferred.append(candidate)
+        else:
+            picked.append(candidate)
+            seen_names.add(name)
+            type_counts[p.type] = type_counts.get(p.type, 0) + 1
+    if len(picked) < limit:
+        # Short after the soft rules -> relax gap/cap/off-interest (a single-theme or
+        # narrow request isn't at fault), preferring on-interest then notability,
+        # never re-introducing a duplicate place.
+        for candidate in sorted(deferred, key=lambda c: (on_interest(c.place), c.place.quality_score), reverse=True):
+            name = _norm_name(candidate.place.name)
+            if name in seen_names:
+                continue
+            picked.append(candidate)
+            seen_names.add(name)
+            if len(picked) >= limit:
+                break
+    picked_ids = {id(c) for c in picked}
+    return picked + [c for c in candidates if id(c) not in picked_ids]
 
 
 def _clamp(value: int | float) -> int:
