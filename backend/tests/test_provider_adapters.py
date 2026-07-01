@@ -150,6 +150,18 @@ def test_geoapify_without_key_returns_empty(monkeypatch):
     assert asyncio.run(GeoapifyProvider().fetch(42.0, 18.0, 25.0, ["history"])) == []
 
 
+def test_geoapify_network_error_returns_empty(monkeypatch):
+    # A transient connect/timeout on a live fetch must degrade to empty, not crash
+    # the run (the whole benchmark otherwise aborts on one blip).
+    monkeypatch.setattr(geoapify_mod, "settings", _settings(geoapify_api_key="k"))
+
+    def boom(url, params):
+        raise RuntimeError("connect timeout")
+
+    _patch_http(monkeypatch, geoapify_mod, boom)
+    assert asyncio.run(GeoapifyProvider().fetch(42.0, 18.0, 25.0, ["history"])) == []
+
+
 # --- LocationIQ --------------------------------------------------------------
 
 def test_locationiq_fetch_single_call_maps_osm_tags_and_dedupes(monkeypatch):
