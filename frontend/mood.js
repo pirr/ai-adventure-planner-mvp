@@ -75,7 +75,7 @@
       time: 120, crew: "solo", transport: "walk", intensity: "easy", interests: ["viewpoints", "food"], childrenAges: [], maxWalkingKm: 2,
       en: { t: "Coffee & a View", s: "A short, scenic start" }, ru: { t: "\u041a\u043e\u0444\u0435 \u0441 \u0432\u0438\u0434\u043e\u043c", s: "\u041a\u043e\u0440\u043e\u0442\u043a\u043e \u0438 \u0436\u0438\u0432\u043e\u043f\u0438\u0441\u043d\u043e" } },
     { key: "family", icon: "users", grad: "linear-gradient(150deg,#3f97a6,#1f5a63)", dayparts: ["morning", "afternoon"],
-      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["history", "water", "nature"], childrenAges: [], maxWalkingKm: 2.5,
+      time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["history", "water", "nature", "caves"], childrenAges: [], maxWalkingKm: 2.5,
       en: { t: "Family Day Out", s: "Easy & kid-friendly" }, ru: { t: "\u0421 \u0441\u0435\u043c\u044c\u0451\u0439", s: "\u041b\u0435\u0433\u043a\u043e, \u0441 \u0434\u0435\u0442\u044c\u043c\u0438" } },
     { key: "sunset", icon: "mountain-snow", grad: "linear-gradient(150deg,#d6794e,#a84e28)", dayparts: ["afternoon", "evening"],
       time: 120, crew: "couple", transport: "car", intensity: "easy", interests: ["viewpoints"], childrenAges: [], maxWalkingKm: 2.5,
@@ -90,7 +90,7 @@
       time: 240, crew: "family", transport: "car", intensity: "easy", interests: ["water", "nature"], childrenAges: [], maxWalkingKm: 2.5,
       en: { t: "By the Water", s: "Beaches & quiet coves" }, ru: { t: "\u0423 \u0432\u043e\u0434\u044b", s: "\u041f\u043b\u044f\u0436\u0438 \u0438 \u0431\u0443\u0445\u0442\u044b" } },
     { key: "surprise", icon: "dices", grad: "linear-gradient(150deg,#6a4a86,#2c2750)", dayparts: ["morning", "afternoon", "evening"],
-      time: 300, crew: "solo", transport: "car", intensity: "medium", interests: ["history", "fortresses", "viewpoints", "water", "nature"], childrenAges: [], maxWalkingKm: 5,
+      time: 300, crew: "solo", transport: "car", intensity: "medium", interests: ["history", "fortresses", "viewpoints", "water", "nature", "caves"], childrenAges: [], maxWalkingKm: 5,
       en: { t: "Surprise Me", s: "Anything great nearby" }, ru: { t: "\u0423\u0434\u0438\u0432\u0438 \u043c\u0435\u043d\u044f", s: "\u0427\u0442\u043e-\u043d\u0438\u0431\u0443\u0434\u044c \u043a\u043b\u0430\u0441\u0441\u043d\u043e\u0435" } },
   ];
   var DAYPARTS = {
@@ -119,7 +119,7 @@
   function smartNowPreset() {
     var interests = {
       morning: ["viewpoints", "food", "nature"],
-      afternoon: ["history", "viewpoints", "nature"],
+      afternoon: ["history", "viewpoints", "nature", "caves"],
       evening: ["viewpoints", "food"],
     }[daypart] || ["viewpoints", "nature"];
     return {

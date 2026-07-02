@@ -243,7 +243,7 @@ async def sample_request() -> dict[str, Any]:
         "group_type": "family",
         "children_ages": [6, 13],
         "intensity": "easy",
-        "interests": ["history", "fortresses", "viewpoints"],
+        "interests": ["history", "fortresses", "viewpoints", "caves"],
         "max_walking_km": 3,
         "request_text": "Family trip for 5 hours with fortress, history and views.",
         "use_live_data": True,

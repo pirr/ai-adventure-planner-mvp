@@ -96,6 +96,9 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "desc_museum": "A low-risk indoor or semi-indoor option with educational value.",
         "desc_park": "A flexible nature option with easy pacing.",
         "desc_water": "A relaxed water-focused stop suitable for a light outing.",
+        "desc_cave": "A nature stop with a little exploration and more uncertain footing.",
+        "desc_natural_site": "A notable natural feature suited to a short outdoor detour.",
+        "desc_picnic": "A low-effort outdoor stop that works well for a relaxed break.",
         "desc_trail": "An active outdoor option that may require more effort.",
         "desc_default": "A nearby place that fits part of your request.",
         # Rejected reasons
@@ -147,6 +150,9 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "desc_museum": "Безопасный крытый или полукрытый вариант с познавательной ценностью.",
         "desc_park": "Гибкий природный вариант с лёгким темпом.",
         "desc_water": "Спокойная остановка у воды, подходящая для лёгкой прогулки.",
+        "desc_cave": "Природная остановка с элементом исследования и менее предсказуемым покрытием.",
+        "desc_natural_site": "Заметный природный объект, подходящий для короткого выезда.",
+        "desc_picnic": "Лёгкая остановка на природе для спокойного перерыва.",
         "desc_trail": "Активный вариант на открытом воздухе, требующий больше усилий.",
         "desc_default": "Место поблизости, которое частично соответствует вашему запросу.",
         # Rejected reasons

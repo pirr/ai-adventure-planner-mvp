@@ -77,6 +77,8 @@ def _candidate_text_query(interests: list[str]) -> str:
         return "bars pubs"
     if "food" in normalized:
         return "restaurants cafes"
+    if "caves" in normalized:
+        return "caves cave tours natural attractions"
     if {"history", "fortresses"} & normalized:
         return "historic sites museums castles fortresses tourist attractions"
     if {"nature", "viewpoints", "water"} & normalized:
@@ -117,6 +119,10 @@ async def _search_candidate_text(
 def _candidate_place_type(result: dict[str, Any]) -> str:
     types = {str(item) for item in result.get("types") or []}
     primary_type = str(result.get("primaryType") or "")
+    display_name = result.get("displayName") or {}
+    name = str(display_name.get("text") or "").lower()
+    if "cave" in name or "cavern" in name:
+        return "cave"
     if types & _DRINK_TYPES or primary_type in _DRINK_TYPES:
         return "drinks"
     if types & _EAT_TYPES or primary_type in _EAT_TYPES:
@@ -127,6 +133,7 @@ def _candidate_place_type(result: dict[str, Any]) -> str:
 def _candidate_interests(place_type: str) -> list[str]:
     return {
         "attraction": ["surprise me"],
+        "cave": ["caves", "nature"],
         "food": ["food"],
         "drinks": ["drinks"],
         "historic_site": ["history"],
@@ -139,6 +146,7 @@ def _candidate_interests(place_type: str) -> list[str]:
 def _candidate_activity(place_type: str) -> int:
     return {
         "attraction": 60,
+        "cave": 45,
         "food": 45,
         "drinks": 50,
         "historic_site": 70,
@@ -151,6 +159,7 @@ def _candidate_activity(place_type: str) -> int:
 def _candidate_walking(place_type: str) -> float:
     return {
         "attraction": 1.0,
+        "cave": 1.5,
         "food": 0.4,
         "drinks": 0.3,
         "historic_site": 1.4,

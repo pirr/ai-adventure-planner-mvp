@@ -29,8 +29,8 @@ def test_children_ages_dropped_outside_0_18():
 
 
 def test_interests_whitelisted_and_lowercased():
-    parsed = ParsedSituation(interests=["History", "beaches", "surprise me"])
-    assert parsed.interests == ["history", "surprise me"]
+    parsed = ParsedSituation(interests=["History", "CAVES", "beaches", "surprise me"])
+    assert parsed.interests == ["history", "caves", "surprise me"]
     assert ParsedSituation(interests=["beaches"]).interests is None
 
 
@@ -40,7 +40,7 @@ def test_unknown_enum_values_rejected():
 
 
 def test_interest_ids_match_the_ui():
-    assert INTEREST_IDS == {"history", "fortresses", "viewpoints", "nature", "water", "food", "drinks", "surprise me"}
+    assert INTEREST_IDS == {"history", "fortresses", "viewpoints", "nature", "caves", "water", "food", "drinks", "surprise me"}
 
 
 # --- ParseTextRequest --------------------------------------------------------
@@ -193,7 +193,8 @@ def test_parse_request_budget_exhausted_is_429_and_skips_provider(monkeypatch):
     assert provider.calls == 0
 
 
-def test_parsed_situation_accepts_drinks_interest():
+def test_parsed_situation_accepts_new_interests():
     assert ParsedSituation(interests=["drinks"]).interests == ["drinks"]
+    assert ParsedSituation(interests=["caves"]).interests == ["caves"]
     # Unknown interests are still dropped by the whitelist.
     assert ParsedSituation(interests=["nightclub"]).interests is None

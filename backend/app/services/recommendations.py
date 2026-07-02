@@ -86,12 +86,17 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * 1000)
 
 
-def _order_key(candidate: ScoredCandidate, rotate: bool, seen: set[str]) -> int:
+def _order_key(candidate: ScoredCandidate, rotate: bool, seen: set[str]) -> tuple[int, int, float, int]:
     # "Show others": sink already-seen places below every unseen one (the
     # penalty exceeds the 0-100 score range), so fresh candidates surface
     # first and seen ones only backfill empty slots. Off otherwise, and it
     # never changes the displayed adventure_score.
-    return candidate.score - (1000 if rotate and candidate.place.source_id in seen else 0)
+    return (
+        candidate.score - (1000 if rotate and candidate.place.source_id in seen else 0),
+        candidate.place.quality_score,
+        -candidate.route.distance_km,
+        -candidate.total_minutes,
+    )
 
 
 def _select_candidates_for_routing(
