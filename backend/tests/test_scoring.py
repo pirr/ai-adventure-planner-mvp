@@ -303,6 +303,24 @@ def test_place_matches_interest_for_drinks():
     assert place_matches_interest(pub, "history") is False
 
 
+def test_new_adventure_place_types_match_existing_interests():
+    from app.services.scoring import place_matches_interest
+
+    cave = PlaceCandidate(source="t", source_id="t:cave", name="Cave", type="cave", lat=42.4, lon=18.7)
+    natural_site = PlaceCandidate(source="t", source_id="t:natural", name="Arch", type="natural_site", lat=42.4, lon=18.7)
+    picnic = PlaceCandidate(source="t", source_id="t:picnic", name="Picnic", type="picnic", lat=42.4, lon=18.7)
+    trail = PlaceCandidate(source="t", source_id="t:trail", name="Trail", type="trail", lat=42.4, lon=18.7)
+
+    assert place_matches_interest(cave, "caves") is True
+    assert place_matches_interest(cave, "nature") is True
+    assert place_matches_interest(cave, "water") is False
+    assert place_matches_interest(natural_site, "nature") is True
+    assert place_matches_interest(natural_site, "viewpoints") is True
+    assert place_matches_interest(picnic, "nature") is True
+    assert place_matches_interest(picnic, "food") is True
+    assert place_matches_interest(trail, "nature") is True
+
+
 def _scored(place_type: str, score: int):
     from app.schemas import ScoreBreakdown
     from app.services.scoring import ScoredCandidate

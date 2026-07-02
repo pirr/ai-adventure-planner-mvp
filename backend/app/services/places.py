@@ -27,6 +27,9 @@ _FAILOVER_OVERPASS_STATUS = {406, 429}
 # Cap (metres) for the dense food/drink amenity scan. Larger radii overrun
 # Overpass's per-query timeout and the whole query returns nothing.
 AMENITY_MAX_RADIUS_M = 8000
+# Route relations are numerous and expensive. Keep them local so a broader
+# car-radius nature search does not sink the whole Overpass query.
+ROUTE_MAX_RADIUS_M = 8000
 
 # {cache_key: (expires_at, candidates)}. Candidates are deep-copied on both
 # read and write so downstream enrichment does not mutate cached entries.
@@ -54,7 +57,7 @@ def _clone_candidates(candidates: list[PlaceCandidate]) -> list[PlaceCandidate]:
 
 def _cache_key(lat: float, lon: float, radius_km: float, interests: list[str]) -> tuple[Any, ...]:
     normalized = tuple(sorted(normalize_interest(str(interest)) for interest in interests))
-    return ("osm-v1", round(lat, 3), round(lon, 3), round(radius_km, 1), normalized)
+    return ("osm-v2", round(lat, 3), round(lon, 3), round(radius_km, 1), normalized)
 
 
 def _candidate_cache_get(key: tuple[Any, ...]) -> list[PlaceCandidate] | None:
@@ -144,14 +147,39 @@ def _has_enough_osm_candidates(candidates: list[PlaceCandidate], interests: list
 
 
 INTEREST_OSM_FILTERS = {
-    "nature": ["tourism=viewpoint", "leisure=park", "natural=beach", "natural=water", "waterway=waterfall"],
+    "nature": [
+        "tourism=viewpoint",
+        "tourism=picnic_site",
+        "leisure=park",
+        "leisure=nature_reserve",
+        "natural=beach",
+        "natural=water",
+        "natural=cave_entrance",
+        "waterway=waterfall",
+        "route=hiking",
+        "route=foot",
+    ],
+    "caves": ["natural=cave_entrance"],
     "viewpoints": ["tourism=viewpoint"],
     "history": ["historic", "tourism=museum", "tourism=attraction"],
     "fortresses": ["historic=fort", "historic=castle", "castle_type"],
-    "water": ["natural=beach", "natural=water", "waterway=waterfall"],
+    "water": [
+        "natural=beach",
+        "natural=water",
+        "natural=spring",
+        "natural=hot_spring",
+        "waterway=waterfall",
+        "waterway=rapids",
+    ],
     "food": ["amenity=cafe", "amenity=restaurant", "amenity=fast_food"],
     "drinks": ["amenity=bar", "amenity=pub", "amenity=biergarten"],
-    "surprise me": ["tourism=viewpoint", "historic", "leisure=park", "tourism=attraction"],
+    "surprise me": [
+        "tourism=viewpoint",
+        "historic",
+        "leisure=park",
+        "tourism=attraction",
+        "tourism=picnic_site",
+    ],
 }
 
 
@@ -178,35 +206,94 @@ def radius_for_request(available_minutes: int, transport_mode: str) -> float:
 
 
 def _build_overpass_query(lat: float, lon: float, radius_m: int, interests: list[str]) -> str:
-    # Broad query first; ranking happens later.
-    normalized = {str(interest).strip().lower() for interest in interests}
-    food_block = ""
+    normalized = {normalize_interest(str(interest)) for interest in interests if str(interest).strip()}
+    broad = not normalized or "surprise me" in normalized
+    blocks: list[str] = []
+
+    def add(block: str) -> None:
+        if block not in blocks:
+            blocks.append(block)
+
+    if broad or normalized & {"viewpoints", "nature"}:
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["tourism"="viewpoint"];
+  way(around:{radius_m},{lat},{lon})["tourism"="viewpoint"];
+  relation(around:{radius_m},{lat},{lon})["tourism"="viewpoint"];
+""")
+    if broad or normalized & {"history", "fortresses"}:
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["tourism"~"attraction|museum|gallery"];
+  way(around:{radius_m},{lat},{lon})["tourism"~"attraction|museum|gallery"];
+  relation(around:{radius_m},{lat},{lon})["tourism"~"attraction|museum|gallery"];
+  node(around:{radius_m},{lat},{lon})["historic"];
+  way(around:{radius_m},{lat},{lon})["historic"];
+  relation(around:{radius_m},{lat},{lon})["historic"];
+""")
+    if broad:
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["tourism"="zoo"];
+  way(around:{radius_m},{lat},{lon})["tourism"="zoo"];
+  relation(around:{radius_m},{lat},{lon})["tourism"="zoo"];
+""")
+    if broad or "caves" in normalized:
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["natural"="cave_entrance"];
+  way(around:{radius_m},{lat},{lon})["natural"="cave_entrance"];
+""")
+    if broad or "nature" in normalized:
+        route_radius = min(radius_m, ROUTE_MAX_RADIUS_M)
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["tourism"~"picnic_site|alpine_hut|wilderness_hut"]["name"];
+  way(around:{radius_m},{lat},{lon})["tourism"~"picnic_site|alpine_hut|wilderness_hut"]["name"];
+  relation(around:{radius_m},{lat},{lon})["tourism"~"picnic_site|alpine_hut|wilderness_hut"]["name"];
+  node(around:{radius_m},{lat},{lon})["leisure"="park"];
+  way(around:{radius_m},{lat},{lon})["leisure"="park"];
+  node(around:{radius_m},{lat},{lon})["leisure"~"nature_reserve|garden|playground|dog_park|swimming_area|bathing_place|bird_hide"]["name"];
+  way(around:{radius_m},{lat},{lon})["leisure"~"nature_reserve|garden|playground|dog_park|swimming_area|bathing_place|bird_hide"]["name"];
+  relation(around:{radius_m},{lat},{lon})["leisure"~"nature_reserve|garden|playground|dog_park|swimming_area|bathing_place|bird_hide"]["name"];
+  node(around:{radius_m},{lat},{lon})["natural"~"beach|water|peak|cave_entrance"];
+  way(around:{radius_m},{lat},{lon})["natural"~"beach|water|peak|cave_entrance"];
+  node(around:{radius_m},{lat},{lon})["natural"~"spring|hot_spring|arch|rock|stone|sinkhole|volcano|cape|bay|saddle"]["name"];
+  way(around:{radius_m},{lat},{lon})["natural"~"spring|hot_spring|arch|rock|stone|sinkhole|volcano|cape|bay|saddle"]["name"];
+  node(around:{radius_m},{lat},{lon})["waterway"="waterfall"];
+  node(around:{radius_m},{lat},{lon})["waterway"="rapids"]["name"];
+  way(around:{radius_m},{lat},{lon})["waterway"="rapids"]["name"];
+  relation(around:{route_radius},{lat},{lon})["route"~"hiking|foot|running|bicycle|mtb"]["name"];
+""")
+    if broad or "water" in normalized:
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["natural"~"beach|water|spring|hot_spring|bay"];
+  way(around:{radius_m},{lat},{lon})["natural"~"beach|water|spring|hot_spring|bay"];
+  node(around:{radius_m},{lat},{lon})["waterway"="waterfall"];
+  node(around:{radius_m},{lat},{lon})["waterway"="rapids"]["name"];
+  way(around:{radius_m},{lat},{lon})["waterway"="rapids"]["name"];
+  node(around:{radius_m},{lat},{lon})["leisure"~"swimming_area|bathing_place"]["name"];
+  way(around:{radius_m},{lat},{lon})["leisure"~"swimming_area|bathing_place"]["name"];
+  relation(around:{radius_m},{lat},{lon})["leisure"~"swimming_area|bathing_place"]["name"];
+""")
     if normalized & {"food", "drinks"}:
         # Food/drink amenities are dense; scanning them over a city-scale radius
         # blows past Overpass's per-query [timeout:10] and the whole query
         # returns zero elements. Cap the amenity search to a local radius — a
         # bar/cafe 50km away is never a good "near me" result anyway.
         amenity_radius = min(radius_m, AMENITY_MAX_RADIUS_M)
-        food_block = f"""
+        add(f"""
   node(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
   way(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
   relation(around:{amenity_radius},{lat},{lon})["amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"];
-"""
+""")
+    if not blocks:
+        add(f"""
+  node(around:{radius_m},{lat},{lon})["tourism"~"viewpoint|attraction|museum"];
+  way(around:{radius_m},{lat},{lon})["tourism"~"viewpoint|attraction|museum"];
+  relation(around:{radius_m},{lat},{lon})["tourism"~"viewpoint|attraction|museum"];
+""")
+
+    query_blocks = "".join(blocks)
     return f"""
 [out:json][timeout:10];
 (
-  node(around:{radius_m},{lat},{lon})["tourism"~"viewpoint|attraction|museum|gallery|zoo"];
-  way(around:{radius_m},{lat},{lon})["tourism"~"viewpoint|attraction|museum|gallery|zoo"];
-  relation(around:{radius_m},{lat},{lon})["tourism"~"viewpoint|attraction|museum|gallery|zoo"];
-  node(around:{radius_m},{lat},{lon})["historic"];
-  way(around:{radius_m},{lat},{lon})["historic"];
-  relation(around:{radius_m},{lat},{lon})["historic"];
-  node(around:{radius_m},{lat},{lon})["leisure"="park"];
-  way(around:{radius_m},{lat},{lon})["leisure"="park"];
-  node(around:{radius_m},{lat},{lon})["natural"~"beach|water|peak|cave_entrance"];
-  way(around:{radius_m},{lat},{lon})["natural"~"beach|water|peak|cave_entrance"];
-  node(around:{radius_m},{lat},{lon})["waterway"="waterfall"];
-{food_block}
+{query_blocks}
 );
 out center tags 80;
 """
@@ -218,6 +305,8 @@ def _place_type_from_tags(tags: dict[str, Any]) -> str:
     leisure = tags.get("leisure")
     natural = tags.get("natural")
     amenity = tags.get("amenity")
+    waterway = tags.get("waterway")
+    route = tags.get("route")
     if historic in {"fort", "castle", "citywalls", "archaeological_site"}:
         return "fortress" if historic in {"fort", "castle", "citywalls"} else "historic_site"
     if historic:
@@ -226,14 +315,28 @@ def _place_type_from_tags(tags: dict[str, Any]) -> str:
         return "viewpoint"
     if tourism == "museum":
         return "museum"
+    if tourism == "picnic_site":
+        return "picnic"
+    if tourism in {"alpine_hut", "wilderness_hut"}:
+        return "trail"
     if tourism:
         return "attraction"
-    if natural in {"beach", "water"}:
+    if leisure in {"swimming_area", "bathing_place"}:
         return "water"
-    if natural == "peak":
-        return "viewpoint"
-    if leisure == "park":
+    if leisure in {"park", "nature_reserve", "garden", "playground", "dog_park", "bird_hide"}:
         return "park"
+    if natural in {"beach", "water", "spring", "hot_spring", "bay"}:
+        return "water"
+    if waterway in {"waterfall", "rapids"}:
+        return "water"
+    if natural in {"peak", "cape", "saddle"}:
+        return "viewpoint"
+    if natural == "cave_entrance":
+        return "cave"
+    if natural in {"arch", "rock", "stone", "sinkhole", "volcano"}:
+        return "natural_site"
+    if route in {"hiking", "foot", "running", "bicycle", "mtb"}:
+        return "trail"
     if amenity in {"bar", "pub", "biergarten"}:
         return "drinks"
     if amenity in {"cafe", "fast_food", "ice_cream", "restaurant"}:
@@ -265,8 +368,12 @@ def _estimate_activity(place_type: str) -> int:
         "historic_site": 70,
         "fortress": 80,
         "attraction": 60,
+        "cave": 45,
         "food": 45,
         "drinks": 50,
+        "natural_site": 45,
+        "picnic": 45,
+        "trail": 100,
     }.get(place_type, 45)
 
 
@@ -279,9 +386,19 @@ def _estimate_walking(place_type: str) -> float:
         "historic_site": 1.8,
         "fortress": 2.0,
         "attraction": 1.3,
+        "cave": 1.5,
         "food": 0.4,
         "drinks": 0.3,
+        "natural_site": 1.2,
+        "picnic": 0.6,
+        "trail": 4.0,
     }.get(place_type, 1.0)
+
+
+def _estimate_difficulty(place_type: str) -> str:
+    if place_type in {"viewpoint", "cave", "natural_site", "trail"}:
+        return "medium"
+    return "easy"
 
 
 def _overpass_endpoints() -> list[str]:
@@ -374,7 +491,7 @@ async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: 
                 tags=tags,
                 estimated_activity_minutes=_estimate_activity(place_type),
                 estimated_walking_km=_estimate_walking(place_type),
-                difficulty="easy" if place_type != "viewpoint" else "medium",
+                difficulty=_estimate_difficulty(place_type),
                 quality_score=_quality_from_tags(tags, True),
             )
         )
@@ -410,6 +527,9 @@ def _needs_google_candidates(candidates: list[PlaceCandidate], interests: list[s
     normalized = {str(interest).strip().lower() for interest in interests}
     if len(candidates) < 8:
         return True
+    focused = [normalize_interest(str(interest)) for interest in interests if str(interest).strip()]
+    if len(focused) == 1 and focused[0] != "surprise me":
+        return _matching_candidate_count(candidates, focused) < 3
     if "food" in normalized and sum(candidate.type == "food" for candidate in candidates) < 5:
         return True
     if "drinks" in normalized and sum(candidate.type == "drinks" for candidate in candidates) < 5:

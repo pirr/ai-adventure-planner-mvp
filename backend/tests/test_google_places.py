@@ -381,8 +381,29 @@ def test_drinks_candidate_query_and_typing():
     assert _candidate_interests("drinks") == ["drinks"]
 
 
+def test_caves_candidate_query_and_typing():
+    from app.services.google_places import _candidate_text_query, _candidate_place_type, _candidate_interests
+
+    assert _candidate_text_query(["caves"]) == "caves cave tours natural attractions"
+    assert _candidate_place_type({"displayName": {"text": "Lipa Cave"}, "primaryType": "tourist_attraction"}) == "cave"
+    assert _candidate_interests("cave") == ["caves", "nature"]
+
+
 def test_needs_google_candidates_triggers_for_sparse_drinks():
     from app.services.places import _needs_google_candidates
 
     eats = [PlaceCandidate(source="o", source_id=f"o:{i}", name="x", type="food", lat=42.4, lon=18.7) for i in range(10)]
     assert _needs_google_candidates(eats, ["drinks"]) is True
+
+
+def test_needs_google_candidates_triggers_for_sparse_focused_caves():
+    from app.services.places import _needs_google_candidates
+
+    parks = [PlaceCandidate(source="o", source_id=f"o:{i}", name="x", type="park", lat=42.4, lon=18.7) for i in range(10)]
+    caves = [
+        PlaceCandidate(source="o", source_id=f"c:{i}", name="cave", type="cave", lat=42.4, lon=18.7)
+        for i in range(3)
+    ]
+
+    assert _needs_google_candidates(parks, ["caves"]) is True
+    assert _needs_google_candidates(parks + caves, ["caves"]) is False

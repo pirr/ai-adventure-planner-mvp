@@ -195,6 +195,70 @@ def test_recommendations_prefilter_keeps_best_candidates_not_first_candidates(mo
     assert "osm:node:bad" not in {place.source_id for place in selected}
 
 
+def test_cetinje_family_default_search_can_surface_lipska_cave(monkeypatch, tmp_path):
+    cave = PlaceCandidate(
+        source="openstreetmap",
+        source_id="osm:node:3599537244",
+        name="Lipska Pećina",
+        type="cave",
+        lat=42.3739938,
+        lon=18.9535409,
+        tags={"natural": "cave_entrance", "wikidata": "Q23808470"},
+        estimated_activity_minutes=45,
+        estimated_walking_km=1.5,
+        difficulty="medium",
+        quality_score=80,
+    )
+    fillers = [
+        _place(
+            lat=42.39 + index * 0.004,
+            lon=18.91 + index * 0.003,
+            source_id=f"osm:node:historic-{index}",
+            name=f"Historic Place {index}",
+            place_type="historic_site" if index % 2 else "fortress",
+        )
+        for index in range(12)
+    ]
+
+    async def fake_weather(*args, **kwargs):
+        return WeatherSummary(source="test", summary="clear", score=90), []
+
+    async def fake_places(*args, **kwargs):
+        return fillers + [cave], []
+
+    async def fake_forecasts(points, *args, **kwargs):
+        return [None] * len(points)
+
+    async def fake_photo(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(recommendations, "storage", Storage(tmp_path / "recommendations.db"))
+    monkeypatch.setattr(recommendations, "get_weather", fake_weather)
+    monkeypatch.setattr(recommendations, "get_destination_forecasts", fake_forecasts)
+    monkeypatch.setattr(recommendations, "get_place_photo", fake_photo)
+
+    response = asyncio.run(
+        recommendations.build_recommendations(
+            AdventureRequest(
+                lat=42.3907,
+                lon=18.9147,
+                available_minutes=240,
+                transport_mode="car",
+                group_type="family",
+                intensity="medium",
+                interests=["history", "fortresses", "viewpoints", "caves"],
+                max_walking_km=3,
+                use_live_data=False,
+                limit=5,
+            ),
+            provider=TemplateProvider(),
+            candidate_source=fake_places,
+        )
+    )
+
+    assert "osm:node:3599537244" in {item.source_id for item in response.recommendations}
+
+
 def test_recommendations_use_one_osrm_table_request(monkeypatch, tmp_path):
     seen: list[httpx.Request] = []
     places = [

@@ -8,6 +8,14 @@ from app.services.places import _build_overpass_query, _place_type_from_tags
 
 
 _AMENITY_REGEX = '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"'
+_ADVENTURE_TOURISM_REGEX = '"tourism"~"picnic_site|alpine_hut|wilderness_hut"'
+_ADVENTURE_LEISURE_REGEX = (
+    '"leisure"~"nature_reserve|garden|playground|dog_park|swimming_area|bathing_place|bird_hide"'
+)
+_ADVENTURE_NATURAL_REGEX = (
+    '"natural"~"spring|hot_spring|arch|rock|stone|sinkhole|volcano|cape|bay|saddle"'
+)
+_ADVENTURE_ROUTE_REGEX = '"route"~"hiking|foot|running|bicycle|mtb"'
 
 
 def _settings(**overrides):
@@ -43,13 +51,32 @@ def test_non_food_interest_keeps_amenities_out_of_overpass_query():
     assert _AMENITY_REGEX not in query
 
 
+def test_adventure_tags_are_included_in_overpass_query():
+    query = _build_overpass_query(42.43, 18.69, 25000, ["nature"])
+
+    assert _ADVENTURE_TOURISM_REGEX in query
+    assert _ADVENTURE_LEISURE_REGEX in query
+    assert _ADVENTURE_NATURAL_REGEX in query
+    assert '"waterway"="rapids"' in query
+    assert _ADVENTURE_ROUTE_REGEX in query
+    assert "camp_site" not in query
+
+
+def test_caves_interest_uses_small_targeted_overpass_query():
+    query = _build_overpass_query(42.43, 18.69, 25000, ["caves"])
+
+    assert '"natural"="cave_entrance"' in query
+    assert '"historic"' not in query
+    assert '"route"~"hiking|foot|running|bicycle|mtb"' not in query
+    assert _ADVENTURE_NATURAL_REGEX not in query
+
+
 def test_amenity_block_radius_is_capped_for_large_radius():
     # The dense amenity scan blows past Overpass's per-query timeout at city
     # scale, so it is capped to a local radius while base blocks keep the full one.
     from app.services.places import AMENITY_MAX_RADIUS_M
 
     query = _build_overpass_query(42.43, 18.69, 25000, ["drinks"])
-    assert 'around:25000,42.43,18.69)["tourism"' in query  # base block, full radius
     assert f'around:{AMENITY_MAX_RADIUS_M},42.43,18.69)["amenity"' in query
     assert 'around:25000,42.43,18.69)["amenity"' not in query
 
@@ -124,6 +151,47 @@ def test_osm_candidate_cache_reuses_cloned_results(monkeypatch):
     assert second[0].name == "Original Fort"
 
 
+def test_lipska_pecina_style_cave_node_becomes_cave_candidate(monkeypatch):
+    places._candidate_cache.clear()
+
+    async def fake_overpass(client, query):
+        return {
+            "elements": [
+                {
+                    "type": "node",
+                    "id": 3599537244,
+                    "lat": 42.3739938,
+                    "lon": 18.9535409,
+                    "tags": {
+                        "name": "Lipska Pećina",
+                        "name:en": "Lipa Cave",
+                        "natural": "cave_entrance",
+                        "access": "customers",
+                        "fee": "yes",
+                        "wikidata": "Q23808470",
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(search_candidate_cache_ttl_seconds=0),
+    )
+    monkeypatch.setattr(places, "_overpass_request", fake_overpass)
+
+    candidates = asyncio.run(places.fetch_osm_places(42.3907, 18.9147, 8, ["caves"]))
+
+    assert len(candidates) == 1
+    cave = candidates[0]
+    assert cave.source_id == "osm:node:3599537244"
+    assert cave.name == "Lipska Pećina"
+    assert cave.type == "cave"
+    assert cave.difficulty == "medium"
+    assert cave.quality_score >= 80
+
+
 def test_overpass_remark_timeout_is_treated_as_failure():
     # Overpass reports a server-side timeout as HTTP 200 with a "remark" and no
     # elements; that must surface as an error so failover/fallback can engage.
@@ -168,6 +236,37 @@ def test_drink_amenities_become_drinks_places():
     assert _place_type_from_tags({"amenity": "pub"}) == "drinks"
     assert _place_type_from_tags({"amenity": "bar"}) == "drinks"
     assert _place_type_from_tags({"amenity": "biergarten"}) == "drinks"
+
+
+def test_adventure_natural_and_waterway_tags_become_specific_places():
+    assert _place_type_from_tags({"natural": "cave_entrance"}) == "cave"
+    assert _place_type_from_tags({"waterway": "waterfall"}) == "water"
+    assert _place_type_from_tags({"waterway": "rapids"}) == "water"
+    assert _place_type_from_tags({"natural": "spring"}) == "water"
+    assert _place_type_from_tags({"natural": "hot_spring"}) == "water"
+    assert _place_type_from_tags({"natural": "bay"}) == "water"
+    assert _place_type_from_tags({"natural": "cape"}) == "viewpoint"
+    assert _place_type_from_tags({"natural": "saddle"}) == "viewpoint"
+    assert _place_type_from_tags({"natural": "arch"}) == "natural_site"
+    assert _place_type_from_tags({"natural": "rock"}) == "natural_site"
+    assert _place_type_from_tags({"natural": "stone"}) == "natural_site"
+    assert _place_type_from_tags({"natural": "sinkhole"}) == "natural_site"
+    assert _place_type_from_tags({"natural": "volcano"}) == "natural_site"
+
+
+def test_adventure_tourism_leisure_and_route_tags_become_specific_places():
+    assert _place_type_from_tags({"tourism": "picnic_site"}) == "picnic"
+    assert _place_type_from_tags({"tourism": "alpine_hut"}) == "trail"
+    assert _place_type_from_tags({"tourism": "wilderness_hut"}) == "trail"
+    assert _place_type_from_tags({"route": "hiking"}) == "trail"
+    assert _place_type_from_tags({"route": "mtb"}) == "trail"
+    assert _place_type_from_tags({"leisure": "nature_reserve"}) == "park"
+    assert _place_type_from_tags({"leisure": "garden"}) == "park"
+    assert _place_type_from_tags({"leisure": "playground"}) == "park"
+    assert _place_type_from_tags({"leisure": "dog_park"}) == "park"
+    assert _place_type_from_tags({"leisure": "bird_hide"}) == "park"
+    assert _place_type_from_tags({"leisure": "swimming_area"}) == "water"
+    assert _place_type_from_tags({"leisure": "bathing_place"}) == "water"
 
 
 def test_live_place_search_does_not_add_fallback_when_results_are_limited(monkeypatch):

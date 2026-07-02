@@ -19,6 +19,8 @@ INTEREST_ALIASES = {
     "fortresses": "fortresses",
     "castle": "fortresses",
     "nature": "nature",
+    "cave": "caves",
+    "caves": "caves",
     "water": "water",
     "food": "food",
     "drink": "drinks",
@@ -35,6 +37,9 @@ PLACE_INTERESTS = {
     "historic_site": {"history", "viewpoints"},
     "fortress": {"history", "fortresses", "viewpoints"},
     "attraction": {"history", "viewpoints", "family"},
+    "cave": {"caves", "nature", "active"},
+    "natural_site": {"nature", "viewpoints"},
+    "picnic": {"nature", "family", "food"},
     "trail": {"nature", "active"},
     "food": {"food"},
     "drinks": {"drinks"},
@@ -174,7 +179,75 @@ def apply_diversity(
             if len(picked) >= limit:
                 break
     picked_ids = {id(c) for c in picked}
-    return picked + [c for c in candidates if id(c) not in picked_ids]
+    ordered = picked + [c for c in candidates if id(c) not in picked_ids]
+    return _promote_interest_coverage(ordered, limit, interests)
+
+
+def _requested_interest_list(interests: list[str] | None) -> list[str]:
+    requested: list[str] = []
+    for interest in interests or []:
+        normalized = normalize_interest(interest)
+        if not normalized or normalized == "surprise me" or normalized in requested:
+            continue
+        requested.append(normalized)
+    return requested
+
+
+def _promote_interest_coverage(
+    ordered: list["ScoredCandidate"],
+    limit: int,
+    interests: list[str] | None,
+) -> list["ScoredCandidate"]:
+    requested = _requested_interest_list(interests)
+    if limit <= 0 or len(ordered) <= 1 or not requested:
+        return ordered
+
+    top = list(ordered[:limit])
+    rest = list(ordered[limit:])
+    if not top:
+        return ordered
+
+    def covers(items: list["ScoredCandidate"], interest: str) -> bool:
+        return any(place_matches_interest(item.place, interest) for item in items)
+
+    def coverage_counts() -> dict[str, int]:
+        return {
+            interest: sum(1 for item in top if place_matches_interest(item.place, interest))
+            for interest in requested
+        }
+
+    for interest in requested:
+        if covers(top, interest):
+            continue
+        top_names = {_norm_name(item.place.name) for item in top}
+        promote_index = next(
+            (
+                index for index, item in enumerate(rest)
+                if place_matches_interest(item.place, interest) and _norm_name(item.place.name) not in top_names
+            ),
+            None,
+        )
+        if promote_index is None:
+            continue
+        promoted = rest.pop(promote_index)
+        if len(top) < limit:
+            top.append(promoted)
+            continue
+
+        counts = coverage_counts()
+        replace_index = None
+        for index in range(len(top) - 1, -1, -1):
+            matched = [item for item in requested if place_matches_interest(top[index].place, item)]
+            if all(counts[item] > 1 for item in matched):
+                replace_index = index
+                break
+        if replace_index is None:
+            replace_index = len(top) - 1
+        displaced = top[replace_index]
+        top[replace_index] = promoted
+        rest.insert(0, displaced)
+
+    return top + rest
 
 
 def _clamp(value: int | float) -> int:
@@ -478,6 +551,9 @@ _DESCRIPTION_KEYS = {
     "museum": "desc_museum",
     "park": "desc_park",
     "water": "desc_water",
+    "cave": "desc_cave",
+    "natural_site": "desc_natural_site",
+    "picnic": "desc_picnic",
     "trail": "desc_trail",
 }
 

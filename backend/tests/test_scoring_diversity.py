@@ -103,6 +103,21 @@ def test_diversity_holds_off_interest_types_for_narrow_requests():
     assert monument in out[:2]
 
 
+def test_diversity_promotes_missing_selected_interest():
+    headliners = [
+        _sc("h1", "historic_site", 42.39, 18.91, name="Monastery"),
+        _sc("h2", "museum", 42.40, 18.92, name="Museum"),
+        _sc("v1", "viewpoint", 42.41, 18.93, name="Lookout"),
+        _sc("a1", "attraction", 42.42, 18.94, name="Gallery"),
+        _sc("p1", "park", 42.43, 18.95, name="Park"),
+    ]
+    cave = _sc("c1", "cave", 42.37, 18.95, name="Lipska Pećina")
+
+    head = apply_diversity(headliners + [cave], limit=5, interests=["history", "viewpoints", "caves"])[:5]
+
+    assert cave in head
+
+
 def test_diversity_noop_on_trivial_input():
     assert apply_diversity([], limit=5) == []
     one = [_sc("x", "park", 51.5, -0.1)]

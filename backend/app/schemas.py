@@ -22,7 +22,7 @@ class AdventureRequest(BaseModel):
     with_elderly: bool = False
     reduced_mobility: bool = False
     intensity: Intensity = "easy"
-    interests: list[str] = Field(default_factory=lambda: ["nature", "viewpoints"])
+    interests: list[str] = Field(default_factory=lambda: ["nature", "viewpoints", "caves"])
     max_walking_km: float | None = Field(default=None, ge=0, le=30)
     request_text: str | None = Field(default=None, max_length=1000)
     use_live_data: bool = True
@@ -46,7 +46,7 @@ class AdventureRequest(BaseModel):
 
 # Canonical interest ids — must match the data-interest values in
 # frontend/index.html. Used by the UI, the parse whitelist and the LLM prompt.
-INTEREST_IDS = {"history", "fortresses", "viewpoints", "nature", "water", "food", "drinks", "surprise me"}
+INTEREST_IDS = {"history", "fortresses", "viewpoints", "nature", "caves", "water", "food", "drinks", "surprise me"}
 
 
 class ParseTextRequest(BaseModel):
