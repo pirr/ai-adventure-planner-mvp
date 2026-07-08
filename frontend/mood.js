@@ -118,9 +118,9 @@
     .catch(function () {});
   function smartNowPreset() {
     var interests = {
-      morning: ["viewpoints", "food", "nature"],
+      morning: ["viewpoints", "nature"],
       afternoon: ["history", "viewpoints", "nature", "caves"],
-      evening: ["viewpoints", "food"],
+      evening: ["viewpoints", "water"],
     }[daypart] || ["viewpoints", "nature"];
     return {
       key: "now", icon: "sparkles", time: 120, crew: "solo", transport: "car",
