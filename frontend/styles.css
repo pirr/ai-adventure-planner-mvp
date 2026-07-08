@@ -305,7 +305,7 @@ body.planning .sheet { display: none; }
   text-transform: uppercase; color: var(--clay-500);
 }
 .card-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.card-head-text { min-width: 0; }
+.card-head-text { min-width: 0; flex: 1 1 auto; }
 .title { font-family: var(--display); font-weight: 800; font-size: 19px; line-height: 1.1; letter-spacing: -0.01em; color: var(--ink-900); }
 .description { margin-top: 6px; color: var(--ink-500); font-size: 13.5px; line-height: 1.45; }
 .g-rating { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -345,7 +345,9 @@ body.planning .sheet { display: none; }
 .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: var(--sand-200); color: var(--pine-700); padding: 5px 11px; font-size: 12px; font-weight: 700; }
 .badge .lucide { width: 12px; height: 12px; }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.category { background: var(--good-bg); color: var(--pine-800); border: 1px solid var(--good-line); padding: 4px 10px; font-size: 11.5px; }
 .badge.community { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-line); }
+.category-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .community-strip { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 0; }
 
 .weather-strip { background: linear-gradient(155deg, var(--pine-700), var(--pine-900)); color: var(--sand-300); border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 16px; box-shadow: var(--float-sm); }
@@ -430,6 +432,9 @@ body.planning .sheet { display: none; }
 .sheet:not(.open) .title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet:not(.open) .score { width: 44px; height: 44px; font-size: 16px; border-radius: 13px; }
 .sheet:not(.open) .card-mini { display: block; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet:not(.open) .category-badges { flex-wrap: nowrap; gap: 5px; margin-top: 5px; overflow: hidden; }
+.sheet:not(.open) .category-badges .badge:nth-child(n + 2) { display: none; }
+.sheet:not(.open) .badge.category { max-width: 100%; padding: 3px 8px; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 420px) {
   .decision-plan { grid-template-columns: 1fr; }
   .practical-grid span { width: 100%; border-radius: var(--r-sm); }

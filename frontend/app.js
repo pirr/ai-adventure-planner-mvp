@@ -1500,6 +1500,82 @@ function readableFeeValue(value) {
   return readableTagValue(value);
 }
 
+const CATEGORY_LABEL_KEYS = {
+  history: 'c_history',
+  fortresses: 'c_fortresses',
+  viewpoints: 'c_viewpoints',
+  nature: 'c_nature',
+  caves: 'c_caves',
+  water: 'c_water',
+  food: 'c_food',
+  drinks: 'c_drinks',
+};
+
+const CATEGORY_ALIASES = {
+  view: 'viewpoints',
+  views: 'viewpoints',
+  'scenic viewpoints': 'viewpoints',
+  fortress: 'fortresses',
+  castle: 'fortresses',
+  historic: 'history',
+  'historic site': 'history',
+  cave: 'caves',
+  drink: 'drinks',
+  'natural site': 'nature',
+};
+
+const PLACE_TYPE_CATEGORIES = {
+  attraction: ['history', 'viewpoints'],
+  cave: ['caves'],
+  drinks: ['drinks'],
+  food: ['food'],
+  fortress: ['fortresses'],
+  historic_site: ['history'],
+  museum: ['history'],
+  natural_site: ['nature'],
+  park: ['nature'],
+  picnic: ['nature', 'food'],
+  trail: ['nature'],
+  viewpoint: ['viewpoints'],
+  water: ['water'],
+};
+
+function normalizeCategoryId(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+  const readable = raw.replaceAll('_', ' ');
+  return CATEGORY_ALIASES[raw] || CATEGORY_ALIASES[readable] || raw;
+}
+
+function addCategoryId(ids, value) {
+  const id = normalizeCategoryId(value);
+  if (CATEGORY_LABEL_KEYS[id] && !ids.includes(id)) ids.push(id);
+}
+
+function categoryIdsForItem(item) {
+  const ids = [];
+  const rawInterests = item.tags && item.tags.interests;
+  const interests = Array.isArray(rawInterests)
+    ? rawInterests
+    : (typeof rawInterests === 'string' ? rawInterests.split(',') : []);
+  interests.forEach((value) => addCategoryId(ids, value));
+
+  if (!ids.length) {
+    (PLACE_TYPE_CATEGORIES[item.place_type] || []).forEach((value) => addCategoryId(ids, value));
+  }
+  return ids.slice(0, 2);
+}
+
+function categoryBadgesHtml(item) {
+  const categories = categoryIdsForItem(item);
+  if (!categories.length) return '';
+  return `
+    <div class="category-badges">
+      ${categories.map((id) => `<span class="badge category">${escapeHtml(t(CATEGORY_LABEL_KEYS[id]))}</span>`).join('')}
+    </div>
+  `;
+}
+
 function practicalFacts(item) {
   const tags = item.tags || {};
   const facts = [
@@ -1610,7 +1686,9 @@ function buildCard(item, isTop) {
     });
     fragment.querySelector('.title').insertAdjacentElement('afterend', ratingEl);
   }
-  fragment.querySelector('.description').textContent = item.summary || item.description;
+  const descriptionEl = fragment.querySelector('.description');
+  descriptionEl.textContent = item.summary || item.description;
+  descriptionEl.insertAdjacentHTML('afterend', categoryBadgesHtml(item));
   fragment.querySelector('.card-mini').textContent = isTop
     ? `${fitLabel(item.adventure_score)} · ${t('score_label', { score: item.adventure_score })}`
     : `${minutes(item.total_minutes)} · ${item.walking_km.toFixed(1)} km · ${t('difficulty_' + item.difficulty)}`;
