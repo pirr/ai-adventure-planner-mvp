@@ -1,10 +1,11 @@
 import asyncio
 import dataclasses
+import time
 
 import httpx
 
 from app.config import settings as real_settings
-from app.schemas import AdventureRequest, PlaceCandidate, WeatherSummary
+from app.schemas import AdventureRequest, PlaceCandidate, RouteInfo, WeatherSummary
 from app.services import recommendations, routing
 from app.services.llm import TemplateProvider
 from app.services.storage import Storage
@@ -193,6 +194,52 @@ def test_recommendations_prefilter_keeps_best_candidates_not_first_candidates(mo
 
     assert len(selected) == 9  # request.limit + 8 is the safety floor
     assert "osm:node:bad" not in {place.source_id for place in selected}
+
+
+def test_recommendations_photo_stage_is_bounded(monkeypatch, tmp_path):
+    async def fake_weather(*args, **kwargs):
+        return WeatherSummary(source="test", summary="clear", score=90), []
+
+    async def fake_places(*args, **kwargs):
+        return [_place()], []
+
+    async def fake_routes(*args, **kwargs):
+        return [
+            RouteInfo(
+                source="test",
+                one_way_minutes=5,
+                round_trip_minutes=10,
+                distance_km=1.0,
+                map_url="https://maps.example",
+            )
+        ]
+
+    async def fake_forecasts(points, *args, **kwargs):
+        return [None] * len(points)
+
+    async def slow_photo(*args, **kwargs):
+        await asyncio.sleep(0.2)
+        raise AssertionError("photo lookup should be cancelled by the endpoint timeout")
+
+    monkeypatch.setattr(recommendations, "settings", _settings(place_photo_timeout_seconds=0.01))
+    monkeypatch.setattr(recommendations, "storage", Storage(tmp_path / "photos.db"))
+    monkeypatch.setattr(recommendations, "get_weather", fake_weather)
+    monkeypatch.setattr(recommendations, "get_candidate_places", fake_places)
+    monkeypatch.setattr(recommendations, "get_routes", fake_routes)
+    monkeypatch.setattr(recommendations, "get_destination_forecasts", fake_forecasts)
+    monkeypatch.setattr(recommendations, "get_place_photo", slow_photo)
+
+    started = time.perf_counter()
+    response = asyncio.run(
+        recommendations.build_recommendations(
+            AdventureRequest(lat=42.4380, lon=18.6936, available_minutes=120, use_live_data=True),
+            provider=TemplateProvider(),
+        )
+    )
+
+    assert time.perf_counter() - started < 0.15
+    assert response.recommendations
+    assert response.recommendations[0].photo is None
 
 
 def test_cetinje_family_default_search_can_surface_lipska_cave(monkeypatch, tmp_path):

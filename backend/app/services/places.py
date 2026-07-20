@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 import logging
 import time
 from typing import Any
@@ -14,6 +16,7 @@ from app.services.i18n import t
 from app.services.net import http_client
 from app.services.sample_data import fallback_places
 from app.services.scoring import normalize_interest, place_matches_interest
+from app.services.storage import storage
 
 
 logger = logging.getLogger(__name__)
@@ -60,16 +63,36 @@ def _cache_key(lat: float, lon: float, radius_km: float, interests: list[str]) -
     return ("osm-v2", round(lat, 3), round(lon, 3), round(radius_km, 1), normalized)
 
 
+def _cache_key_id(key: tuple[Any, ...]) -> str:
+    return json.dumps(key, separators=(",", ":"), ensure_ascii=True)
+
+
+def _candidate_to_dict(candidate: PlaceCandidate) -> dict[str, Any]:
+    return candidate.model_dump() if hasattr(candidate, "model_dump") else candidate.dict()
+
+
 def _candidate_cache_get(key: tuple[Any, ...]) -> list[PlaceCandidate] | None:
     if settings.search_candidate_cache_ttl_seconds <= 0:
         return None
+    now = time.time()
     cached = _candidate_cache.get(key)
-    if cached is None:
-        return None
-    expires_at, candidates = cached
-    if expires_at <= time.time():
+    if cached is not None:
+        expires_at, candidates = cached
+        if expires_at > now:
+            return _clone_candidates(candidates)
         _candidate_cache.pop(key, None)
+
+    try:
+        entry = storage.place_cache.get_place_search(_cache_key_id(key), now)
+    except Exception:  # noqa: BLE001 - cache failure must not break live search
         return None
+    if entry is None or entry.payload_json is None:
+        return None
+    try:
+        candidates = [PlaceCandidate(**item) for item in json.loads(entry.payload_json)]
+    except Exception:  # noqa: BLE001 - corrupt cache rows are treated as misses
+        return None
+    _candidate_cache[key] = (entry.expires_at, _clone_candidates(candidates))
     return _clone_candidates(candidates)
 
 
@@ -84,7 +107,16 @@ def _candidate_cache_set(key: tuple[Any, ...], candidates: list[PlaceCandidate])
             _candidate_cache.pop(cache_key, None)
     while len(_candidate_cache) >= max_entries:
         _candidate_cache.pop(next(iter(_candidate_cache)))
-    _candidate_cache[key] = (now + ttl, _clone_candidates(candidates))
+    expires_at = now + ttl
+    _candidate_cache[key] = (expires_at, _clone_candidates(candidates))
+    try:
+        storage.place_cache.set_place_search(
+            _cache_key_id(key),
+            expires_at,
+            json.dumps([_candidate_to_dict(candidate) for candidate in candidates], ensure_ascii=False),
+        )
+    except Exception:  # noqa: BLE001 - cache persistence is best-effort
+        pass
 
 
 def _search_radius_steps(full_radius_km: float) -> list[float]:
@@ -409,49 +441,100 @@ def _overpass_endpoints() -> list[str]:
     return endpoints
 
 
-async def _overpass_request(client: httpx.AsyncClient, query: str) -> dict[str, Any]:
-    """POST the query to each Overpass endpoint, then fall over to the next.
-
-    Rate-limit rejections come back instantly and won't clear on a quick retry,
-    so we only retry genuinely busy endpoints (502/503/504) and otherwise move on.
-    The most informative error (a real HTTP status over a mirror's connection
-    error) is re-raised so the caller can report a meaningful cause.
-    """
+async def _overpass_endpoint_request(client: httpx.AsyncClient, url: str, query: str) -> dict[str, Any]:
+    """POST the query to one Overpass endpoint with local retry semantics."""
     attempts = max(1, settings.overpass_max_attempts)
     last_exc: Exception | None = None
     status_exc: httpx.HTTPStatusError | None = None  # preferred for reporting
-    for url in _overpass_endpoints():
-        for attempt in range(attempts):
-            try:
-                response = await client.post(url, data={"data": query})
-                response.raise_for_status()
-                payload = response.json()
-                if not payload.get("elements") and _is_overpass_timeout_remark(payload):
-                    # Server-side abort (HTTP 200 + remark, no data). Treat like
-                    # a busy endpoint: retry, then fail over to the next one.
-                    last_exc = OverpassRuntimeError(str(payload.get("remark")))
-                    if attempt + 1 < attempts:
-                        await asyncio.sleep(settings.overpass_retry_backoff_seconds * (attempt + 1))
-                        continue
-                    break
-                return payload
-            except httpx.HTTPStatusError as exc:
-                last_exc = exc
-                if status_exc is None:
-                    status_exc = exc
-                if exc.response.status_code in _RETRY_OVERPASS_STATUS and attempt + 1 < attempts:
+    for attempt in range(attempts):
+        try:
+            response = await client.post(url, data={"data": query})
+            response.raise_for_status()
+            payload = response.json()
+            if not payload.get("elements") and _is_overpass_timeout_remark(payload):
+                # Server-side abort (HTTP 200 + remark, no data). Treat like
+                # a busy endpoint: retry if configured, then let the caller try
+                # or wait for another endpoint.
+                last_exc = OverpassRuntimeError(str(payload.get("remark")))
+                if attempt + 1 < attempts:
                     await asyncio.sleep(settings.overpass_retry_backoff_seconds * (attempt + 1))
                     continue
-                break  # rate-limited, non-transient, or out of retries -> next endpoint
-            except (httpx.TransportError, httpx.TimeoutException) as exc:
-                last_exc = exc
-                break  # connection/timeout -> try the next endpoint
+                break
+            return payload
+        except httpx.HTTPStatusError as exc:
+            last_exc = exc
+            if status_exc is None:
+                status_exc = exc
+            if exc.response.status_code in _RETRY_OVERPASS_STATUS and attempt + 1 < attempts:
+                await asyncio.sleep(settings.overpass_retry_backoff_seconds * (attempt + 1))
+                continue
+            break  # rate-limited, non-transient, or out of retries -> caller can fail over
+        except (httpx.TransportError, httpx.TimeoutException) as exc:
+            last_exc = exc
+            break  # connection/timeout -> caller can fail over
     # Prefer a real HTTP status (e.g. the primary's 406) over a mirror's
     # connection error, so the surfaced warning names the actual cause.
     raise status_exc or last_exc or RuntimeError("No Overpass endpoint configured")
 
 
-async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: list[str]) -> list[PlaceCandidate]:
+async def _overpass_request(client: httpx.AsyncClient, query: str) -> dict[str, Any]:
+    """POST to configured Overpass endpoints, hedging mirrors on slow/failing primaries."""
+    endpoints = _overpass_endpoints()
+    if not endpoints:
+        raise RuntimeError("No Overpass endpoint configured")
+    if len(endpoints) == 1:
+        return await _overpass_endpoint_request(client, endpoints[0], query)
+
+    hedge_delay = max(0.0, settings.overpass_hedge_delay_seconds)
+    pending: set[asyncio.Task[dict[str, Any]]] = set()
+    next_index = 0
+    errors: list[Exception] = []
+
+    def start_next() -> None:
+        nonlocal next_index
+        if next_index >= len(endpoints):
+            return
+        url = endpoints[next_index]
+        next_index += 1
+        pending.add(asyncio.create_task(_overpass_endpoint_request(client, url, query)))
+
+    start_next()
+    try:
+        while pending:
+            wait_timeout = hedge_delay if next_index < len(endpoints) else None
+            done, still_pending = await asyncio.wait(
+                pending,
+                timeout=wait_timeout,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            pending = set(still_pending)
+            if not done:
+                start_next()
+                continue
+            for task in done:
+                try:
+                    return task.result()
+                except Exception as exc:  # noqa: BLE001 - keep trying configured endpoints
+                    errors.append(exc)
+                    start_next()
+    finally:
+        for task in pending:
+            task.cancel()
+        for task in pending:
+            with contextlib.suppress(BaseException):
+                await task
+
+    status_error = next((exc for exc in errors if isinstance(exc, httpx.HTTPStatusError)), None)
+    raise status_error or (errors[-1] if errors else RuntimeError("No Overpass endpoint configured"))
+
+
+async def fetch_osm_places(
+    lat: float,
+    lon: float,
+    radius_km: float,
+    interests: list[str],
+    timeout_seconds: float | None = None,
+) -> list[PlaceCandidate]:
     key = _cache_key(lat, lon, radius_km, interests)
     cached = _candidate_cache_get(key)
     if cached is not None:
@@ -460,7 +543,7 @@ async def fetch_osm_places(lat: float, lon: float, radius_km: float, interests: 
 
     radius_m = int(radius_km * 1000)
     query = _build_overpass_query(lat, lon, radius_m, interests)
-    async with http_client(settings.overpass_timeout_seconds) as client:
+    async with http_client(timeout_seconds or settings.overpass_timeout_seconds) as client:
         payload = await _overpass_request(client, query)
 
     candidates: list[PlaceCandidate] = []
@@ -506,9 +589,45 @@ async def _fetch_osm_places_progressive(
     interests: list[str],
 ) -> list[PlaceCandidate]:
     candidates: list[PlaceCandidate] = []
+    total_budget = settings.search_osm_total_timeout_seconds
+    deadline = time.perf_counter() + total_budget if total_budget > 0 else None
+    last_exc: BaseException | None = None
     for search_radius_km in _search_radius_steps(radius_km):
+        timeout_seconds = settings.overpass_timeout_seconds
+        if deadline is not None:
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                last_exc = TimeoutError("OSM search total timeout exceeded")
+                break
+            timeout_seconds = min(timeout_seconds, max(0.1, remaining))
         started = time.perf_counter()
-        stage = await fetch_osm_places(lat, lon, search_radius_km, interests)
+        try:
+            stage = await asyncio.wait_for(
+                fetch_osm_places(lat, lon, search_radius_km, interests, timeout_seconds=timeout_seconds),
+                timeout=timeout_seconds,
+            )
+        except (asyncio.TimeoutError, TimeoutError) as exc:
+            last_exc = exc
+            logger.info(
+                "place_search_osm_stage_timeout radius_km=%.1f merged=%d duration_ms=%d budget_ms=%d",
+                search_radius_km,
+                len(candidates),
+                int((time.perf_counter() - started) * 1000),
+                int(timeout_seconds * 1000),
+            )
+            break
+        except Exception as exc:
+            last_exc = exc
+            if candidates:
+                logger.info(
+                    "place_search_osm_stage_failed radius_km=%.1f merged=%d duration_ms=%d error=%s",
+                    search_radius_km,
+                    len(candidates),
+                    int((time.perf_counter() - started) * 1000),
+                    exc.__class__.__name__,
+                )
+                break
+            raise
         candidates = _merge_candidates(candidates, stage)
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
@@ -520,6 +639,8 @@ async def _fetch_osm_places_progressive(
         )
         if _has_enough_osm_candidates(candidates, interests):
             break
+    if not candidates and last_exc is not None:
+        raise last_exc
     return candidates
 
 

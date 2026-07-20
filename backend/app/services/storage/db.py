@@ -201,6 +201,21 @@ class SqliteDatabase(Database):
                     count INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (day, scope, key)
                 );
+
+                -- Persistent caches for external place lookups. Service-level
+                -- in-memory caches remain L1; these L2 rows survive deploys and
+                -- Fly scale-to-zero on the mounted SQLite volume.
+                CREATE TABLE IF NOT EXISTS place_search_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    expires_at REAL NOT NULL,
+                    payload_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS google_place_cache (
+                    source_id TEXT PRIMARY KEY,
+                    expires_at REAL NOT NULL,
+                    payload_json TEXT
+                );
                 """
             )
             # Migrate pre-0.2 databases that predate the anonymous_id columns.

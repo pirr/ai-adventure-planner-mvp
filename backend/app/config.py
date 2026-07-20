@@ -48,11 +48,19 @@ class Settings:
     overpass_timeout_seconds: float = float(os.getenv("OVERPASS_TIMEOUT_SECONDS", "12"))
     overpass_max_attempts: int = int(os.getenv("OVERPASS_MAX_ATTEMPTS", "2"))
     overpass_retry_backoff_seconds: float = float(os.getenv("OVERPASS_RETRY_BACKOFF_SECONDS", "0.5"))
+    # Start a mirror shortly after the primary if it has not answered. Public
+    # Overpass often fails under load; hedging keeps one slow endpoint from
+    # dominating the recommendation request.
+    overpass_hedge_delay_seconds: float = float(os.getenv("OVERPASS_HEDGE_DELAY_SECONDS", "0.75"))
     # Search latency controls. Progressive radius keeps dense-area Overpass
     # calls small first, then expands only when the early rings are weak.
     search_progressive_enabled: bool = _env_bool("SEARCH_PROGRESSIVE_ENABLED", True)
     search_radius_tiers_km: tuple[float, ...] = _env_float_tuple("SEARCH_RADIUS_TIERS_KM", "8,25,55")
     search_osm_target_candidates: int = int(os.getenv("SEARCH_OSM_TARGET_CANDIDATES", "32"))
+    # Hard wall-clock budget for the full OSM discovery pass. <= 0 disables the
+    # cap. The endpoint can still use sparse OSM results or budgeted Google
+    # candidate fallback; it should not wait tens of seconds for public Overpass.
+    search_osm_total_timeout_seconds: float = float(os.getenv("SEARCH_OSM_TOTAL_TIMEOUT_SECONDS", "4.5"))
     # Raw OSM candidates are safe to cache briefly; final recommendations still
     # use fresh weather, routing, personalization, seen/visited state and LLM.
     search_candidate_cache_ttl_seconds: int = int(os.getenv("SEARCH_CANDIDATE_CACHE_TTL_SECONDS", "21600"))
@@ -70,6 +78,9 @@ class Settings:
     openweather_api_key: str | None = os.getenv("OPENWEATHER_API_KEY")
     use_open_meteo_fallback: bool = os.getenv("USE_OPEN_METEO_FALLBACK", "true").lower() == "true"
     http_timeout_seconds: float = float(os.getenv("HTTP_TIMEOUT_SECONDS", "8"))
+    # Photos are nice-to-have. Bound this stage so a slow Wikidata/Google media
+    # lookup cannot keep the result cards off-screen.
+    place_photo_timeout_seconds: float = float(os.getenv("PLACE_PHOTO_TIMEOUT_SECONDS", "1.0"))
     # Anonymous users get a lighter, cheaper tier: rule-based explanations instead
     # of LLM prose, and a coarse origin-only weather read. Both default on; turn
     # off to give anonymous users the full (logged-in) experience.
@@ -160,8 +171,9 @@ class Settings:
     # In-process cache TTL per place. Google ToS allows caching most fields up
     # to 30 days; keep the default well inside that.
     google_places_cache_ttl_seconds: int = int(os.getenv("GOOGLE_PLACES_CACHE_TTL_SECONDS", "86400"))
-    # Max places enriched per request (cost cap; the re-scoring pool is <= limit+5 <= 15).
-    google_places_max_enriched: int = int(os.getenv("GOOGLE_PLACES_MAX_ENRICHED", "15"))
+    # Max places enriched per request (cost cap). Keep this near the displayed
+    # result count; per-place Text Search is the expensive Google path.
+    google_places_max_enriched: int = int(os.getenv("GOOGLE_PLACES_MAX_ENRICHED", "5"))
     # Max candidates returned by one Google Text Search when OSM has no usable
     # live candidates. Text Search caps this at 20.
     google_places_candidate_limit: int = int(os.getenv("GOOGLE_PLACES_CANDIDATE_LIMIT", "12"))
