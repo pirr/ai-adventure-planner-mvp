@@ -368,7 +368,7 @@ const I18N = {
     no_more_recommendations: 'No more recommendations for this search.',
     more_recommendations_error: 'Could not load more recommendations.',
     retry: 'Retry',
-    auth_more_recommendations: 'Create an account for more recommendations, AI-written tips and arrival-time weather.',
+    auth_more_recommendations: 'Create an account to load more places, AI tips and arrival weather.',
     weather_upsell: 'See the weather for when you’ll arrive —',
     history_opened: 'opened',
     history_cleared: 'History cleared.',
@@ -377,8 +377,8 @@ const I18N = {
     open_maps: 'Maps',
     start_route: 'Start route',
     open_apple_maps: 'Apple',
-    useful: '👍',
-    not_useful: '👎',
+    useful: 'Useful',
+    not_useful: 'Not useful',
     photo_source: 'Photo: {source}',
     rating_label: '★ {rating} ({count}) · Google',
     place_weather_title: 'Weather at destination',
@@ -392,6 +392,8 @@ const I18N = {
     wind_badge: 'Wind: {kmh} km/h',
     uv_badge: 'UV: {uv}',
     data_notes: 'Data notes',
+    data_notes_summary: 'Data notes ({n})',
+    data_notes_hint: 'Live data was limited. Tap to inspect fallback details.',
     badge_total: '{v} total',
     badge_travel: '{v} travel',
     badge_onsite: '{v} on-site',
@@ -399,8 +401,8 @@ const I18N = {
     badge_community_liked: '♥ {pct}% liked · {n} adventurers',
     badge_community_visits: '{n} visited recently',
     badge_community_wants: '{n} want to go',
-    want_to_visit: '☆ Want to visit',
-    want_to_visit_saved: '★ Saved',
+    want_to_visit: 'Want to visit',
+    want_to_visit_saved: 'Saved',
     want_to_visit_title: 'Want to visit',
     clear_want_to_visit: 'Clear all',
     want_remove: 'Remove',
@@ -575,7 +577,7 @@ const I18N = {
     no_more_recommendations: 'Для этого поиска больше рекомендаций нет.',
     more_recommendations_error: 'Не удалось загрузить больше рекомендаций.',
     retry: 'Повторить',
-    auth_more_recommendations: 'Создайте аккаунт: больше рекомендаций, советы от ИИ и погода на время прибытия.',
+    auth_more_recommendations: 'Создайте аккаунт, чтобы загрузить больше мест, советы ИИ и погоду по прибытии.',
     weather_upsell: 'Узнайте погоду на время прибытия —',
     history_opened: 'открыто',
     history_cleared: 'История очищена.',
@@ -584,8 +586,8 @@ const I18N = {
     open_maps: 'Карты',
     start_route: 'Начать маршрут',
     open_apple_maps: 'Apple',
-    useful: '👍',
-    not_useful: '👎',
+    useful: 'Полезно',
+    not_useful: 'Не полезно',
     photo_source: 'Фото: {source}',
     rating_label: '★ {rating} ({count}) · Google',
     place_weather_title: 'Погода в месте назначения',
@@ -599,6 +601,8 @@ const I18N = {
     wind_badge: 'Ветер: {kmh} км/ч',
     uv_badge: 'УФ: {uv}',
     data_notes: 'Заметки о данных',
+    data_notes_summary: 'Заметки о данных ({n})',
+    data_notes_hint: 'Онлайн-данные были ограничены. Нажмите, чтобы увидеть детали резервных данных.',
     badge_total: 'всего {v}',
     badge_travel: 'в пути {v}',
     badge_onsite: 'на месте {v}',
@@ -606,8 +610,8 @@ const I18N = {
     badge_community_liked: '♥ {pct}% понравилось · {n} путешеств.',
     badge_community_visits: '{n} побывали недавно',
     badge_community_wants: '{n} хотят посетить',
-    want_to_visit: '☆ Хочу посетить',
-    want_to_visit_saved: '★ В списке',
+    want_to_visit: 'Хочу посетить',
+    want_to_visit_saved: 'В списке',
     want_to_visit_title: 'Хочу посетить',
     clear_want_to_visit: 'Очистить',
     want_remove: 'Удалить',
@@ -1226,10 +1230,14 @@ function buildLoadMoreCard() {
   card.className = 'load-more-card';
 
   if (!currentUser && (loadMoreAuthBlocked || appFeatures.require_auth_for_more_recommendations)) {
-    card.classList.add('needs-auth');
+    card.classList.add('needs-auth', 'is-compact');
     card.innerHTML = `
-      <p>${t('auth_more_recommendations')}</p>
-      <button type="button" class="btn btn-solid">${t('create_account')}</button>
+      <div class="load-more-icon" aria-hidden="true">${iconHtml('user-plus')}</div>
+      <div class="load-more-copy">
+        <strong>${t('more_recommendations')}</strong>
+        <p>${t('auth_more_recommendations')}</p>
+      </div>
+      <button type="button" class="btn btn-line">${t('create_account')}</button>
     `;
     card.querySelector('button').addEventListener('click', () => {
       retryLoadMoreAfterAuth = true;
@@ -1239,10 +1247,10 @@ function buildLoadMoreCard() {
   }
 
   if (loadMoreError) {
-    card.classList.add('is-error');
+    card.classList.add('is-error', 'is-compact');
     card.innerHTML = `
-      <div class="load-more-icon" aria-hidden="true"><i data-lucide="refresh-cw"></i></div>
-      <p>${t('more_recommendations_error')}</p>
+      <div class="load-more-icon" aria-hidden="true">${iconHtml('refresh-cw')}</div>
+      <div class="load-more-copy"><strong>${t('more_recommendations_error')}</strong></div>
       <button type="button" class="btn btn-line">${t('retry')}</button>
     `;
     card.querySelector('button').addEventListener('click', () => loadMoreRecommendations({ force: true }));
@@ -1250,18 +1258,19 @@ function buildLoadMoreCard() {
   }
 
   if (loadMoreExhausted) {
-    card.classList.add('is-done');
+    card.classList.add('is-done', 'is-compact');
     card.innerHTML = `
-      <div class="load-more-icon" aria-hidden="true"><i data-lucide="check"></i></div>
-      <p>${t('no_more_recommendations')}</p>
+      <div class="load-more-icon" aria-hidden="true">${iconHtml('check')}</div>
+      <div class="load-more-copy"><strong>${t('no_more_recommendations')}</strong></div>
     `;
     return card;
   }
 
+  card.classList.add('is-compact');
   card.classList.toggle('is-loading', loadingMore);
   card.innerHTML = `
-    <div class="load-more-icon" aria-hidden="true"><i data-lucide="${loadingMore ? 'loader-circle' : 'sparkles'}"></i></div>
-    <p>${loadingMore ? t('loading_more_recommendations') : t('more_recommendations')}</p>
+    <div class="load-more-icon" aria-hidden="true">${iconHtml(loadingMore ? 'loader-circle' : 'sparkles')}</div>
+    <div class="load-more-copy"><strong>${loadingMore ? t('loading_more_recommendations') : t('more_recommendations')}</strong></div>
   `;
   return card;
 }
@@ -1413,6 +1422,17 @@ function renderResults(data, { refit = true } = {}) {
     // smooth scroll outlives the spy pause and pans the map off the overview.
     if (refit) scrollCardIntoView(target, { behavior: 'auto' });
   }
+  if (refit) {
+    const title = document.querySelector('.sheet-title');
+    if (title) {
+      title.setAttribute('tabindex', '-1');
+      try {
+        title.focus({ preventScroll: true });
+      } catch (error) {
+        title.focus();
+      }
+    }
+  }
 }
 
 function renderWeather(weather) {
@@ -1431,6 +1451,17 @@ function renderWeather(weather) {
   `;
 }
 
+function iconHtml(name) {
+  return `<i data-lucide="${name}" aria-hidden="true"></i>`;
+}
+
+function setButtonIcon(button, iconName, label, { text = false } = {}) {
+  if (!button) return;
+  button.innerHTML = `${iconHtml(iconName)}${text ? `<span>${escapeHtml(label)}</span>` : ''}`;
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+}
+
 function renderWarnings(warnings) {
   const container = $('dataWarnings');
   if (!warnings.length) {
@@ -1438,10 +1469,15 @@ function renderWarnings(warnings) {
     return;
   }
   container.innerHTML = `
-    <div class="card">
-      <h3>${t('data_notes')}</h3>
-      ${warnings.map((warning) => `<div class="item warn">${escapeHtml(warning)}</div>`).join('')}
-    </div>
+    <details class="card data-notes">
+      <summary>
+        <span>${t('data_notes_summary', { n: warnings.length })}</span>
+        <small>${t('data_notes_hint')}</small>
+      </summary>
+      <div class="data-notes-body">
+        ${warnings.map((warning) => `<div class="item warn">${escapeHtml(warning)}</div>`).join('')}
+      </div>
+    </details>
   `;
 }
 
@@ -1699,11 +1735,13 @@ function buildCard(item, isTop) {
   const requestId = item._request_id || lastRequestId;
 
   const mapLink = fragment.querySelector('.map-link');
-  mapLink.textContent = isTop ? t('start_route') : t('open_maps');
+  mapLink.innerHTML = `${iconHtml(isTop ? 'navigation' : 'map')}<span>${isTop ? t('start_route') : t('open_maps')}</span>`;
+  mapLink.setAttribute('aria-label', isTop ? t('start_route') : t('open_maps'));
   if (isTop) mapLink.classList.add('route-primary');
   mapLink.href = item.map_url;
   const appleLink = fragment.querySelector('.apple-map-link');
-  appleLink.textContent = t('open_apple_maps');
+  appleLink.innerHTML = `${iconHtml('map-pin')}<span>${t('open_apple_maps')}</span>`;
+  appleLink.setAttribute('aria-label', t('open_apple_maps'));
   appleLink.href = item.apple_map_url;
   mapLink.addEventListener('click', () =>
     track('maps_opened', { request_id: requestId, recommendation_id: item.id, meta: { provider: 'google' } }),
@@ -1712,8 +1750,12 @@ function buildCard(item, isTop) {
     track('maps_opened', { request_id: requestId, recommendation_id: item.id, meta: { provider: 'apple' } }),
   );
 
-  fragment.querySelector('.feedback-up').textContent = t('useful');
-  fragment.querySelector('.feedback-down').textContent = t('not_useful');
+  const upBtn = fragment.querySelector('.feedback-up');
+  const downBtn = fragment.querySelector('.feedback-down');
+  upBtn.classList.add('icon-action');
+  downBtn.classList.add('icon-action');
+  setButtonIcon(upBtn, 'thumbs-up', t('useful'));
+  setButtonIcon(downBtn, 'thumbs-down', t('not_useful'));
   fragment.querySelector('.badges').innerHTML = `
     <span class="badge">${t('badge_total', { v: minutes(item.total_minutes) })}</span>
     <span class="badge">${t('badge_travel', { v: minutes(item.travel_minutes) })}</span>
@@ -1752,17 +1794,19 @@ function buildCard(item, isTop) {
     });
   }
   const reasonsBox = fragment.querySelector('.feedback-reasons');
-  fragment.querySelector('.feedback-up').addEventListener('click', () => submitFeedback(item.id, 'up', null, requestId));
-  fragment.querySelector('.feedback-down').addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id, requestId));
+  upBtn.addEventListener('click', () => submitFeedback(item.id, 'up', null, requestId));
+  downBtn.addEventListener('click', () => toggleReasonPicker(reasonsBox, item.id, requestId));
   const wantBtn = fragment.querySelector('.want-to-visit');
   const applyWant = (w) => {
-    wantBtn.textContent = t(w ? 'want_to_visit_saved' : 'want_to_visit');
+    setButtonIcon(wantBtn, w ? 'star' : 'bookmark', t(w ? 'want_to_visit_saved' : 'want_to_visit'), { text: true });
     wantBtn.classList.toggle('is-saved', w);
   };
+  wantBtn.classList.add('secondary-action');
   applyWant(!!item.wanted);
   wantBtn.addEventListener('click', () => toggleWantToVisit(item, wantBtn, applyWant));
   const visitedBtn = fragment.querySelector('.mark-visited');
-  visitedBtn.textContent = t('mark_visited');
+  visitedBtn.classList.add('secondary-action');
+  setButtonIcon(visitedBtn, 'check-circle-2', t('mark_visited'), { text: true });
   visitedBtn.addEventListener('click', () => markVisited(item));
   // Tap a card: from peek, open the sheet to read details; from the open list,
   // focus the place on the map (center + zoom) and collapse the sheet.

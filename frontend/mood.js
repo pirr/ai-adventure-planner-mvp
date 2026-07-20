@@ -12,17 +12,18 @@
       everything: "Just show me everything nearby", perfect: "Perfect right now",
       best_now: "Find best trip now", best_near: "Best near me", best_now_sub: "I will choose the strongest ready-to-go plan.",
       your_vibe: "Popular", time: "Time", interest: "Interest", crew: "Crew", effort: "Effort",
-      transport: "Transport", f_transport: "How are you getting there?", recent: "Recent", apply: "Apply", reset: "Reset", changes: "changed",
+      transport: "Transport", f_transport: "How are you getting there?", recent: "Recent", apply: "Apply", reset: "Reset", changes: "changed", changes_waiting: "changes to apply",
       f_time: "How much time?", f_crew: "Who\u2019s coming?", f_effort: "Effort level", f_interest: "What are you into?",
       advanced: "Advanced",
       morning: "Morning", afternoon: "Afternoon", evening: "Evening",
       greet_morning: "Good morning", greet_afternoon: "Good afternoon", greet_evening: "Good evening",
       ctx_morning: "This morning", ctx_afternoon: "This afternoon", ctx_evening: "This evening",
       sky_morning: "Crisp", sky_afternoon: "Clear", sky_evening: "Golden", loc: "Location",
-      picked: "Map point", mine: "My location",
+      picked: "Map point", mine: "My location", start_from: "Start", change_start: "Change",
       use_loc: "Use my location", loc_title: "Where are you starting from?", map_hint: "Tap the map to set your start",
       enter_coords: "Enter coordinates", lat: "Latitude", lon: "Longitude", set_btn: "Set",
-      describe_ph: "Describe it: time, company, mood…",
+      describe_label: "Describe your trip", describe_go: "Find from description", interpreted: "Understood",
+      describe_ph: "Time, company, mood...",
       describe_fail: "Couldn’t understand that — try different words or pick a vibe",
       describe_mic: "Dictate",
       describe_mic_unavailable: "Voice input is not available in this browser.",
@@ -40,17 +41,18 @@
       everything: "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0432\u0441\u0451 \u0440\u044f\u0434\u043e\u043c", perfect: "\u0421\u0435\u0439\u0447\u0430\u0441 \u0441\u0430\u043c\u043e\u0435 \u0442\u043e",
       best_now: "\u041d\u0430\u0439\u0442\u0438 \u043b\u0443\u0447\u0448\u0443\u044e \u043f\u043e\u0435\u0437\u0434\u043a\u0443", best_near: "\u041b\u0443\u0447\u0448\u0435\u0435 \u0440\u044f\u0434\u043e\u043c", best_now_sub: "\u042f \u0432\u044b\u0431\u0435\u0440\u0443 \u0433\u043e\u0442\u043e\u0432\u044b\u0439 \u043f\u043b\u0430\u043d \u0441 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u043e\u043c.",
       your_vibe: "\u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u043e", time: "\u0412\u0440\u0435\u043c\u044f", interest: "\u0418\u043d\u0442\u0435\u0440\u0435\u0441", crew: "\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f", effort: "\u041d\u0430\u0433\u0440\u0443\u0437\u043a\u0430",
-      transport: "\u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442", f_transport: "\u041a\u0430\u043a \u0434\u043e\u0431\u0438\u0440\u0430\u0435\u0442\u0435\u0441\u044c?", recent: "\u041d\u0435\u0434\u0430\u0432\u043d\u0435\u0435", apply: "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c", reset: "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c", changes: "\u0438\u0437\u043c.",
+      transport: "\u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442", f_transport: "\u041a\u0430\u043a \u0434\u043e\u0431\u0438\u0440\u0430\u0435\u0442\u0435\u0441\u044c?", recent: "\u041d\u0435\u0434\u0430\u0432\u043d\u0435\u0435", apply: "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c", reset: "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c", changes: "\u0438\u0437\u043c.", changes_waiting: "\u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u0436\u0434\u0443\u0442",
       f_time: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438?", f_crew: "\u041a\u0442\u043e \u0438\u0434\u0451\u0442?", f_effort: "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0438", f_interest: "\u0427\u0442\u043e \u0438\u043d\u0442\u0435\u0440\u0435\u0441\u043d\u043e?",
       advanced: "\u0414\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u043e",
       morning: "\u0423\u0442\u0440\u043e", afternoon: "\u0414\u0435\u043d\u044c", evening: "\u0412\u0435\u0447\u0435\u0440",
       greet_morning: "\u0414\u043e\u0431\u0440\u043e\u0435 \u0443\u0442\u0440\u043e", greet_afternoon: "\u0414\u043e\u0431\u0440\u044b\u0439 \u0434\u0435\u043d\u044c", greet_evening: "\u0414\u043e\u0431\u0440\u044b\u0439 \u0432\u0435\u0447\u0435\u0440",
       ctx_morning: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0443\u0442\u0440\u043e\u043c", ctx_afternoon: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0434\u043d\u0451\u043c", ctx_evening: "\u0421\u0435\u0433\u043e\u0434\u043d\u044f \u0432\u0435\u0447\u0435\u0440\u043e\u043c",
       sky_morning: "\u0421\u0432\u0435\u0436\u043e", sky_afternoon: "\u042f\u0441\u043d\u043e", sky_evening: "\u0417\u043e\u043b\u043e\u0442\u043e\u0439 \u0447\u0430\u0441", loc: "\u041b\u043e\u043a\u0430\u0446\u0438\u044f",
-      picked: "\u0422\u043e\u0447\u043a\u0430 \u043d\u0430 \u043a\u0430\u0440\u0442\u0435", mine: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e",
+      picked: "\u0422\u043e\u0447\u043a\u0430 \u043d\u0430 \u043a\u0430\u0440\u0442\u0435", mine: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e", start_from: "\u0421\u0442\u0430\u0440\u0442", change_start: "\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c",
       use_loc: "\u041c\u043e\u0451 \u043c\u0435\u0441\u0442\u043e", loc_title: "\u041e\u0442\u043a\u0443\u0434\u0430 \u043d\u0430\u0447\u043d\u0451\u043c?", map_hint: "\u041a\u043e\u0441\u043d\u0438\u0442\u0435\u0441\u044c \u043a\u0430\u0440\u0442\u044b, \u0447\u0442\u043e\u0431\u044b \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u0441\u0442\u0430\u0440\u0442",
       enter_coords: "\u0412\u0432\u0435\u0441\u0442\u0438 \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u044b", lat: "\u0428\u0438\u0440\u043e\u0442\u0430", lon: "\u0414\u043e\u043b\u0433\u043e\u0442\u0430", set_btn: "\u0413\u043e\u0442\u043e\u0432\u043e",
-      describe_ph: "\u041e\u043f\u0438\u0448\u0438\u0442\u0435: \u0432\u0440\u0435\u043c\u044f, \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f, \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435\u2026",
+      describe_label: "\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u043f\u043e\u0435\u0437\u0434\u043a\u0443", describe_go: "\u041d\u0430\u0439\u0442\u0438 \u043f\u043e \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u044e", interpreted: "\u041f\u043e\u043d\u044f\u043b\u0438",
+      describe_ph: "\u0412\u0440\u0435\u043c\u044f, \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f, \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435...",
       describe_fail: "\u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u043f\u043e\u043d\u044f\u0442\u044c \u2014 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u0438\u043c\u0438 \u0441\u043b\u043e\u0432\u0430\u043c\u0438 \u0438\u043b\u0438 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
       describe_mic: "\u041d\u0430\u0434\u0438\u043a\u0442\u043e\u0432\u0430\u0442\u044c",
       describe_mic_unavailable: "\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0439 \u0432\u0432\u043e\u0434 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d \u0432 \u044d\u0442\u043e\u043c \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435.",
@@ -109,6 +111,8 @@
   var currentMood = null;
   var placeLabel = null;
   var sheetAutoOpened = false;
+  var parsedNotice = null;
+  var parsedNoticeTimer = null;
   // "Describe your trip" is available only when the backend has a real LLM
   // provider configured (GET /api/features). Hidden until confirmed.
   var featureParse = false;
@@ -131,6 +135,14 @@
   }
   function locName() { return placeLabel || lx("loc"); }
   function useMyLocation() { placeLabel = lx("mine"); updateContext(); if (window.requestGeolocation) window.requestGeolocation(); }
+  function changeStartPoint() {
+    var s = $("launchSheet");
+    if (s) s.classList.remove("open");
+    document.body.classList.remove("loc-set");
+    sheetAutoOpened = false;
+    setMapHint();
+    invalidateSoon();
+  }
   function theMap() {
     try { if (window.appMap && window.appMap.on) return window.appMap; } catch (e) {}
     try { if (typeof map !== "undefined" && map && map.on) return map; } catch (e) {}
@@ -225,6 +237,7 @@
 
   function choosePreset(p) {
     if (window.setRequestText) window.setRequestText(null);
+    parsedNotice = null;
     currentMood = p;
     applyPreset(p);
     commitSearch();
@@ -316,6 +329,9 @@
         if (window.setRequestText) window.setRequestText(text);
         currentMood = null;                  // custom situation, not a vibe
         applyPreset(parsedToPreset(parsed));
+        parsedNotice = compactStateLabel(readState());
+        if (parsedNoticeTimer) { clearTimeout(parsedNoticeTimer); parsedNoticeTimer = null; }
+        if (typeof track === "function") track("intent_parsed", { meta: { facets: aiSetFacets } });
         commitSearch();
         buildFilterBar();
       })
@@ -384,12 +400,17 @@
     });
     html += '  </div>';
     html += '</div>';
+    html += '<div class="launch-context">';
+    html += '  <span>' + icon("map-pin") + '<b>' + lx("start_from") + '</b> ' + locName() + '</span>';
+    html += '  <button type="button" id="changeStartBtn">' + lx("change_start") + '</button>';
+    html += '</div>';
 
     if (featureParse) {
+      html += '<label class="describe-label" for="describeInput">' + lx("describe_label") + '</label>';
       html += '<div class="describe-box" id="describeBox">';
       html += '  <input id="describeInput" maxlength="500" autocomplete="off" placeholder="' + lx("describe_ph") + '">';
       html += '<button type="button" class="describe-mic" id="describeMic" title="' + lx("describe_mic") + '" aria-label="' + lx("describe_mic") + '">' + icon("mic") + "</button>";
-      html += '  <button type="button" class="describe-go" id="describeGo">' + icon("arrow-right") + "</button>";
+      html += '  <button type="button" class="describe-go" id="describeGo" title="' + lx("describe_go") + '" aria-label="' + lx("describe_go") + '">' + icon("arrow-right") + "</button>";
       html += "</div>";
       html += '<p class="describe-err hidden" id="describeErr">' + lx("describe_fail") + "</p>";
     }
@@ -421,6 +442,7 @@
     html += '<div class="coord-row"><input id="mLat" inputmode="decimal" placeholder="' + lx("lat") + '"><input id="mLon" inputmode="decimal" placeholder="' + lx("lon") + '"><button type="button" class="coord-set" id="mSet">' + lx("set_btn") + '</button></div></details>';
 
     host.innerHTML = html;
+    var changeStart = $("changeStartBtn"); if (changeStart) changeStart.addEventListener("click", changeStartPoint);
     var now = $("bestNowBtn"); if (now) now.addEventListener("click", chooseNow);
     var dGo = $("describeGo"); if (dGo) dGo.addEventListener("click", submitDescribe);
     var dIn = $("describeInput");
@@ -563,8 +585,34 @@
     if (s.vibeKey) { var p = presetByKey(s.vibeKey); if (p) return icon(p.icon) + " " + pt(p).t; }
     return valueLabel("timeChips", "minutes", s.minutes) + " \u00b7 " + valueLabel("transportChips", "transport", s.transport) + " \u00b7 " + valueLabel("groupChips", "group", s.group);
   }
+  function compactStateLabel(s) {
+    var parts = [
+      valueLabel("timeChips", "minutes", s.minutes),
+      valueLabel("transportChips", "transport", s.transport),
+      valueLabel("groupChips", "group", s.group),
+    ];
+    var interest = (s.interests || [])[0];
+    if (interest) {
+      var suffix = s.interests.length > 1 ? " +" + (s.interests.length - 1) : "";
+      parts.push(valueLabel("interestChips", "interest", interest) + suffix);
+    }
+    return parts.filter(Boolean).join(" \u00b7 ");
+  }
   function renderRecents() {
     var row = $("recentRow"); if (!row) return;
+    if (parsedNotice && !openFacetKey) {
+      row.className = "recent-row parsed-row";
+      row.innerHTML = '<span class="recent-label">' + lx("interpreted") + '</span><span class="parsed-chip">' + icon("sparkles") + " " + parsedNotice + "</span>";
+      refreshIcons();
+      if (!parsedNoticeTimer) {
+        parsedNoticeTimer = setTimeout(function () {
+          parsedNotice = null;
+          parsedNoticeTimer = null;
+          renderRecents();
+        }, 6500);
+      }
+      return;
+    }
     var rec = loadRecents();
     if (!rec.length || openFacetKey) { row.className = "recent-row hidden"; row.innerHTML = ""; return; }
     var html = '<span class="recent-label">' + lx("recent") + "</span>";
@@ -582,7 +630,7 @@
     var bar = $("applyBar"); if (!bar) return;
     if (!isPending()) { bar.className = "apply-bar hidden"; bar.innerHTML = ""; return; }
     bar.className = "apply-bar";
-    bar.innerHTML = '<span class="apply-count">' + changeCount() + " " + lx("changes") + "</span>" +
+    bar.innerHTML = '<span class="apply-count">' + changeCount() + " " + lx("changes_waiting") + "</span>" +
       '<span class="apply-actions"><button type="button" class="apply-reset" id="filterReset">' + lx("reset") + "</button>" +
       '<button type="button" class="apply-go" id="filterApply">' + lx("apply") + "</button></span>";
     $("filterReset").addEventListener("click", resetStaged);
@@ -601,6 +649,7 @@
         '" data-facet="' + f.key + '"><span class="fk">' + lx(f.label) + "</span><b>" + facetValue(f) + "</b>" + icon("chevron-down") + "</button>";
     });
     bar.innerHTML = html;
+    bar.setAttribute("aria-label", "Trip filters");
     $("moodPill").addEventListener("click", function () { resetStaged(); if (window.enterPlanning) window.enterPlanning(); setTimeout(syncPlanningSheet, 0); });
     bar.querySelectorAll("[data-facet]").forEach(function (el) {
       el.addEventListener("click", function () { toggleFacet(el.dataset.facet); });
