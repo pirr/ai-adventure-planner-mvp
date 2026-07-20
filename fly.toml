@@ -24,20 +24,22 @@ primary_region = "fra"  # Frankfurt: closest region to the target users.
   AUTH_COOKIE_SECURE = "true"
 
   # Overpass/OSM is the primary (free, unlimited) place source. From Fly's
-  # network overpass-api.de answers in ~8s, whose variance crossed the old 12s
-  # client timeout and ReadTimeout'd — collapsing all traffic onto the small
-  # paid Google fallback, which then exhausts and returns nothing. Give the
-  # primary headroom and add the one mirror verified reachable+fast from Fly
-  # (~4s) as failover. Do NOT add kumi.systems / private.coffee: both are
-  # unreachable from Fly and an unreachable mirror costs a full timeout.
+  # network overpass-api.de can return 429/504 or stall. Keep a per-endpoint
+  # timeout for server-side work, but cap the full OSM discovery stage and hedge
+  # to the verified reachable mirror so recommendations do not wait tens of
+  # seconds before falling back to sparse/Google candidates. Do NOT add
+  # kumi.systems / private.coffee: both were unreachable from Fly.
   OVERPASS_TIMEOUT_SECONDS = "20"
+  SEARCH_OSM_TOTAL_TIMEOUT_SECONDS = "4.5"
+  OVERPASS_HEDGE_DELAY_SECONDS = "0.75"
   OVERPASS_MIRRORS = "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+  PLACE_PHOTO_TIMEOUT_SECONDS = "1.0"
 
   # Google Places spend caps — the app-side backstop. ALSO cap quota + a billing
   # budget in Google Cloud Console; app limits alone can't stop a leaked key.
   GOOGLE_PLACES_DAILY_LIMIT = "800"
   GOOGLE_PLACES_USER_DAILY_LIMIT = "60"
-  GOOGLE_PLACES_MAX_ENRICHED = "15"
+  GOOGLE_PLACES_MAX_ENRICHED = "5"
   GOOGLE_PLACES_CACHE_TTL_SECONDS = "86400"
 
   # Per-client-IP HTTP rate limits (slowapi). Tighten/loosen without a rebuild.

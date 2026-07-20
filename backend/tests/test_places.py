@@ -1,10 +1,15 @@
 import asyncio
 import dataclasses
+import time
+
+import httpx
+import pytest
 
 from app.config import settings as real_settings
 from app.schemas import PlaceCandidate
 from app.services import places
 from app.services.places import _build_overpass_query, _place_type_from_tags
+from app.services.storage import Storage
 
 
 _AMENITY_REGEX = '"amenity"~"restaurant|cafe|bar|pub|fast_food|ice_cream|biergarten"'
@@ -101,7 +106,7 @@ def test_progressive_radius_steps_include_full_radius(monkeypatch):
 def test_progressive_osm_search_stops_when_first_ring_is_strong(monkeypatch):
     calls = []
 
-    async def fake_fetch(lat, lon, radius_km, interests):
+    async def fake_fetch(lat, lon, radius_km, interests, timeout_seconds=None):
         calls.append(radius_km)
         return [_candidate(index) for index in range(35)]
 
@@ -118,9 +123,10 @@ def test_progressive_osm_search_stops_when_first_ring_is_strong(monkeypatch):
     assert calls == [8]
 
 
-def test_osm_candidate_cache_reuses_cloned_results(monkeypatch):
+def test_osm_candidate_cache_reuses_cloned_results(monkeypatch, tmp_path):
     calls = []
     places._candidate_cache.clear()
+    monkeypatch.setattr(places, "storage", Storage(tmp_path / "places.db"))
 
     async def fake_overpass(client, query):
         calls.append(query)
@@ -149,6 +155,41 @@ def test_osm_candidate_cache_reuses_cloned_results(monkeypatch):
 
     assert len(calls) == 1
     assert second[0].name == "Original Fort"
+
+
+def test_osm_candidate_cache_persists_after_l1_clear(monkeypatch, tmp_path):
+    calls = []
+    places._candidate_cache.clear()
+    monkeypatch.setattr(places, "storage", Storage(tmp_path / "places.db"))
+
+    async def fake_overpass(client, query):
+        calls.append(query)
+        return {
+            "elements": [
+                {
+                    "type": "node",
+                    "id": 1,
+                    "lat": 42.43,
+                    "lon": 18.69,
+                    "tags": {"name": "Persistent Fort", "historic": "castle"},
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(search_candidate_cache_ttl_seconds=60, search_candidate_cache_max_entries=8),
+    )
+    monkeypatch.setattr(places, "_overpass_request", fake_overpass)
+
+    first = asyncio.run(places.fetch_osm_places(42.43, 18.69, 8, ["history"]))
+    places._candidate_cache.clear()
+    second = asyncio.run(places.fetch_osm_places(42.43, 18.69, 8, ["history"]))
+
+    assert len(calls) == 1
+    assert first[0].source_id == second[0].source_id
+    assert second[0].name == "Persistent Fort"
 
 
 def test_lipska_pecina_style_cave_node_becomes_cave_candidate(monkeypatch):
@@ -195,8 +236,6 @@ def test_lipska_pecina_style_cave_node_becomes_cave_candidate(monkeypatch):
 def test_overpass_remark_timeout_is_treated_as_failure():
     # Overpass reports a server-side timeout as HTTP 200 with a "remark" and no
     # elements; that must surface as an error so failover/fallback can engage.
-    import httpx
-    import pytest
     from app.services.places import _overpass_request
 
     def handler(request):
@@ -212,7 +251,6 @@ def test_overpass_remark_timeout_is_treated_as_failure():
 
 def test_overpass_remark_with_partial_results_is_returned():
     # A remark alongside actual elements (partial results) is still usable.
-    import httpx
     from app.services.places import _overpass_request
 
     def handler(request):
@@ -224,6 +262,69 @@ def test_overpass_remark_with_partial_results_is_returned():
 
     payload = asyncio.run(run())
     assert len(payload["elements"]) == 1
+
+
+def test_overpass_request_returns_fast_hedged_mirror(monkeypatch):
+    from app.services.places import _overpass_request
+
+    seen = []
+
+    async def handler(request):
+        seen.append(str(request.url.host))
+        if request.url.host == "primary.example":
+            await asyncio.sleep(0.05)
+            return httpx.Response(200, json={"elements": [{"type": "node", "id": 1}]})
+        return httpx.Response(200, json={"elements": [{"type": "node", "id": 2}]})
+
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(
+            overpass_url="https://primary.example/api",
+            overpass_mirrors=("https://mirror.example/api",),
+            overpass_hedge_delay_seconds=0.01,
+            overpass_max_attempts=1,
+        ),
+    )
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await _overpass_request(client, "q")
+
+    started = time.perf_counter()
+    payload = asyncio.run(run())
+
+    assert payload["elements"][0]["id"] == 2
+    assert {"primary.example", "mirror.example"} <= set(seen)
+    assert time.perf_counter() - started < 0.08
+
+
+def test_progressive_osm_search_returns_partial_results_on_total_timeout(monkeypatch):
+    calls = []
+
+    async def fake_fetch(lat, lon, radius_km, interests, timeout_seconds=None):
+        calls.append(radius_km)
+        if radius_km == 8:
+            return [_candidate(1)]
+        await asyncio.sleep(1)
+        return [_candidate(2)]
+
+    monkeypatch.setattr(
+        places,
+        "settings",
+        _settings(
+            search_progressive_enabled=True,
+            search_radius_tiers_km=(8, 25),
+            search_osm_target_candidates=32,
+            search_osm_total_timeout_seconds=0.05,
+        ),
+    )
+    monkeypatch.setattr(places, "fetch_osm_places", fake_fetch)
+
+    candidates = asyncio.run(places._fetch_osm_places_progressive(42.43, 18.69, 25, ["history"]))
+
+    assert [candidate.source_id for candidate in candidates] == ["osm:node:1"]
+    assert calls == [8, 25]
 
 
 def test_eat_amenities_become_food_places():

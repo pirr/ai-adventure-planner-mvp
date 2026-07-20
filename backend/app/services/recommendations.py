@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Awaitable, Protocol
 
 from app.config import settings
-from app.schemas import AdventureRequest, AdventureResponse, PlaceCandidate, WeatherSummary
+from app.schemas import AdventureRequest, AdventureResponse, PlaceCandidate, PlacePhoto, WeatherSummary
 from app.services import google_places
 from app.services.place_photos import get_place_photo
 from app.services.places import get_candidate_places
@@ -84,6 +84,26 @@ def _is_recommendable(candidate: ScoredCandidate, request: AdventureRequest) -> 
 
 def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * 1000)
+
+
+async def _get_place_photo_for_response(place: PlaceCandidate, request: AdventureRequest) -> PlacePhoto | None:
+    timeout = settings.place_photo_timeout_seconds
+    try:
+        if timeout <= 0:
+            return await get_place_photo(place, request.use_live_data, request.anonymous_id)
+        return await asyncio.wait_for(
+            get_place_photo(place, request.use_live_data, request.anonymous_id),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.info(
+            "place_photo_timeout source_id=%s budget_ms=%d",
+            place.source_id,
+            int(timeout * 1000),
+        )
+    except Exception as exc:  # noqa: BLE001 - photos must not break recommendations
+        logger.info("place_photo_failed source_id=%s error=%s", place.source_id, exc.__class__.__name__)
+    return None
 
 
 def _order_key(candidate: ScoredCandidate, rotate: bool, seen: set[str]) -> tuple[int, int, float, int]:
@@ -271,8 +291,13 @@ async def build_recommendations(
     # war memorials, all wikidata) can't monopolise the results; name-dedup + a soft
     # per-type cap, with a graceful fallback for single-theme towns (see scoring).
     top = apply_diversity(ranked, limit=request.limit, interests=request.interests)[: request.limit]
-    photos = await asyncio.gather(
-        *[get_place_photo(item.place, request.use_live_data, request.anonymous_id) for item in top]
+    stage_started = time.perf_counter()
+    photos = await asyncio.gather(*[_get_place_photo_for_response(item.place, request) for item in top])
+    logger.info(
+        "recommendations_timing request_id=%s stage=photos recommendations=%d duration_ms=%d",
+        request_id,
+        len(top),
+        _elapsed_ms(stage_started),
     )
     recommendations = [to_recommendation(item, photo, community) for item, photo in zip(top, photos)]
     # Per-user render state: which of these the current user already wants to visit.

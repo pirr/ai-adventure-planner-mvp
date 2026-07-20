@@ -27,6 +27,9 @@ Run via docker compose (the app must already be serving):
     # quick smoke test of the first few cities
     docker compose exec app python -m eval.city_benchmark --max-cities 3 --delay 0
 
+    # OSM-only latency/coverage check (disables budgeted Google fallback)
+    docker compose exec app python -m eval.city_benchmark --no-anonymous-id --max-cities 3 --delay 0
+
 Exits non-zero if any city fails, so it can gate a launch in CI.
 
 Note on rate limits: /api/recommendations is 10/minute;100/day per IP. The
@@ -112,8 +115,13 @@ class CityResult:
         return max(self.samples_ms) if self.samples_ms else float("inf")
 
 
-def build_payload(args: argparse.Namespace, lat: float, lon: float) -> dict[str, Any]:
-    return {
+def _slug(value: str) -> str:
+    slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")
+    return "-".join(part for part in slug.split("-") if part)
+
+
+def build_payload(args: argparse.Namespace, name: str, lat: float, lon: float) -> dict[str, Any]:
+    payload = {
         "lat": lat,
         "lon": lon,
         "available_minutes": args.minutes,
@@ -124,13 +132,18 @@ def build_payload(args: argparse.Namespace, lat: float, lon: float) -> dict[str,
         "limit": 5,
         "lang": "en",
     }
+    if not args.no_anonymous_id:
+        # Mirrors the frontend: every browser has an anonymous_id, so budgeted
+        # Google candidate fallback can run when OSM is sparse or capped.
+        payload["anonymous_id"] = f"{args.anonymous_prefix}-{_slug(name)}"
+    return payload
 
 
 async def run_city(
     client: httpx.AsyncClient, args: argparse.Namespace, name: str, country: str, lat: float, lon: float
 ) -> CityResult:
     res = CityResult(name=name, country=country)
-    payload = build_payload(args, lat, lon)
+    payload = build_payload(args, name, lat, lon)
     for attempt in range(args.repeats):
         if attempt and args.delay:
             await asyncio.sleep(args.delay)
@@ -248,6 +261,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--interests", nargs="+", default=DEFAULT_INTERESTS, help="interest ids (default: %(default)s)")
     p.add_argument("--max-cities", type=int, default=0, help="Only test the first N cities (0 = all)")
     p.add_argument("--json", default="", help="Write a machine-readable report to this path")
+    p.add_argument("--anonymous-prefix", default="city-bench", help="anonymous_id prefix used by benchmark payloads")
+    p.add_argument("--no-anonymous-id", action="store_true",
+                   help="Omit anonymous_id to test pure OSM behavior and avoid budgeted Google fallback")
     return p.parse_args(argv)
 
 

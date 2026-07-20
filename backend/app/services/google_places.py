@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
 import time
@@ -69,6 +70,62 @@ def blended_quality(osm_quality: int, rating: float, rating_count: int) -> int:
     weight = min(1.0, math.log10(rating_count + 1) / 3)
     google_quality = rating / 5 * 100
     return max(0, min(100, round((1 - weight) * osm_quality + weight * google_quality)))
+
+
+def _info_to_json(info: GooglePlaceInfo | None) -> str | None:
+    if info is None:
+        return None
+    return json.dumps(
+        {
+            "rating": info.rating,
+            "rating_count": info.rating_count,
+            "photo_name": info.photo_name,
+            "photo_attribution": info.photo_attribution,
+        },
+        ensure_ascii=False,
+    )
+
+
+def _info_from_json(payload_json: str | None) -> GooglePlaceInfo | None:
+    if payload_json is None:
+        return None
+    payload = json.loads(payload_json)
+    return GooglePlaceInfo(
+        rating=float(payload["rating"]),
+        rating_count=int(payload["rating_count"]),
+        photo_name=payload.get("photo_name"),
+        photo_attribution=payload.get("photo_attribution"),
+    )
+
+
+def _cache_get(source_id: str, now: float) -> tuple[bool, GooglePlaceInfo | None]:
+    cached = _cache.get(source_id)
+    if cached is not None:
+        expires_at, info = cached
+        if expires_at > now:
+            return True, info
+        _cache.pop(source_id, None)
+
+    try:
+        entry = storage.place_cache.get_google_place(source_id, now)
+    except Exception:  # noqa: BLE001 - cache failure must not break enrichment
+        return False, None
+    if entry is None:
+        return False, None
+    try:
+        info = _info_from_json(entry.payload_json)
+    except Exception:  # noqa: BLE001 - corrupt cache rows are treated as misses
+        return False, None
+    _cache[source_id] = (entry.expires_at, info)
+    return True, info
+
+
+def _cache_set(source_id: str, expires_at: float, info: GooglePlaceInfo | None) -> None:
+    _cache[source_id] = (expires_at, info)
+    try:
+        storage.place_cache.set_google_place(source_id, expires_at, _info_to_json(info))
+    except Exception:  # noqa: BLE001 - cache persistence is best-effort
+        pass
 
 
 def _candidate_text_query(interests: list[str]) -> str:
@@ -342,10 +399,10 @@ async def enrich_places(
                     photo_attribution=place.google_photo_attribution,
                 )
             continue
-        cached = _cache.get(place.source_id)
-        if cached and cached[0] > now:
-            if cached[1] is not None:
-                results[place.source_id] = cached[1]
+        hit, info = _cache_get(place.source_id, now)
+        if hit:
+            if info is not None:
+                results[place.source_id] = info
             continue
         misses.append(place)
 
@@ -375,7 +432,7 @@ async def enrich_places(
             first_error = first_error or payload
             continue
         info = _info_from_payload(place, payload)
-        _cache[place.source_id] = (now + settings.google_places_cache_ttl_seconds, info)
+        _cache_set(place.source_id, now + settings.google_places_cache_ttl_seconds, info)
         if info is not None:
             results[place.source_id] = info
 

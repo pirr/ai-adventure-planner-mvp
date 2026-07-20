@@ -136,11 +136,31 @@ def test_enrich_serves_repeat_searches_from_cache(google_env, monkeypatch):
     assert first == second
 
 
+def test_enrich_serves_repeat_searches_from_persistent_cache(google_env, monkeypatch):
+    calls = _patch_search(monkeypatch, {"osm:node:1": _payload()})
+    first, _ = asyncio.run(enrich_places([_place()], "u"))
+    google_places._cache.clear()  # simulate Fly scale-to-zero / process restart
+    second, _ = asyncio.run(enrich_places([_place()], "u"))
+
+    assert calls == ["osm:node:1"]
+    assert first == second
+
+
 def test_enrich_caches_negative_results_too(google_env, monkeypatch):
     calls = _patch_search(monkeypatch, {"osm:node:1": {"places": []}})
     asyncio.run(enrich_places([_place()], "u"))
     results, _ = asyncio.run(enrich_places([_place()], "u"))
     assert calls == ["osm:node:1"]  # the unmatched place isn't re-billed
+    assert results == {}
+
+
+def test_enrich_serves_negative_results_from_persistent_cache(google_env, monkeypatch):
+    calls = _patch_search(monkeypatch, {"osm:node:1": {"places": []}})
+    asyncio.run(enrich_places([_place()], "u"))
+    google_places._cache.clear()
+    results, _ = asyncio.run(enrich_places([_place()], "u"))
+
+    assert calls == ["osm:node:1"]
     assert results == {}
 
 
@@ -161,6 +181,14 @@ def test_enrich_makes_no_calls_when_budget_exhausted(google_env, monkeypatch):
     calls = _patch_search(monkeypatch, {"osm:node:1": _payload()})
 
     results, warnings = asyncio.run(enrich_places([_place()], "u"))
+    assert calls == [] and results == {} and warnings == []
+
+
+def test_enrich_makes_no_calls_without_anonymous_id(google_env, monkeypatch):
+    calls = _patch_search(monkeypatch, {"osm:node:1": _payload()})
+
+    results, warnings = asyncio.run(enrich_places([_place()], None))
+
     assert calls == [] and results == {} and warnings == []
 
 
@@ -205,6 +233,18 @@ def test_google_candidate_search_consumes_one_google_budget(google_env, monkeypa
     with google_env._connect() as conn:
         row = conn.execute("SELECT count FROM api_usage WHERE scope='google_candidates:global'").fetchone()
     assert row["count"] == 1
+
+
+def test_google_candidate_search_skips_without_anonymous_id(google_env, monkeypatch):
+    async def fail(*args):
+        raise AssertionError("Google candidate search must not run without a budgetable anonymous_id")
+
+    monkeypatch.setattr(google_places, "_search_candidate_text", fail)
+
+    candidates, warnings = asyncio.run(search_candidate_places(42.0, 18.0, 10, ["food"], None, "en"))
+
+    assert candidates == []
+    assert warnings == []
 
 
 def test_enrich_skips_google_candidates_without_extra_search(google_env, monkeypatch):

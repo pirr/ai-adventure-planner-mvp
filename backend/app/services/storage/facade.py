@@ -9,6 +9,7 @@ from app.schemas import AnalyticsEvent, FeedbackRequest
 from app.services.storage.accounts import AccountsRepo
 from app.services.storage.api_usage import ApiUsageRepo
 from app.services.storage.auth import AuthRepo
+from app.services.storage.cache import CacheRepo
 from app.services.storage.community import CommunityRepo
 from app.services.storage.db import Connection, Database, SqliteDatabase, create_database
 from app.services.storage.events import EventsRepo
@@ -46,6 +47,7 @@ class Storage:
         self.events = EventsRepo(self.db)
         self.community = CommunityRepo(self.db)
         self.api_usage = ApiUsageRepo(self.db)
+        self.place_cache = CacheRepo(self.db)
         self.lifecycle = LifecycleRepo(self.db)
 
     def _connect(self) -> Connection:
